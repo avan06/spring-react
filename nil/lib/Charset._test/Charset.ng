@@ -1,0 +1,188 @@
+(function(){
+	
+	var {COM,Unknown,BStr,Result}=require('COM');
+	
+	var DetectEncodingInfo=new Struct({
+		langID:		UInt,
+		codepage:	UInt,
+		percent:	Int,
+		confidence:	Int,
+	});
+	var MimeCPInfo=new Struct({
+		flags:				UInt,
+		codepage:			UInt,
+		familyCodepage:		UInt,
+		description:		[WChar,64],
+		webCharset:			[WChar,50],
+		headerCharset:		[WChar,50],
+		bodyCharset:		[WChar,50],
+		fixedWidthFont:		[WChar,32],
+		proportionalFont:	[WChar,32],
+		gdiCharset:			UInt,
+	});
+	
+	var MultiLanguage2=Unknown.define('MultiLanguage2','{DCCFC164-2B38-11d2-B7EC-00C04F8F5D9A}',{
+		GetNumberOfCodePageInfo:	[Pointer],
+		GetCodePageInfo:			[UInt,UInt,Pointer],
+		GetFamilyCodePage:			[UInt,Pointer],
+		EnumCodePages:				[UInt,UInt,Pointer],
+		GetCharsetInfo:				[Pointer,Pointer],
+		IsConvertible:				[UInt,UInt],
+		ConvertString:				[Pointer,UInt,UInt,Pointer,Pointer,Pointer,Pointer],
+		ConvertStringToUnicode:		[Pointer,UInt,Pointer,Pointer,Pointer,Pointer],
+		ConvertStringFromUnicode:	[Pointer,UInt,Pointer,Pointer,Pointer,Pointer],
+		ConvertStringReset:			[],
+		GetRfc1766FromLcid:			[UInt,Pointer],
+		GetLcidFromRfc1766:			[Pointer,Pointer],
+		EnumRfc1766:				[UInt,Pointer],
+		GetRfc1766Info:				[UInt,UInt,Pointer],
+		CreateConvertCharset:		[UInt,UInt,UInt,Pointer],
+		ConvertStringInIStream:		[Pointer,UInt,Pointer,UInt,UInt,Pointer,Pointer],
+		ConvertStringToUnicodeEx:	[Pointer,UInt,Pointer,Pointer,Pointer,Pointer,UInt,Pointer],
+		ConvertStringFromUnicodeEx:	[Pointer,UInt,Pointer,Pointer,Pointer,Pointer,UInt,Pointer],
+		DetectCodepageInIStream:	[UInt,UInt,Pointer,Pointer,Pointer],
+		DetectInputCodepage:		[UInt,UInt,Pointer,Pointer,Pointer,Pointer],
+		ValidateCodePage:			[UInt,UInt],
+		GetCodePageDescription:		[UInt,UInt,Pointer,UInt],
+		IsCodePageInstallable:		[UInt],
+		SetMimeDBSource:			[Pointer],
+		GetNumberOfScripts:			[Pointer],
+		EnumScripts:				[UInt,UInt,Pointer],
+		ValidateCodePageEx:			[UInt,UInt,UInt],
+	}).addMembers({
+		__class__:{
+			classID:'{275c23e2-3747-11d0-9fea-00aa003f8646}',
+		},
+	});
+	
+	
+	
+	var Detector=new Class({},StreamMixin,EventMixin,{
+		__class__:{
+			detect:function(buf,set){
+				try{
+					var buf2free;
+					if(typeof(buf)=='string'){
+						buf=cwd().file(buf);
+					}
+					if(typeof(buf.loadBytes)=='function'){
+						buf=buf2free=buf.loadBytes();
+					}
+					var ml=MultiLanguage2.create();
+					var inf=DetectEncodingInfo.alloc();
+					var cpi=MimeCPInfo.alloc();
+					var size=UInt.alloc().update(buf.size);
+					var count=UInt.alloc().update(1);
+					if(Result.succeeded(ml.DetectInputCodepage(0,0,buf,size,inf,count))){
+						if(set){
+							buf.codepage=inf.codepage
+						}
+						if(Result.succeeded(ml.GetCodePageInfo(inf.codepage,inf.langID,cpi))){
+							return(cpi.webCharset.toString());
+						}else{
+							return(inf.codepage);
+						}
+					}
+				}finally{
+					free(ml,size,count,inf,cpi,buf2free);
+				}
+			},
+			load:function(file,html,detect){
+				if(!file.openRead){
+					file=cwd().file(file);
+				}
+				try{
+					var s=new this(file.openRead(),html);
+					if(detect){
+						var cc;
+						s.observe('detect',function(o){
+							cc=o.encoding;
+						});
+						var t=s.readText();
+						
+						return([cc,t]);
+					}else{
+					}
+				}finally{
+					free(s);
+				}
+			},
+		},
+		__new__:function(stream,isHTML){
+			this.__stream__=stream;
+			this.__stream__.encoding='utf8';
+			this.__ml__=MultiLanguage2.create();
+			this.__html__=!!isHTML;
+		},
+		__free__:function(){
+			this.fire('beforeFree');
+			free(this.__stream__,this.__ml__);
+			this.fire('free');
+		},
+		get __eof__()(this.__stream__.eof),
+		__read__:function(addr,size){
+			if(!this.__encodingDetected__){
+				var enc;
+				if(this.__html__ && !this.__noHtmlHeader__){
+					var bs=0;
+					while(bs<(bs=this.__stream__.buffer(1024))){
+						this.__stream__.bufferedBytes.encoding='utf8';
+						var m=this.__stream__.bufferedBytes.toString().match(/<\?xml\s[^>]*encoding="([^"]*)"|<meta\b[^>]*charset=["']?([^"'>\s]+)|<meta\b(?=[^>]*content-type)[^>]*;\s*charset=\s*([^\s">]*(?=[\s"'>]))|(<(?!html|head|title|isindex|base|script|style|meta|link|object|!doctype|\?xml)\w+[^>]*>)/i);
+						if(m){
+							if(m[4]){
+								this.__noHtmlHeader__=true;
+							}else{
+								enc=m[1]||m[2]||m[3];
+							}
+							break;
+						}
+					}
+					if(!enc){
+						this.__noHtmlHeader__=true;
+					}
+				}
+				if(!enc){
+					if((this.__stream__.bufferedSize||0)<128){
+						this.__stream__.buffer(1024);
+					}
+					try{
+						var inf,sz,count,cpi,buf=this.__stream__.bufferedBytes;
+						if(buf && !buf.__triedDetectEncoding__){
+							buf.__triedDetectEncoding__=true;
+							inf=DetectEncodingInfo.alloc();
+							sz=UInt.alloc().update(buf.size);
+							count=UInt.alloc().update(1);
+							if(0==this.__ml__.DetectInputCodepage(this.__html__?0x8:0,0, buf,sz,inf,count)){
+								if(inf.confidence>85){
+									cpi=MimeCPInfo.alloc();
+									if(0==this.__ml__.GetCodePageInfo(inf.codepage,inf.langID,cpi)){
+										enc=cpi.webCharset.toString();
+									}
+								}
+							}
+						}
+					}finally{
+						free(inf,size,count,cpi);
+					}
+				}
+				if(enc){
+					this.__encodingDetected__=true;
+					this.encoding=enc;
+					this.fire('detect',{encoding:enc});
+				}
+			}
+			return(this.__stream__.readTo(addr,size,0,false));
+		},
+		__write__:function(addr,size){
+			var ptr=new (Byte.pointer)(addr);
+			ptr.count=size;
+			return(this.__stream__.write(ptr));
+		},
+	});
+	
+	
+	this.Detector=Detector;
+	
+	
+	
+})

@@ -1,0 +1,158 @@
+(function(){
+	var Diff=new Class({
+		__class__:{
+			calc:function(a,b){
+				try{
+					if(!(a instanceof Array)){
+						a=String(a).split("");
+					}
+					if(!(b instanceof Array)){
+						b=String(a).split("");
+					}
+					var diff=new this();
+					return(diff.calc(a,b));
+				}finally{
+					diff.free();
+				}
+			},
+			merge:function(before,patch){
+				var res=[];
+				var pos=0;
+				for(var i=0,l=patch.length;i<l;i++){
+					if(patch[i] instanceof Array){
+						res=res.concat(patch[i]);
+					}else if(patch[i]>0){
+						res=res.concat(before.slice(pos,pos+patch[i]));
+						pos+=patch[i];
+					}else{
+						pos-=patch[i];
+					}
+				}
+				return(res);
+			},
+		},
+		__new__:function(){},
+		free:function(){},
+		
+		calc:function(a,b){
+			var res={before:a,after:b,inserted:[],deleted:[],common:[]};
+			var del,ins;
+			[a,b,del,ins]=(a.length<b.length)?[a,b,'deleted','inserted']:[b,a,'inserted','deleted'];
+			var m=a.length, n=b.length;
+			var delta=n-m;
+			var fp=[],lst=[],path=[];
+			for(var i=-m-1;i<=n+1;i++){
+				fp[i]=-1;
+				lst[i]=-1;
+			}
+			var x,y,k,pre;
+			for(var p=0;p<=m;p++) {
+				for(k=-p;k<delta;k++){
+					if((y=fp[k-1]+1)>fp[k+1]){
+						pre=lst[k-1];
+					}else{
+						y=fp[k+1];
+						pre=lst[k+1];
+					}
+					x=y-k;
+					while(x<m && y<n && a[x]==b[y]){
+						x++;
+						y++;
+					}
+					fp[k]=y;
+					path[lst[k]=path.length]=[pre,x,y];
+				}
+				for(k=delta+p;k>delta;k--){
+					if((y=fp[k-1]+1)>fp[k+1]){
+						pre=lst[k-1];
+					}else{
+						y=fp[k+1];
+						pre=lst[k+1];
+					}
+					x=y-k;
+					while(x<m && y<n && a[x]==b[y]){
+						x++;
+						y++;
+					}
+					fp[k]=y;
+					path[lst[k]=path.length]=[pre,x,y];
+				}
+				k=delta;
+				if((y=fp[k-1]+1)>fp[k+1]){
+					pre=lst[k-1];
+				}else{
+					y=fp[k+1];
+					pre=lst[k+1];
+				}
+				x=y-k;
+				while(x<m && y<n && a[x]==b[y]){
+					x++;
+					y++;
+				}
+				fp[k]=y;
+				path[lst[k]=path.length]=[pre,x,y];
+				if(fp[delta]>=n){
+					var pt=lst[delta];
+					list=[]
+					while(pt>=0){
+						var buf=path[pt];
+						list.push([buf[1], buf[2]]);
+						pt=buf[0];
+					}
+					var x0=0, y0=0;
+					var commands=[],patch=[],last='',cmd,itm;
+					for(var i=list.length-1;i>=0;i--){
+						var x1=list[i][0], y1=list[i][1];
+						while(x0<x1 || y0<y1){
+							if(y1-x1 > y0-x0){
+								cmd=ins;
+								itm=b[y0++];
+							}else if(y1-x1 < y0-x0){
+								cmd=del;
+								itm=a[x0++];
+							}else{
+								cmd='common';
+								itm=a[x0++];
+								y0++;
+							}
+							res[cmd].push(itm);
+							commands[commands.length]={command:cmd,item:itm};
+							switch(cmd){
+								case('inserted'):{
+									if(last!=cmd){
+										patch[patch.length]=[itm];
+									}else{
+										patch[patch.length-1].push(itm);
+									}
+									break;
+								}case('deleted'):{
+									if(last!=cmd){
+										patch[patch.length]=-1;
+									}else{
+										patch[patch.length-1]--;
+									}
+									break;
+								}case('common'):{
+									if(last!=cmd){
+										patch[patch.length]=1;
+									}else{
+										patch[patch.length-1]++;
+									}
+									break;
+								}
+							}
+							last=cmd;
+						}
+					}
+					
+					
+					res.commands=commands;
+					res.patch=patch;
+					res.distance=res.inserted.length+res.deleted.length;
+					return(res);
+				}
+			}
+		},
+	});
+	this.Diff=Diff;
+})

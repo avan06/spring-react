@@ -1,0 +1,158 @@
+(function(){
+	var mkRegExp=function mkRegExp(o,opt){
+		if(o instanceof RegExp){
+			return(new RegExp(o.source,opt||""));
+		}else if(o instanceof Array){
+			var r=new Array(o.length);
+			for(var i=0,l=o.length;i<l;i++){
+				r[i]=mkRegExp(o[i]).source;
+			}
+			return(new RegExp(r.join('|'),opt||""));
+		}else{
+			return(new RegExp(o,opt||""));
+		}
+	};
+	var streamLines=function(stream,size,close){
+		try{
+			var m,text=stream.readText(size),r,sep=/\r?\n/;
+			while(true){
+				if(m=sep.exec(text)){
+					var pos=m.index+m[0].length;
+					yield(text.slice(0,pos));
+					text=text.slice(pos);
+				}else if(stream.eof){
+					yield(text);
+					break;
+				}else{
+					text+=stream.readText(size);
+				}
+			}
+		}finally{
+			close && stream.free && stream.free();
+		}
+	};
+	
+	var lineSeparator=/\r?\n/;
+	var TextFilter=new Class({
+		__new__:function(src,filters,options){
+			for each(let [n,v] in Iterator(options||{})){
+				this[n]=v;
+			}
+			this.source=src;
+			
+			this.set(filters);
+		},
+		readTextSize:1024,
+		free:function(){
+			this.source=null;
+		},
+		get source()(this.__source__),
+		set source(s){
+			if(this.__source__){
+				this.__source__.close();
+			}
+			if(s){
+				if(typeof(s)=='string'){
+					s=s.separate(lineSeparator,true);
+				}else if(s instanceof XML){
+					s=s.toXMLString().separate(lineSeparator,true);
+				}else if(s.openRead){
+					s=streamLines(s.openRead(),this.readTextSize,true);
+				}else if(s.readText){
+					s=streamLines(s,this.readTextSize,!!this.closeStream);
+				}else{
+					s=$G(s);
+				}
+			}else{
+				s=$G([]);
+			}
+			this.__source__=s;
+		},
+		
+		add:function(o,p1,p2){
+			var g=this.strings;
+			if(typeof(o)=='function'){
+				this.strings=(function(){
+					for(let s in g){
+						yield(o(s));
+					}
+				})();
+			}else if(!p1){
+				o=mkRegExp(o,"g");
+				p2=p2||"";
+				this.strings=(function(){
+					for(let s in g){
+						yield(String(s).replace(o,p2));
+					}
+				})();
+			}else{
+				o=mkRegExp(o);
+				p1=mkRegExp(p1);
+				if(typeof(p2)!='function'){
+					let rep=p2||"";
+					p2=function()((arguments.length<3)?"":rep);
+				}
+				this.strings=(function(){
+					try{
+						var m,M,s,b="",end;
+						if(p1.source.match(/\$\d+/)){
+							p1=p1.source;
+						}else{
+							end=p1;
+							p1=null;
+						}
+						s=g.next();
+						while(true){
+							if(m=o.exec(s)){
+								b+=s.slice(0,m.index)+(p2(m)||"");
+								s=s.slice(m.index+m[0].length);
+								if(p1){
+									end=mkRegExp(p1.replace(/\$(\d+)/g,function($0,$1)(RegExp.escape(m[$1]||""))));
+								}
+								while(true){
+									if(M=end.exec(s)){
+										if(M.index>0){
+											b+=p2(m,s.slice(0,M.index))||"";
+										}
+										s=s.slice(M.index+M[0].length);
+										b+=p2(m,"",M)||"";
+										break;
+									}else{
+										if(s){
+											b+=p2(m,s)||"";
+										}
+										if(b){
+											yield(b);
+											b="";
+										}
+										s=g.next();
+									}
+								}
+							}else{
+								if(s=b+s){
+									yield(s);
+									b="";
+								}
+								s=g.next();
+							}
+						}
+					}finally{
+						g.close();
+					}
+				})();
+			}
+		},
+		
+		set:function(a){
+			this.strings=this.source;
+			if(!(a instanceof Array)){
+				a=[a];
+			}
+			for(var i=0,l=a.length;i<l;i++){
+				this.add(a[i][0],a[i][1],a[i][2]);
+			}
+		},
+	});
+	
+	this.TextFilter=TextFilter;
+})

@@ -1,0 +1,27 @@
+(function(){
+	var {UDP}=require('Socket');
+	var WOL=new Class({
+		__class__:{
+			send:function(mac,bc,port){
+				try{
+					var buf;
+					if((typeof(mac)=='string')&&(mac.match(/[0-9a-f]{2}/ig).length==6)){
+						buf=Hex.decode("FF FF FF FF FF FF "+mac.times(16));
+					}else if((mac instanceof Pointer)&&(addr.size==6)){
+						buf=Hex.decode("FF FF FF FF FF FF "+"00 00 00 00 00 00".times(16));
+						mac=new (Byte.pointer)(mac);
+						for(var i=0;i<16;i++){
+							mac.copy(buf.inc(i+1),6);
+						}
+					}else{
+						throw(new TypeError("invalid addr: "+addr));
+					}
+					UDP.broadcast(buf,bc,port||2304);
+				}finally{
+					free(buf);
+				}
+			},
+		},
+	});
+	this.WOL=WOL;
+})

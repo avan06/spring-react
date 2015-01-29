@@ -1,0 +1,37 @@
+
+マルチバイト文字列の文字コードに関する追加の機能を提供する。
+
+
+●Detectorクラス
+
+
+Detector.detect(buf,set)
+	指定したバッファの文字コードを判別して文字コード名文字列を返す。
+	bufはマルチバイト文字列のPointerオブジェクト。
+	setをtrueにすると、buf.encodingにセットされる。
+
+Detector.load(file,isHTML)
+	fileで指定したファイルを、文字コードを自動判別して読み込む。
+	fileはファイルパス文字列か、openRead()メソッドを持つオブジェクト(Fileなど)
+	isHTMLがtrueの場合、HTML/XMLの文字コード指定タグが見つかればそれに従う。
+
+
+new Detector(stream,isHTML)
+	streamをラップして、文字コード自動判別のストリームオブジェクトを返す
+	isHTMLがtrueの場合、HTML/XMLの文字コード指定タグが見つかればそれに従う。
+
+
+DetectorオブジェクトにはStreamMixinとEventMixinがミックスされている。
+用意されているイベントは以下の通り
+
+	detect
+		文字コードが認識された時
+		引数オブジェクトのencodingメンバに文字コード名がセットされる
+	beforeFree
+		このDetectorオブジェクトのfree()メソッドが呼び出されて
+		ストリームが解放される前
+	free
+		ストリームが解放された後
+
+
+

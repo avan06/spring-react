@@ -1,0 +1,968 @@
+(function(){
+	
+	var 
+	
+		VkKeyScan=			user32.proc('VkKeyScanW',[Short],Short),
+		CreateEvent=		kernel32.proc('CreateEventW',[Pointer,UInt,UInt,WideString],UInt),
+		SetEvent=			kernel32.proc('SetEvent',[UInt],UInt),
+		ResetEvent=			kernel32.proc('ResetEvent',[UInt],UInt),
+		PulseEvent=			kernel32.proc('PulseEvent',[UInt],UInt),
+		SignalObjectAndWait=kernel32.proc('SignalObjectAndWait',[UInt,UInt,UInt,Int],UInt),
+		
+		CreateMutex=		kernel32.proc('CreateMutexW',[Pointer,Int,WideString],Int),
+		ReleaseMutex=		kernel32.proc('ReleaseMutex',[UInt],Int),
+		
+		WaitForMultipleObjects=kernel32.proc('WaitForMultipleObjects',[UInt,Pointer,UInt,UInt],UInt),
+		WaitForSingleObject=kernel32.proc('WaitForSingleObject',[UInt,UInt],UInt),
+		CloseHandle=		kernel32.proc('CloseHandle',[UInt],UInt);
+
+	
+	var HotstrokesPlugin=new Class(Plugin,{
+		keys:{},
+		conditions:{},
+		actions:{},
+		contextMembers:{},
+		hotstrokesMembers:{},
+		register:Function.doNothing,
+		reset:Function.doNothing,
+		
+		__findItem__:function(key,name){
+			for each(let [n,v] in Iterator(this[key])){
+				if(String(n).toLowerCase()==name){
+					return(true);
+				}
+			}
+		},
+		__findCondition__:function(name)(this.__findItem__('conditions',name)),
+		__findAction__:function(name)(this.__findItem__('actions',name)),
+		__findKey__:function(name)(this.__findItem__('keys',name)),
+	});
+	
+	var {Keyboard:Keyboard,Key:KeyboardKey}=require('Keyboard');
+	
+	var Key=new Class({
+		__class__:{
+			items:{},
+			strictModifiers:{},
+			__nextExID__:0x02000001,
+			item:function(n){
+				var name=n;
+				if(typeof(n)!='number'){
+					name=n=String(n).toLowerCase();
+					if(n.match(/^\d\d+$/)){
+						n=n*1;
+						name=(n<256)?-n:n;
+					}
+				}else if(n<256){
+					name=-n;
+				}
+				if(!this.items[name]){
+					try{
+						var key=new KeyboardKey(n);
+						if(this.items[key.__instanceIdentifier__]){
+							this.items[name]=this.items[key.__instanceIdentifier__];
+						}else{
+							this.items[name]=new this({
+								stateless:false,
+								cancelable:true,
+								modifier:false,
+								strict:false,
+								down:function()(key.down()),
+								up:function()(key.up()),
+								getState:function()(key.state),
+							},key.__instanceIdentifier__);
+						}
+						
+					}catch(e){
+						var f;
+						var m=String(n).match(/^(.*?)\$/);
+						if(m){
+							Hotstrokes.use(m[1]);
+						}else{
+							for(let p in Hotstrokes.plugins.items){
+								if(p.load().__findKey__(n)){
+									Hotstrokes.use(p.name);
+								}
+							}
+						}
+						if(!this.items[name]){
+							throw(e || "unknown key: "+n);
+						}
+					}
+				}
+				return(this.items[name]);
+			},
+		},
+		__new__:function(obj,id){
+			Object.extend(this,obj);
+			this.id=id||(this.constructor.__nextExID__++);
+			this.constructor.items[this.id]=this;
+			if(this.strict){
+				this.constructor.strictModifiers[this.id]=this;
+			}
+		},
+		setStrict:function(b){
+			if(b){
+				this.strict=true;
+				Key.strictModifiers[this.id]=true;
+			}else{
+				this.strict=false;
+				delete(Key.strictModifiers[this.id]);
+			}
+		},
+		send:function(up)(((up?this.up:this.down)||Function.doNothing)()),
+		
+		__getState__:function(p){
+			for(var i=0,a=(p||"vig").split(''),l=a.length;i<l;i++){
+				switch(a[i]){
+					case('p'):{
+						if('__state__' in this){
+							return(this.__state__);
+						}
+						break;
+					}case('v'):{
+						if('__virtualState__' in this){
+							return(this.__virtualState__);
+						}
+						break;
+					}case('i'):{
+						if('__internalState__' in this){
+							return(this.__internalState__);
+						}
+						break;
+					}default:{
+						if('getState' in this){
+							return(this.getState());
+						}
+						break;
+					}
+				}
+			}
+		},
+		
+		get state()(('__state__' in this)?this.__state__:(this.getState||Function.doNothing)()),
+	});
+	
+	var Stroke=new Class({
+		__new__:function(key,up){
+			this.key=key;
+			this.up=!!up;
+			this.id=key.id | (up?0x10000000:0);
+		},
+		send:function()(this.key.send(this.up)),
+	});
+	var Strokes=new Class({
+		__class__:{
+			__cached__:{},
+			item:function(v)((v instanceof this)?v:(this.__cached__[v]||(this.__cached__[v]=new this(v)))),
+		},
+		__new__:function(str){
+			var mod={};
+			var strokes=[];
+			var intervals={};
+			var pressedKeys={};
+			this.source=str;
+			
+			if(str instanceof Array){
+				str=str[0];
+				for(let n in Key.strictModifiers){
+					mod[n]=false;
+				}
+				this.beforeModifiers=Object.extend({},mod);
+				
+				var mkeys={shift:Key.item('Shift'), ctrl:Key.item('Ctrl'), alt:Key.item('Alt')};
+				var state={shift:false,ctrl:false,alt:false};
+				var exKeys={"\n":0x0D,"\r":0,};
+				for(var i=0,l=str.length;i<l;i++){
+					var val=exKeys[str.charAt(i)]||VkKeyScan(str.charCodeAt(i));
+					if(val){
+						var flg={shift:!!(val&0x0100),ctrl:!!(val&0x0200),alt:!!(val&0x0400)};
+						for each(let [n,v] in Iterator(mkeys)){
+							if(state[n]!=flg[n]){
+								strokes.push(new Stroke(v,!flg[n]));
+								state[n]=flg[n];
+							}
+						}
+						var k=Key.item(val&0xFF);
+						strokes.push(new Stroke(k));
+						strokes.push(new Stroke(k,true));
+					}
+				}
+				for each(let [n,v] in Iterator(mkeys)){
+					if(state[n]){
+						strokes.push(new Stroke(v,true));
+					}
+				}
+			}else{
+				var m=str.split(/\s*\+\s*/g);
+				if(m[0]==""){
+					m.shift();
+				}else{
+					for(let n in Key.strictModifiers){
+						mod[n]=false;
+					}
+				}
+				var s=m.pop().replace(/([^\[\!])([\[\(\!])/g,"$1 $2").replace(/([^\[\!])([\)\]])/g,"$1$2 ").split(/\s+/g);
+				for(var i=0,l=m.length;i<l;i++){
+					switch(m[i].charAt(0)){
+						case('!'):{
+							mod[Key.item(m[i].slice(1)).id]=false;
+							break;
+						}case('?'):{
+							delete(mod[Key.item(m[i].slice(1)).id]);
+							break;
+						}default:{
+							mod[Key.item(m[i]).id]=true;
+							break;
+						}
+					}
+				}
+				this.beforeModifiers=Object.extend({},mod);
+				if(s[s.length-1].match(/^\*$/)){
+					s.pop();
+					this.wildcard=true;
+				}
+				for(var i=0,l=s.length;i<l;i++){
+					if(!s[i]){
+						continue;
+					}
+					var t,key=null,state=false;
+					if(t=s[i].match(/^(.+)\*(\d+)$/)){
+						key=Key.item(t[1]);
+						for(var j=0,c=1*t[2];j<c;j++){
+							strokes.push(new Stroke(key));
+							if(!key.stateless){
+								strokes.push(new Stroke(key,true));
+							}
+						}
+					}else if(t=s[i].match(/^\[(.*)\]$/)){
+						key=Key.item(t[1]);
+						strokes.push(new Stroke(key));
+						if(!key.stateless){
+							strokes.push(new Stroke(key,true));
+						}
+					}else if(t=s[i].match(/^!(.*)$/)){
+						key=Key.item(t[1]);
+						if(!key.stateless){
+							strokes.push(new Stroke(key,true));
+						}
+					}else if(t=s[i].match(/^\((-?\d+)\)$/)){
+						intervals[strokes.length]=t[1]*1;
+					}else{
+						key=Key.item(s[i]);
+						strokes.push(new Stroke(key));
+						state=true;
+					}
+					if(key && !key.stateless){
+						pressedKeys[key.id]=state;
+						if(key.id in mod){
+							mod[key.id]=state;
+						}
+					}
+				}
+			}
+			var pk=[];
+			for each(let [n,v] in Iterator(pressedKeys)){
+				if(v){
+					pk.push(Key.item(n));
+				}
+			}
+			this.strokes=strokes;
+			this.intervals=intervals;
+			this.afterModifiers=mod;
+			this.downedKeys=pk;
+		},
+		send:function(){
+			try{
+				var mod=[];
+				for each(let [n,v] in Iterator(this.beforeModifiers)){
+					var k=Key.item(n);
+					if(k.__getState__('vig')!=v){
+//						println([v,k.__getState__('v'),k.__getState__('i'),k.__getState__('g')]);
+						k.send(!v);
+						mod.push([k,!v]);
+					}
+				}
+				if(this.strokes.length==0){
+					sleep(this.intervals[0]||0);
+				}else{
+					for(var i=0,a=this.strokes,l=a.length;i<l;i++){
+						if(i in this.intervals){
+							sleep(Math.abs(this.intervals[i]));
+						}
+						a[i].send();
+					}
+				}
+				if(this.strokes.length in this.intervals){
+					sleep(Math.abs(this.intervals[this.strokes.length]));
+				}
+				for(var i=mod.length-1;i>=0;i--){
+					var [k,s]=mod[i];
+					if(k.__getState__('vig')!=s){
+//						println([s,k.__getState__('v'),k.__getState__('i'),k.__getState__('g')]);
+						k.send(!s);
+					}
+				}
+//						println("");
+			}catch(e){
+				println(e);
+			}finally{
+			}
+		},
+		
+		
+		
+	});
+	var Mapping=new Class({
+		__class__:{
+			__items__:{},
+			add:function(strokes,cond,act){
+				var s=new Strokes(strokes);
+				var a=new Array(s.strokes.length);
+				for(var i=0,x=s.strokes,l=x.length;i<l;i++){
+					a[i]=x[i].id;
+				}
+				var md=[];
+				var mu=[];
+				for each(let [n,v] in Iterator(s.afterModifiers)){
+					(v?md:mu).push(Key.item(n));
+				}
+				var obj={
+					upModifiers:mu,
+					downModifiers:md,
+					intervals:s.intervals,
+					condition:cond,
+					action:act,
+				};
+				var idx=a.join("\n");
+				var map=this.__items__[idx] ||(this.__items__[idx]=new this(a));
+				var ary=(s.wildcard?map.wildcard:map.mappings);
+				if(ary[ary.length-1] && !ary[ary.length-1].condition){
+					var tmp=ary.pop();
+					ary.push(obj);
+					ary.push(tmp);
+				}else{
+					ary.push(obj);
+				}
+			},
+		},
+		__new__:function(array){
+			this.state=array;
+			this.length=array.length;
+			this.mappings=[];
+			this.wildcard=[];
+		},
+		execute:function(context,wildcard){
+			for(var i=0,a=wildcard?this.wildcard:this.mappings,l=a.length;!context.__canceled__ &&(i<l);i++){
+				this.__x__(context,a[i],wildcard);
+			}
+		},
+		__x__:function(context,obj,wildcard){
+			try{
+				for(var i=0,a=obj.downModifiers,l=a.length;i<l;i++){
+					if(!a[i].__getState__('pig')){
+						return;
+					}
+				}
+				for(var i=0,a=obj.upModifiers,l=a.length;i<l;i++){
+					if(a[i].__getState__('pig')){
+						return;
+					}
+				}
+				for each(let [n,v] in Iterator(obj.intervals)){
+					var idx=context.intervals.length-this.state.length+n+(wildcard?0:1);
+					var x=context.intervals[idx]||((new Date()).getTime()-context.lastTime);
+					if((v<0)?(x>-v):(x<v)){
+						return;
+					}
+				}
+				if(!obj.condition || obj.condition.apply(context)){
+					obj.action.apply(context);
+				}
+				
+			}catch(e){
+			}
+		},
+	});
+	
+	
+	var Hotstrokes=new Class({__class__:{
+		plugins:new Pluggable('Hotstrokes',HotstrokesPlugin),
+		
+		__registeredPlugins__:{},
+		__conditions__:{},
+		__actions__:{},
+		
+		use:function(){
+			for(var i=0,l=arguments.length;i<l;i++){
+				if(!this.__registeredPlugins__[arguments[i]]){
+					var name=arguments[i];
+					var p=this.plugins.item(name);
+					if(!p.__registered__){
+						if(!p.exists){
+							throw('Hotstrokes Error: plugin not found "'+name+'"');
+						}
+						p.load();
+						p.register();
+						this.defineKeys(p.keys,false,name);
+						this.defineConditions(p.conditions,p.name);
+						this.defineActions(p.actions,p.name);
+						this.addClassMembers(p.hotstrokesMembers);
+						HotstrokesContext.addMembers(p.contextMembers);
+						p.__registered__=true;
+						this.__registeredPlugins__[name]=p;
+						this.use.apply(this,p.require||[]);
+					}
+				}
+			}
+			return(this);
+		},
+		
+		defineKeys:function(obj,noOverwrite,name){
+			name=(name||"").toLowerCase();
+			for each(let [n,v] in Iterator(obj)){
+				n=String(n).toLowerCase();
+				if(!noOverwrite || !Key.items[n]){
+					Key.items[name+"$"+n]=Key.items[n]=(typeof(v)=='object')?(new Key(v)):Key.item(v);
+				}
+			}
+			return(this);
+		},
+		defineConditions:function(obj,name){
+			var o={};
+			name=(name||"");
+			var low=name.toLowerCase();
+			for each(let [n,v] in Iterator(obj)){
+				var ln=String(n).toLowerCase();
+				this.__conditions__[ln]=o[n]=this.__conditions__[low+"$"+ln]=o[name+"$"+n]=v;
+			}
+			HotstrokesContext.addMembers(o);
+			return(this);
+		},
+		defineActions:function(obj,name){
+			var o={};
+			name=(name||"");
+			var low=name.toLowerCase();
+			for each(let [n,v] in Iterator(obj)){
+				var ln=String(n).toLowerCase();
+				this.__actions__[low+"$"+ln]=this.__actions__[ln]=v;
+				o[name+"$"+n]=o[n]=let(f=v)(function(){f.apply(this);return(this);});
+			}
+			HotstrokesContext.addMembers(o);
+			return(this);
+		},
+		
+		setModifierType:function(obj){
+			for each(let [n,v] in Iterator(obj)){
+				(Key.item(n)||{}).strict=!!v;
+			}
+			return(this);
+		},
+		
+		
+		findCondition:function(name){
+			if(typeof(name)=='function'){
+				return(name);
+			}
+			name=String(name).toLowerCase();
+			if(name.match(/\|/)){
+				name=name.split(/\|/ig);
+				let a=[],l=name.length;
+				for(var i=0;i<l;i++){
+					a.push(this.findCondition(name[i])||function()false);
+				}
+				return(function(){
+					for(var i=0;i<l;i++){
+						if(a[i].apply(this,arguments)){
+							return(true);
+						}
+					}
+					return(false);
+				});
+				
+				
+			}else if(name.match(/\&/)){
+				name=name.split(/\&/ig);
+				let a=[],l=name.length;
+				for(var i=0;i<l;i++){
+					a.push(this.findCondition(name[i])||function()true);
+				}
+				return(function(){
+					for(var i=0;i<l;i++){
+						if(a[i].apply(this,arguments)){
+							return(false);
+						}
+					}
+					return(true);
+				});
+			}else{
+				if(name.match(/^!/)){
+					let func=this.findCondition(name.slice(1));
+					return(function()(!func.apply(this,arguments)));
+				}else{
+					if(!(name in this.__conditions__)){
+						for(let p in this.plugins.items){
+							if(p.load().__findCondition__(name)){
+								this.use(p.name);
+							}
+						}
+					}
+					return(this.__conditions__[name]);
+				}
+			}
+		},
+		findAction:function(name,err){
+			if(typeof(name)=='function'){
+				return(name);
+			}
+			if(name instanceof Array){
+				let a=[],l=name.length;
+				for(var i=0;i<l;i++){
+					a.push(this.findAction(name[i]));
+				}
+				return(function(){
+					for(var i=0;i<l;i++){
+						a[i].apply(this,arguments);
+					}
+					return(this);
+				});
+				
+			}else{
+				var low=String(name).toLowerCase();
+				if(!(low in this.__actions__)){
+					var m=String(name).match(/^(.*?)\$(.*)$/);
+					if(m){
+						this.use(m[1]);
+					}else{
+						for(let p in this.plugins.items){
+							if(p.load().__findAction__(name)){
+								this.use(p.name);
+							}
+						}
+					}
+					if(err && !(low in this.__actions__)){
+						throw(new Error('Hotstrokes error: action not found "'+name+'"'));
+					}
+				}
+				
+				return(this.__actions__[low]);
+			}
+		},
+		map:function(obj,a2){
+			var withMod="",defCond="";
+			if(a2){
+				obj=String(obj);
+				if(obj.match(/\+$/)){
+					withMod=obj;
+				}else{
+					defCond=obj;
+				}
+				obj=a2;
+			}
+			for each(let [strokes,mapping] in Iterator(obj)){
+				strokes=withMod+strokes;
+				if(!mapping || (typeof(mapping)!='object')){
+					var mp={};
+					mp[defCond]=mapping;
+					mapping=mp;
+				}
+				for each(let [cond,act] in Iterator(mapping)){
+					Mapping.add(strokes,this.findCondition(cond),this.findAction(act,true)||function()(this.cancel()));
+				}
+			}
+			return(this);
+		},
+		mapModifiers:function(obj){
+			var m={};
+			for each(let [n,v] in Iterator(obj)){
+				if(typeof(v)!='object'){
+					v={name:String(v),send:false};
+				}
+				var msrc="",bsrc="";
+				let mod,ds,us;
+				if(v.name){
+					var obj={};
+					obj[v.name]={modifier:true};
+					this.defineKeys(obj,true);
+					mod=Key.item(v.name);
+					msrc+="mod.__internalState__=true;";
+					bsrc+="mod.__internalState__=false;";
+				}
+				if(v.ignore||v.rewrite){
+					msrc+="this.rewrite("+(v.ignore?"":v.rewrite.quote())+");";
+					bsrc+="this.rewrite("+(v.ignore?"":v.rewrite.quote())+");";
+				}
+				if(v.oneShot||("send" in v)){
+					msrc+="this.cancel();";
+					bsrc+="this.cancel();";
+				}
+				if(!v.ignore && v.oneShot){
+					let shot=new Strokes("["+((typeof(v.oneShot)!='string')?n:v.oneShot)+"]");
+					if(("send" in v)&&v.send){
+						m["+!"+v.send+"+["+(v.rewrite||n)+"]"]=function()(this.send(shot));
+						let shot2=new Strokes("?"+v.send+"+!"+v.send+" ["+((typeof(v.oneShot)!='string')?n:v.oneShot)+"]");
+						m["+"+v.send+"+["+(v.rewrite||n)+"]"]=function()(this.send(shot2));
+					}else{
+						m["+["+(v.rewrite||n)+"]"]=function()(this.send(shot));
+					}
+				}
+/*
+				if(!v.ignore && v.oneShot){
+					let shot=new Strokes("["+((typeof(v.oneShot)!='string')?n:v.oneShot)+"]");
+					m["+["+(v.rewrite||n)+"]"]=function()(this.send(shot));
+				}
+*/
+				if(v.send){
+					ds=new Strokes("+"+v.send), us=new Strokes("+!"+v.send);
+					msrc+="this.send(ds);";
+					bsrc+="this.send(us);";
+				}
+				m["+"+n]=eval("function(){"+msrc+"}");
+				m["+!"+n]=eval("function(){"+bsrc+"}");
+				if("strict" in v){
+					(mod||Key.item(n)).setStrict(v.strict);
+				}
+			}
+			this.map(m);
+			return(this);
+		},
+		
+		remap:function(obj,a2){
+			var withMod="",defCond="";
+			if(a2){
+				obj=String(obj);
+				if(obj.match(/\+$/)){
+					withMod=obj;
+				}else{
+					defCond=obj;
+				}
+				obj=a2;
+			}
+			for each(let [strokes,mapping] in Iterator(obj)){
+				strokes=withMod+strokes;
+				if(!mapping || (typeof(mapping)!='object') || (mapping instanceof Array)){
+					var mp={};
+					mp[defCond]=mapping;
+					mapping=mp;
+				}
+				for each(let [cond,send] in Iterator(mapping)){
+					var act,from=new Strokes("+"+strokes), to=new Strokes((typeof(send)=='string')?("+"+send):send);
+					if(!send){
+						act=function()(this.cancel());
+					}else if((from.downedKeys.length>0)&&(to.downedKeys.length>0)){
+						var dks=new Array(to.downedKeys.length);
+						for(var i=0,a=to.downedKeys,l=a.length;i<l;i++){
+							dks[i]="+!"+a[i].id;
+						}
+						act=let(
+							st=to,
+							dfr=let(upst=new Strokes(dks.join(" ")))(function()(this.send(upst))),
+							trg=from.downedKeys[from.downedKeys.length-1]
+						)(function()(this.cancel().send(st).defer(dfr,trg)));
+					}else{
+						act=let(st=to)(function()(this.cancel().send(st)));
+					}
+					Mapping.add("+"+strokes,this.findCondition(cond),act);
+				}
+			}
+			return(this);
+		},
+		
+		__deferred__:{},
+		__stroke__:null,
+		__controllerMutex__:new Mutex(),
+		__controllerSignal__:new Signal(),
+		__executerSignal__:new Signal(),
+		__executerThreadFunction__:function(_this){
+			var exSig=_this.__executerSignal__;
+			var cnSig=_this.__controllerSignal__;
+			var context=new HotstrokesContext();
+			var map=_this.__automaton__.start.outputs;
+			var last, prev;
+			var ac=_this.__automaton__;
+			exSig.pulse();
+			while(true){
+				try{
+					cnSig.wait();
+					cnSig.turnOff();
+					var wasSet=(ac.context!=ac.start);
+					var s=_this.__stroke__;
+					if(typeof(s)=='function'){
+						s.apply(context);
+					}else if(s){
+						Key.items['repeated'].__state__=(s.id==last);
+						if(_this.__repeatFunction__ && s.id!=_this.__repeatStroke__){
+							_this.__repeatFunction__=null;
+							_this.__repeatSignal__.turnOn();
+						}
+						context.stroke=s;
+						context.prepare();
+						if(s.up && _this.__deferred__[s.key.id]){
+							_this.__deferred__[s.key.id].apply(context);
+							delete(_this.__deferred__[s.key.id]);
+						}
+						
+						prev=ac.context;
+//						for(var i=0,a=prev.outputs,l=a.length;!context.__canceled__ && (i<l);i++){
+//							a[i].execute(context,true);
+//						}
+						map=ac.input(context.stroke.id);
+						for(var i=0,l=map.length;!context.__canceled__ && (i<l);i++){
+							map[i].execute(context);
+						}
+						last=s.id;
+						if(context.__canceled__){
+							_this.__stroke__=null;
+						}else{
+							s.key.__virtualState__=!s.up;
+						}
+						if(context.stroke){
+							context.stroke.key.__internalState__=!context.stroke.up;
+						}
+						if(context.__reset__){
+							map=ac.reset();
+							context=new HotstrokesContext();
+							if(wasSet){
+								for each(let [n,v] in Iterator(_this.__registeredPlugins__)){
+									v.reset();
+								}
+							}
+						}else if(context.stroke){
+							ac.context=prev;
+							map=ac.input(context.stroke.id);
+							if(ac.context===ac.start){
+								context=new HotstrokesContext();
+								if(wasSet){
+									for each(let [n,v] in Iterator(_this.__registeredPlugins__)){
+										v.reset();
+									}
+								}
+							}else{
+								context.go();
+							}
+						}
+					}
+				}catch(e){
+					println(e);
+				}
+				exSig.pulse();
+			}
+		},
+		
+		repeatDelay:250,
+		repeatInterval:32,
+		__repeatSignal__:new Signal(),
+		__repeatThreadFunction__:function(_this){
+			var repSig=_this.__repeatSignal__;
+			var mux=_this.__controllerMutex__;
+			var conSig=_this.__controllerSignal__.handle;
+			var exSig=_this.__executerSignal__.handle;
+			var timeout=void(0);
+			while(true){
+				if(repSig.wait(timeout)){
+					repSig.turnOff();
+					if(_this.__repeatFunction__){
+						if(_this.__repeatDelay__>0){
+							mux.lock();
+							_this.__stroke__=_this.__repeatFunction__;
+							SignalObjectAndWait(conSig,exSig,0xFFFFFFFF,0);
+							mux.unlock();
+						}
+						timeout=Math.abs(_this.__repeatDelay__);
+					}else{
+						timeout=void(0);
+					}
+				}else{
+					mux.lock();
+					_this.__stroke__=_this.__repeatFunction__;
+					SignalObjectAndWait(conSig,exSig,0xFFFFFFFF,0);
+					mux.unlock();
+					timeout=_this.__repeatInterval__;
+				}
+			}
+		},
+		repeat:function(func,delay,interval,stroke){
+			if(!this.__repeatThread__){
+				this.__repeatThread__=Thread.create(this.__repeatThreadFunction__,[this]);
+			}
+			this.__repeatFunction__=func||Function.doNothing;
+			this.__repeatDelay__=delay|| this.repeatDelay;
+			this.__repeatInterval__=interval|| this.repeatInterval;
+			this.__repeatStroke__=stroke.id;
+			this.__repeatSignal__.turnOn();
+		},
+		
+		receiveStroke:function(name,up){
+			if(this.__executerThread__){
+				if(this.__controllerMutex__.lock()){
+					try{
+						var k=Key.item(name);
+						k.__state__=!up;
+						this.__stroke__=new Stroke(k,up);
+						SignalObjectAndWait(this.__controllerSignal__.handle,this.__executerSignal__.handle,0xFFFFFFFF,0);
+						//this.__controllerSignal__.pulse();
+						//this.__executerSignal__.wait();
+						return(!this.__stroke__);
+					}catch(e){
+						println(e);
+					}finally{
+						this.__controllerMutex__.unlock();
+					}
+				}
+			}
+		},
+		receiveState:function(name,up){
+			Key.item(name).__internalState__=!up;
+			return(this);
+		},
+		register:function(){
+			var ac=new (require('AhoCorasickMethod').Automaton)(function(a,b)(b.length-a.length));
+			for each(let [n,v] in Iterator(Mapping.__items__)){
+				ac.addRule(v.state,v);
+			}
+			ac.prepare();
+			this.__automaton__=ac;
+			this.__executerThread__=Thread.create(this.__executerThreadFunction__,[this]);
+			this.__executerSignal__.wait();
+//			this.__executerThread__.priority=Thread.priority.high;
+			var _this=this;
+			this.__keyEventHandler__=function(obj){
+				if(obj.injected){
+					Key.item(obj.key.__instanceIdentifier__).__virtualState__=(obj.event!='up');
+				}else{
+					return(_this.receiveStroke(obj.key.__instanceIdentifier__, obj.event=='up'));
+				}
+			}
+			Keyboard.observe(['down','up'],this.__keyEventHandler__);
+		},
+		unregister:function(){
+		},
+		clear:function(){
+		},
+		state:function(name)(Key.item(name).state),
+		
+		
+		__senderThreadFunction__:function(_this){
+			var sig=_this.__senderSignal__;
+			var mux=_this.__senderMutex__;
+//			var mux2=_this.__controllerMutex__.handle;
+			try{
+				var wait=UInt.alloc(3);
+				wait.update(sig);
+				wait.inc(1).update(mux);
+//				wait.inc(2).update(mux2);
+				var ary;
+				while(true){
+					WaitForMultipleObjects(2 /*3*/,wait,1,0xFFFFFFFF);
+					ary=_this.__senderQueue__;
+					_this.__senderQueue__=[];
+					ReleaseMutex(mux);
+					_this.__controllerMutex__.lock();
+					_this.__controllerMutex__.unlock();
+//					ReleaseMutex(mux2);
+					for(var i=0,l=ary.length;i<l;i++){
+						try{
+							ary[i].send();
+						}catch(e){
+							println(e);
+						}
+					}
+				}
+			}finally{
+				wait && wait.free();
+			}
+		},
+		send:function(){
+			if(!this.__senderThread__){
+				this.__senderMutex__=CreateMutex(null,0,null);
+				this.__senderSignal__=CreateEvent(null,0,0,null);
+				this.__senderQueue__=[];
+				this.__senderThread__=Thread.create(this.__senderThreadFunction__,[this]);
+			}
+			WaitForSingleObject(this.__senderMutex__,0xFFFFFFFF);
+			for(var i=0,l=arguments.length;i<l;i++){
+				this.__senderQueue__.push(Strokes.item(arguments[i]));
+			}
+			SetEvent(this.__senderSignal__);
+			ReleaseMutex(this.__senderMutex__);
+		},
+	}});
+	HotstrokesPlugin.addMembers({"Hotstrokes":Hotstrokes});
+	
+	var Window=require('Window').Window;
+	var HotstrokesContext=new Class({
+		__new__:function(){
+			this.state=[];
+			this.intervals=[];
+			this.lastTime=(new Date()).getTime();
+		},
+		go:function(){
+			this.state.push(this.stroke);
+			var t=(new Date()).getTime();
+			this.intervals.push(t-this.lastTime);
+			this.lastTime=t;
+			return(this);
+		},
+		rewrite:function(key,up){
+			if(key){
+				this.stroke=new Stroke(key,(typeof(up)!='undefined')?up:this.stroke.up);
+			}else{
+				this.stroke=null;
+			}
+			return(this);
+		},
+		prepare:function(flag){
+			this.__reset__=!!flag;
+			this.__canceled__=!!flag;
+			return(this);
+		},
+		reset:function(){
+			this.__reset__=true;
+			return(this);
+		},
+		cancel:function(){
+			this.__canceled__=true;
+			return(this);
+		},
+		
+		defer:function(func,key){
+			Hotstrokes.__deferred__[(key?((key instanceof Key)?key:Key.item(key)):this.stroke.key).id]=func;
+			return(this);
+		},
+		repeat:function(func,delay,interval,key){
+			Hotstrokes.repeat(func,delay,interval,this.stroke);
+			return(this);
+		},
+		send:function(){
+			Hotstrokes.send.apply(Hotstrokes,arguments);
+			return(this);
+		},
+		state:function(n)(Hotstrokes.state(n)),
+		
+		get activeWindow()(Window.active),
+		get focusedWindow()(Window.focused),
+		
+	});
+	
+	var mods=['LShift','LCtrl','LAlt','LWin','RShift','RCtrl','RAlt','RWin'];
+	for(var i=0,l=mods.length;i<l;i++){
+		Key.item(mods[i]).setStrict(true);
+	}
+	Hotstrokes.defineKeys({
+		'ctrl':'lctrl',
+		'shift':'lshift',
+		'alt':'lalt',
+		'win':'lwin',
+		'Repeated':{
+			modifier:true,
+		},
+	}).defineActions({
+		block:function()(this.cancel()),
+		ignore:function()(this.rewrite()),
+	});
+	this.Strokes=Strokes;
+	this.Hotstrokes=Hotstrokes;
+	this.HotstrokesContext=HotstrokesContext;
+})
+
+

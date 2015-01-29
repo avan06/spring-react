@@ -1,0 +1,193 @@
+(function(){
+	var {Window,ChildWindow}=require('Window');
+	
+	
+	
+	
+	
+	var comctl=WinLibrary.load('comctl32.dll');
+	var
+		InitCommonControls=comctl.proc('InitCommonControls',[],Int),
+		
+	var_end;
+	
+	
+	InitCommonControls();
+	
+	
+	
+	var CommonControl=ChildWindow.define({
+		
+		__class__:{
+			create:function(obj){
+				var klass=this.superClass.define.call(this,obj);
+				if(obj.controlStyles){
+					var members={};
+					for(let [n,v] in Iterator(obj.controlStyles)){
+						let value=v, mask=0^v, g=obj.getControlStyleMessage, s=setControlStyleMessage;
+						members.__defineGetter__(n,function()(!!(this.send(g)&value)));
+						members.__defineSetter__(n,function(b)(!!(this.send(s,v,b?v:0))));
+					}
+					klass.addMembers(members);
+				}
+				return(klass);
+			},
+		},
+		styles:{
+		},
+	});
+	
+	
+	
+	
+	
+	var LVItem=new Struct({
+		mask:		UInt,
+		iItem:		Int,
+		iSubItem:	Int,
+		state:		UInt,
+		stateMask:	UInt,
+		text:		WideString,
+		textLength:	Int,
+		iImage:		UInt,
+		lParam:		UInt,
+		iIndent:	Int,
+		iGroupId:	Int,
+		cColumns:	UInt,
+		puColumns:	Pointer,
+		piColFmt:	Pointer,
+		iGroup:		Int,
+	});
+	
+	
+	
+	var LVColumn=new Struct({
+		mask:		UInt,
+		fmt:		Int,
+		cx:			Int,
+		text:		WideString,
+		textLength:	Int,
+		iSubItem:	Int,
+		iImage:		Int,
+		iOrder:		Int,
+		cxMin:		Int,
+		cxDefault:	Int,
+		cxIdeal:	Int,
+	});
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	var ListViewItem=new Class({
+	});
+	var ListView=CommonControl.define({
+		className:'SysListView32',
+		styles:{
+			report                  :0x0001,
+			smallIcon               :0x0002,
+			singleSelect            :0x0004,
+			alwaysShowSelection     :0x0008,
+			sortAscending           :0x0010,
+			sortDescending          :0x0020,
+			shareImageLists         :0x0040,
+			noLabelWrap             :0x0080,
+			autoArrange             :0x0100,
+			editLabels              :0x0200,
+			ownerDrawFixed          :0x0400,
+			alignLeft               :0x0800,
+			ownerData               :0x1000,
+			noScroll                :0x2000,
+			noColumnHeader          :0x4000,
+			noSortHeader            :0x8000,
+		},
+		exStyles:{
+		},
+		setControlStyleMessage:0x1036,
+		getControlStyleMessage:0x1037,
+		controlStyles:{
+			gridLines            :0x00000001,
+			subitemImages        :0x00000002,
+			checkboxes           :0x00000004,
+			trackSelect          :0x00000008,
+			headerDragDrop       :0x00000010,
+			fullRowSelect        :0x00000020, // applies to report mode only
+			oneClickActivate     :0x00000040,
+			twoClickActivate     :0x00000080,
+			flatScrollBars       :0x00000100,
+			regional             :0x00000200,
+			infoTip              :0x00000400, // listview does infotips for you
+			underlineHot         :0x00000800,
+			underlineCold        :0x00001000,
+			multiWorkAreas       :0x00002000,
+			labelTip             :0x00004000, // listview unfolds partly hidden labels if it does not have infotip text
+			borderSelect         :0x00008000, // border selection style instead of highlight
+			doubleBuffer         :0x00010000,
+			hideLabels           :0x00020000,
+			singleRow            :0x00040000,
+			snapToGrid           :0x00080000,  // icons automatically snap to grid.
+			simpleSelect         :0x00100000,  // also changes overlay rendering to top right for icon mode.
+			justifyColumns       :0x00200000,  // icons are lined up in columns that use up the whole view area.
+			transparentBackground:0x00400000,  // background is painted by the parent via wm_printclient
+			transparentShadowText:0x00800000,  // enable shadow text on transparent backgrounds only (useful with bitmaps)
+			autoAutoArrange      :0x01000000,  // icons automatically arrange if no icon positions have been set
+			headerInAllViews     :0x02000000,  // display column header in all view modes
+			autoCheckSelect      :0x08000000,
+			autoSizeColumns      :0x10000000,
+			columnSnapPoints     :0x40000000,
+			columnOverflow       :0x80000000,
+		},
+		notifications:{
+		},
+		
+		events:{
+		},
+		
+		properties:{
+			colmuns:[],
+			
+		},
+		
+		
+		
+		
+		
+		
+	}).addMembers({
+		
+		
+		set colmuns(c){
+		},
+		get colmuns(c){
+		},
+		
+		
+		
+		
+		addItem:function(o,pos){
+		},
+		getItem:function(pos){
+		},
+		updateItem:function(o,pos){
+		},
+		
+		
+	});
+	
+	
+	
+	
+	
+	
+	
+	
+	this.ListView=ListView;
+	
+	
+	
+	
+});

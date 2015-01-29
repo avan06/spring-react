@@ -1,0 +1,1518 @@
+(function(){
+	
+	
+	var TCPServer=require('Socket').TCPServer;
+	var TCP=require('Socket').TCP;
+	
+	var uHTTP=require('HTTP');
+	var uHTTPD=this;
+	var uLooseXML=require('LooseXML');
+	var TextFilter=require('TextFilter').TextFilter;
+	var SHA256=require('Hash').SHA256;
+	
+	var jQuery=this.directory.file('jquery.js').load();
+	var jQueryJSON=this.directory.file('jquery.json.js').load();
+	
+	var HTTPDPlugin=new Class(Plugin,{
+		title:'',
+		description:'',
+		require:[],
+		initialize:Function.doNothing,
+		save:Function.doNothing,
+		finalize:Function.doNothing,
+		
+		map:{},
+		scripts:[],
+		clientSide:{},
+		serverSide:{},
+		bookmarklets:{},
+		connectionMembers:{},
+		httpdMembers:{},
+	});
+	
+	var HTTPD=new Class({},EventMixin,{
+		__class__:{
+			plugins:new Pluggable('HTTPD',HTTPDPlugin),
+			
+			contentTypes:{
+				'txt' :'text/plain',
+				'html':'text/html',
+				'css' :'text/css',
+				'js'  :'text/javascript',
+				'csv' :'text/csv',
+				
+				'xml' :'application/xml',
+				'rss' :'application/rss+xml',
+				'atom':'application/atom+xml',
+				
+				'jpeg':'image/jpeg',
+				'png' :'image/png',
+				'gif' :'image/gif',
+				'bmp' :'image/bmp',
+				
+				'mp3' :'audio/mpeg',
+				'flv' :'video/flv',
+				'mp4' :'video/mp4',
+				'mpeg':'video/mpeg',
+				
+				'bin':'application/octet-stream',
+			},
+			statusTexts:{
+				200:"OK",
+				201:"Created",
+				202:"Accepted",
+				203:"Non-Authoritative Information",
+				204:"No Content",
+				205:"Reset Content",
+				206:"Partial Content",
+				207:"Multi-Status",
+				208:"Already Reported",
+				226:"IM Used",
+				300:"Multiple Choices",
+				301:"Moved Permanently",
+				302:"Found",
+				303:"See Other",
+				304:"Not Modified",
+				305:"Use Proxy",
+				307:"Temporary Redirect",
+				400:"Bad Request",
+				401:"Unauthorized",
+				402:"Payment Required",
+				403:"Forbidden",
+				404:"Not Found",
+				405:"Method Not Allowed",
+				406:"Not Acceptable",
+				407:"Proxy Authentication Required",
+				408:"Request Timeout",
+				409:"Conflict",
+				410:"Gone",
+				411:"Length Required",
+				412:"Precondition Failed",
+				413:"Request Entity Too Large",
+				414:"Request-URI Too Long",
+				415:"Unsupported Media Type",
+				416:"Requested Range Not Satisfiable",
+				417:"Expectation Failed",
+				422:"Unprocessable Entity",
+				423:"Locked",
+				424:"Failed Dependency",
+				426:"Upgrade Required",
+				500:"Internal Server Error",
+				501:"Not Implemented",
+				502:"Bad Gateway",
+				503:"Service Unavailable",
+				504:"Gateway Timeout",
+				505:"HTTP Version Not Supported",
+				506:"Variant Also Negotiates",
+				507:"Insufficient Storage",
+				508:"Loop Detected",
+				510:"Not Extended",
+			},
+			httpOptions:{
+				maxRedirect:0,
+				failures:/^999$/,
+			},
+		},
+		address:'127.0.0.1',
+		port:80,
+		logSize:256,
+		maxConnections:16,
+		bufferSize:4096,
+		timeout:30000,
+		timeLimit:Math.POSITIVE_INFINITY,
+		
+		encoding:'UTF-8',
+		
+		__new__:function(opt){
+			opt=opt||{};
+			this.name=				opt.name				||Main.appName;
+			this.lang=				opt.lang				||System.locale.langShortName;
+			this.address=			opt.address				||this.address;
+			this.port=				opt.port				||this.port;
+			this.logSize=			opt.logSize				||this.logSize;
+			this.bufferSize=		opt.bufferSize			||this.bufferSize;
+			this.directoryIndex=	opt.directoryIndex		||this.directoryIndex;
+			this.encoding=			opt.encoding			||this.encoding;
+			this.index=				opt.index				||this.index;
+			this.maxConnections=	opt.maxConnections		||this.maxConnections;
+			this.timeout=			opt.timeout				||this.timeout;
+			this.timeLimit=			opt.timeLimit			||this.timeLimit;
+			this.url='http://'+this.address+((this.port!=80)?(':'+this.port):'');
+			this.proxyConfig=		opt.proxyConfig			||this.proxyConfig;
+			
+			this.__optionMembers__={};
+			
+			this.__path__={};
+			this.__proxyRequestHandlers__=[];
+			this.__proxyResponseHandlers__=[];
+			this.__proxyOverrideHandlers__=[];
+			this.__useProxyPatterns__=[];
+			this.__noProxyPatterns__=[];
+			this.__scripts__=[];
+			this.__bookmarklets__={_:{}};
+			this.__proxyScripts__={};
+			this.__clientSide__={};
+			this.__clientSideNS__={};
+			this.__serverSide__={_:{}};
+			this.__loadedPlugins__={};
+			this.__bookmarkletLastUsed__=0;
+			this.__jsonpLastUsed__={};
+			
+			this.use.apply(this,opt.require||[]);
+			this.addScripts(opt.scripts||[]);
+			this.addClientSide(opt.clientSide||{});
+			this.addServerSide(opt.serverSide||{});
+			this.addBookmarklets(opt.bookmarklets||{});
+			this.addProxyRequestHandlers(opt.proxyRequest||[]);
+			this.addProxyResponseHandlers(opt.proxyResponse||[]);
+			this.addProxyOverrideHandlers(opt.proxyOverride||[]);
+			this.addUseProxy(opt.useProxy||[]);
+			this.addNoProxy(opt.noProxy||[]);
+			this.map(opt.paths||{});
+			
+			this.addOptionMembers(opt.options||{});
+			this.__applyOptions__(opt);
+			
+			this.statusTexts=Object.extend(Object.extend({},this.constructor.statusTexts),opt.statusTexts||{});
+			this.contentTypes=Object.extend(Object.extend({},this.constructor.contentTypes),opt.contentTypes||{});
+			this.errorDocuments=Object.extend({},opt.errorDocuments||{});
+			for each(let [n,v] in Iterator(opt.events||{})){
+				this.observe(n,v);
+			}
+			
+			
+			this.__http__=new uHTTP.HTTP(Object.extend(Object.extend({},this.constructor.httpOptions||{}),opt.httpOptions||{}));
+//			this.__httpMutex__=new Mutex();
+			Main.reside();
+			this.__mainThread__=Thread.create((function(){
+				var ary=[];
+				var svr=new TCPServer(this.port,this.address,this.logSize);
+				var Timeout={},Refuse={};
+				
+				Main.observe('exit',let(_this=this)(function()(_this.free())));
+				this.fire("ready");
+				while(true){
+					try{
+						var s=svr.accept();
+						if(!this.fire('connect',{host:s.host})){
+							throw(Refuse);
+						}
+						if(this.__terminated__){
+							break;
+						}
+						var deadline=now().getTime()+this.timeout;
+						while(ary.length>=this.maxConnections){
+							var t=now().getTime();
+							if(t>deadline){
+								throw(Timeout);
+							}
+							var ary2=[];
+							for(var i=0,l=ary.length;i<l;i++){
+								if(!ary[i].exists){
+								}else if(t>ary[i].connection.deadline){
+									ary[i].terminate();
+									ary[i].connection.free();
+								}else{
+									ary2.push(ary[i]);
+								}
+							}
+							ary=ary2;
+							if(ary.length>=this.maxConnections){
+								sleep(20);
+							}
+						}
+						var conn=new Connection(this,s),func;
+						conn.deadline=now().getTime()+this.timeLimit;
+						var p=conn.path;
+						var pp=p.split('/').slice(1);
+						if(conn.__proxy__){
+							if(conn.headers.getValue('X-NILHTTPDXHR-Digest')){
+								func=this.__proxyAjax__;
+							}else if(conn.url.build('/')=='http://localhostalternative.example.com:1234/'){
+								switch(pp[0]){
+									case('script'):{
+										func=this.__proxyScript__;
+										break;
+									}case('bookmarklet'):{
+										func=this.__bookmarklet__;
+										break;
+									}
+								}
+							}else{
+								func=this.__proxy__;
+							}
+						}else{
+							switch(pp[0]){
+								case('__proxy__'):{
+									switch(pp[1]){
+										case('conf.pac'):{
+											func=this.__proxyConfig__;
+											break;
+										}case('bookmarklet'):{
+											func=this.__proxyBookmarklets__;
+											break;
+										}default:{
+											c.__proxy__=true;
+											c.urlProxy=c.url;
+											c.url=new uHTTP.URL('http://'+pp[2]+((pp[1]=='80')?'':(':'+pp[1]))+'/'+pp.slice(3).join('/'));
+											func=this.__proxy__;
+											break;
+										}
+									}
+									break;
+								}case('__ajax__'):{
+									func=this.__ajax__;
+									break;
+								}case('bookmarklet'):{
+									if(pp.length<3){
+										func=this.__bookmarkletList__;
+									}else{
+										func=this.__bookmarklet__;
+									}
+									break;
+								}case('__jsonp__'):{
+									func=this.__jsonp__;
+									break;
+								}default:{
+									var maxlen=-1;
+									func=this.__path__[p];
+									if(!func){
+										for each(let [n,v] in Iterator(this.__path__)){
+											if((p.indexOf(n+'/')==0)&&(n.length>maxlen)){
+												maxlen=n.length;
+												conn.pathInfo=p.slice(maxlen+1);
+												func=v;
+											}
+										}
+									}
+									func=func||this.__notFound__;
+									break;
+								}
+							}
+						}
+						s=null;
+						ary.push(this.__thread__(conn,func));
+					}catch(e){
+						try{
+							if(e===Timeout){
+								var c=new Connection(this,s);
+								this.fire('timeout');
+								c.error(503);
+							}else if(e===Refuse){
+								this.fire('refuse');
+							}else if(e===Connection.Closed){
+							}else{
+//								println(e);
+							}
+						}catch(E){
+//							println(E);
+						}
+					}finally{
+						try{
+							s&&s.free();
+						}catch(e){
+						}
+					}
+				}
+				while(ary.length>0){
+					var ary2=[];
+					for(var i=0,l=ary.length;i<l;i++){
+						if(ary[i].exists){
+							ary2.push(ary[i]);
+						}
+					}
+					ary=ary2;
+				}
+			}).bind(this));
+		},
+		__thread__:function(conn,func){
+			var res=Thread.create(function(){
+				try{
+					func(conn);
+				}catch(e){
+//					println([e.fileName,e.lineNumber,e.message]);
+					var msg=e+"<br />"+e.stack.replace(/[\n\r\s]*$/,"").indent().replace(/ /g,'&nbsp;').replace(/\r?\n/g,'<br />');
+					if(conn.state=='received'){
+						conn.error(500,msg);
+					}else if((conn.response.getValue('Content-Type')||"").match(/text/)){
+						conn.write('<h1>ERROR</h1><p>'+msg+'</p>');
+					}
+				}finally{
+					conn&&conn.free();
+				}
+			});
+			res.connection=conn;
+			return(res);
+		},
+		
+		free:function(){
+			this.__terminated__=true;
+			try{
+				var s=TCP.connect(this.address,this.port);
+			}catch(e){
+			}finally{
+				s&&s.free();
+			}
+			for(var i=0;i<20;i++){
+				if(!this.__mainThread__.exists){
+					break;
+				}
+				sleep(100);
+			}
+			this.__http__.free();
+			Main.unreside();
+		},
+		
+		__notFound__:function(c){
+			c.error(404,'Path not exists: '+c.url);
+		},
+		__proxyConfig__:function(c){
+			c.contentType='text/javascript';
+			c.write('function FindProxyForURL(url, host){');
+			c.write('var DIRECT="'+(c.parent.parentProxy?('PROXY '+c.parent.parentProxy):'DIRECT')+'",');
+			c.write(' HOST="'+c.url.host+'",');
+			c.write(' HTTPD="PROXY '+c.url.host+':'+c.parent.port+'; "+DIRECT, DEFAULT=void(0);\n');
+			var pc=c.parent.proxyConfig;
+			if(typeof(pc)=='function'){
+				pc=pc(c);
+			}
+			var nop=c.parent.__noProxyPatterns__.join('||');
+			var usep=c.parent.__useProxyPatterns__.join('||');
+			var def;
+			if(usep){
+				if(nop){
+					def='((('+usep+')&&!('+nop+'))?HTTPD:DIRECT)';
+				}else{
+					def='(('+usep+')?HTTPD:DIRECT)';
+				}
+			}else if(nop){
+				def='(('+nop+')?DIRECT:HTTPD)';
+			}else{
+				def='DIRECT';
+			}
+			
+			if(typeof(pc)=='function'){
+				c.write('return(('+pc.toSource()+')(url,host)||'+def+');\n}');
+			}else if(pc instanceof Array){
+				c.write('for(var i=0,a='+pc.toSource()+',l=a.length;i<l;i++){\n');
+				c.write('if(url.match(a[i])){return(HTTPD);}\n}\nreturn('+def+');\n}');
+			}else if(pc instanceof RegExp){
+				c.write('return(url.match('+pc.toSource()+')?HTTPD:('+def+'));\n}');
+			}else if(pc){
+				c.write('return(('+pc.toSource()+')?HTTPD:('+def+'));');
+			}else{
+				c.write('return('+def+');');
+			}
+			c.write('}');
+		},
+		
+		
+//		proxyConfig:function(c)(function(url,host){return(((url.indexOf('http://')!=0)||(host==HOST))?DIRECT:HTTPD);}),
+		
+		__ajax__:function(c){
+			var pp=c.path.split('/').slice(1);
+			let f=(c.parent.__serverSide__[pp[1]]||{})[pp[2]];
+			var ref=c.headers.referer;
+			if(f && ref && ((new uHTTP.URL(ref)).host==c.url.host)){
+				c.contentType='text/plain';
+				c.send(JSON.stringify(f.apply(c,JSON.parse((c.body||"").toString()))));
+			}
+		},
+		__proxyAjax__:function(c){
+			c.contentType='text/html';
+			var digest=c.headers.getValue('X-NILHTTPDXHR-Digest');
+			var method=c.headers.getValue('X-NILHTTPDXHR-Method');
+			var nonce=c.headers.getValue('X-NILHTTPDXHR-Nonce');
+			var ref=c.headers.referer||"";
+			var [ns,name]=method.split('/');
+			var ss=(c.parent.__serverSide__[ns]||{})[name];
+			var [group,time]=nonce.split('_');
+			
+			if(c.parent.calculateDigest(ref,method,nonce)!=digest){
+				c.write('alert("check digest errro")');
+			}else if(parseInt(time)<(c.parent.__jsonpLastUsed__[group]||Number.POSITIVE_INFINITY)){
+				c.write('alert("suspicious behavior")');
+			}else if(!ss){
+				c.write('alert("function not found")');
+			}else{
+				c.contentType='text/javascript';
+				c.send(JSON.stringify(ss.apply(c,JSON.parse((c.body||"").toString()))));
+			}
+		},
+		__jsonp__:function(c){
+			c.contentType='text/html';
+			var pp=c.path.split('/').slice(1);
+			var ss=(c.parent.__serverSide__[pp[1]]||{})[pp[2]];
+			var ref=c.headers.referer||"";
+			var url='http://'+c.url.host+'/'+pp.slice(0,3).join('/');
+			var nonce=pp[3];
+			var digest=pp[4];
+			var [group,time]=nonce.split('_');
+			if(c.parent.calculateDigest(ref,url,nonce)!=digest){
+				c.write('alert("check digest errro")');
+			}else if(parseInt(time)<(c.parent.__jsonpLastUsed__[group]||Number.POSITIVE_INFINITY)){
+				c.write('alert("suspicious behavior")');
+			}else if(!ss){
+				c.write('alert("function not found")');
+			}else{
+				var cb=pp[5]||'';
+				c.write('<script type="text/javascript">var $=jQuery={};');
+				c.write(jQueryJSON);
+				c.write(';window.parent.postMessage($.toJSON('+JSON.stringify(ss.apply(c,JSON.parse(((c.post||{}).arguments||""))))+'),"*");</script>');
+			}
+		},
+		__bookmarkletList__:function(c){
+			c.beginHTML(c.parent.name+' Bookmarklets');
+			c.write('<h1>Bookmarklets</h1><p></p><dl>');
+			for each(let [n,v] in Iterator(c.parent.__bookmarklets__._)){
+				c.write('<dt>');
+				c.bookmarklet(n,n);
+				c.write('</dt><dd>'+eval((v.match(/\(\s*\{\s*description:\s*("[\s\S]*?")\s*\}\s*\)\s*;/)||['','""'])[1])+'</dd>');
+			}
+			c.write('</dl>');
+			for each(let [N,V] in Iterator(c.parent.__bookmarklets__)){
+				var out=null;
+				if(N!='_'){
+					for each(let [n,v] in Iterator(V)){
+						if(!out){
+							c.write('<h2>'+N+' plugin</h2><dl>');
+						}
+						out=true;
+						c.write('<dt>');
+						c.bookmarklet(N+':'+n,n);
+						c.write('</dt><dd>'+eval((v.match(/\(\s*\{\s*description:\s*("[\s\S]*?")\s*\}\s*\)\s*;/)||['','"aaaaa"'])[1])+'</dd>');
+					}
+					c.write('</dl>');
+				}
+			}
+			c.endHTML();
+		},
+		__proxyBookmarklets__:function(c){
+		},
+		__bookmarklet__:function(c){
+			var pp=c.path.split('/').slice(1);
+			c.contentType='text/javascript';
+			c.write('(function(){\n');
+			var ns=pp[1],name=pp[2];
+			var url=c.url.build('/'+pp.slice(0,3).join('/'));
+			var nonce=parseInt(pp[3]);
+			var ref=c.headers.referer||"";
+			var digest=pp[4];
+			if(c.parent.calculateDigest(ref,url,nonce)!=digest){
+				c.write('alert("check digest error")');
+			}else if(nonce<=c.parent.__bookmarkletLastUsed__){
+				c.write('alert("repeated too rapidly")');
+			}else if(!(c.parent.__bookmarklets__[ns]||{})[name]){
+				c.write('alert("bookmarklet not found")');
+			}else{
+				var rand=String.random(16,62);
+				c.parent.__bookmarkletLastUsed__=c.parent.__jsonpLastUsed__[rand]=nonce;
+				c.write('var __base__="'+c.url.build('/__jsonp__')+'", __protectKey__="'+c.parent.protectKey+'", __random__="'+rand+'";\n');
+				
+				c.__sendInitScript__(c.__proxy__?(c.parent.__proxyAJAXCaller__):(function(ns,name,_this,args,callback){
+					var ref=(location.protocol=='https:')?'':location.href, url=[__base__,ns,name].join('/'), nonce=__random__+'_'+(new Date()).getTime();
+					var x=0,i=0,s,L={},a=[ref,__protectKey__,url,nonce].join(':').split('');
+					while(s=a.pop()){x=((L[s]||(L[s]=++i))+x*i)%0x1fffffffffff91;};
+					
+					var d=window.document, c=d.createElement('input'), f=d.createElement('form'), e=d.createElement('iframe');
+					c.type='hidden';
+					c.name='arguments';
+					c.value=$.toJSON(args);
+					f.method='POST';
+					f.action=[url,nonce,x].join('/');
+					f.acceptCharset='utf-8';
+					f.appendChild(c);
+					
+					e.style.display=c.style.display=f.style.display='none';
+					d.body.appendChild(e);
+					d.body.appendChild(f);
+					e.contentWindow.name=e.name=f.target="__anonymous__"+nonce;
+					var h=function(event){
+						event=event||window.event;
+						if(event.source==e.contentWindow){
+							(callback||function(){}).apply(_this,[$.evalJSON(event.data||'""'),args]);
+							if(window.attachEvent) {
+								window.detachEvent("onmessage",h,false);
+							}else{
+								window.removeEventListener ("message",h,false);
+							}
+							d.body.removeChild(e);
+							d.body.removeChild(f);
+						}
+					};
+					if(window.attachEvent) {
+						window.attachEvent("onmessage",h,false);
+					}else{
+						window.addEventListener("message",h,false);
+					}
+					f.submit();
+				}));
+				c.write('('+c.parent.__bookmarklets__[ns][name]+')();');
+				c.write('var a=document.getElementsByTagName("script");document.body.removeChild(a[a.length-1]);');
+			}
+			c.write('\n})()');
+		},
+		
+		__proxyAJAXCaller__:function(ns,name,_this,args,callback){
+			var ref=location.href, method=ns+"/"+name, nonce=__random__+'_'+(new Date()).getTime();
+			var x=0,i=0,s,L={},a=[ref,__protectKey__,method,nonce].join(':').split('');
+			while(s=a.pop()){x=((L[s]||(L[s]=++i))+x*i)%0x1fffffffffff91;};
+			$.ajax({
+				type:'POST',
+				url:location.href,
+				beforeSend:function(xhr){
+					xhr.setRequestHeader('X-NILHTTPDXHR-Digest',x);
+					xhr.setRequestHeader('X-NILHTTPDXHR-Nonce',nonce);
+					xhr.setRequestHeader('X-NILHTTPDXHR-Method',method);
+				},
+				data:$.toJSON(args),
+				success:function(data,state){
+					(callback||(function(){})).apply(_this,[$.evalJSON(data||'""'),args]);
+				},
+			});
+		},
+		
+		__proxyScript__:function(c){
+			var pp=c.path.split('/');
+			var time=pp[2], hash=pp[3];
+			var nonce=pp[4];
+			var digest=pp[5];
+			if(digest!=c.parent.calculateDigest(c.headers.getValue('Referer'),'http://localhostalternative.example.com:1234/script/'+time+'/'+hash,nonce)){
+			}else{
+				var s=c.parent.__proxyScripts__[time+'/'+hash];
+				if(s){
+					var rand=String.random(16,62);
+					c.parent.__jsonpLastUsed__[rand]=time*1;
+					c.contentType='text/javascript';
+					c.write('(function(){\n');
+					c.write('var __protectKey__="'+c.parent.protectKey+'", __random__="'+rand+'";\n');
+					c.__sendInitScript__(c.parent.__proxyAJAXCaller__);
+					c.write(s);
+					c.write(';var a=document.getElementsByTagName("script"),s=a[a.length-1];s.parentNode.removeChild(s);');
+					c.write('\n})();\n');
+				}
+			}
+		},
+		
+		__proxy__:function(c){
+			c.parent.fire('proxyRequest',{connection:c});
+			if((c.method=='GET') && c.ready && c.cache){
+				if(typeof(c.cache.file)=='function'){
+					var a=[c.url.port,c.url.host], p=c.url.path.split('/'),l=p.length;
+					p[l-1]=p[l-1]||'index.html';
+					for(var i=1;i<l;i++){
+						a[a.length]=p[i].replace(/[\?\*\<\>\|\/\\\'\"]/g,function($0)('%'+('00'+$0.charCodeAt(0).toString(16)).slice(-2)));
+					}
+					c.cache=c.cache.file(a.join('\\'));
+				}
+				if(c.cache.exists){
+					c.send(c.cache);
+				}
+			}
+			if(c.ready){
+				c.__proxy__="sending";
+				var o={
+					method:c.method,
+					url:c.url.toString(),
+					headers:c.headers.items,
+//					proxy:'localhost:8080',
+				};
+				if(c.parent.parentProxy){
+					o.proxy=c.parent.parentProxy;
+				}
+				if(c.method=='POST'){
+					if(c.__post__){
+						o.body=c.__post__;
+					}else if(c.__body__){
+						o.body=c.__body__;
+					}else{
+						o.body=c.__stream__;
+						o.bodySize=c.headers.getValue('Content-Length');
+					}
+				}
+//				var req=(new uHTTP.HTTP(c.parent.httpOptions)).request({method:c.method,url:c.url});
+				
+				try{
+					var req=c.parent.__http__.request(o);
+					var res=req.send();
+					c.status=res.status;
+					c.response=new uHTTP.Headers(res.headers.items);
+					c.response.removeValue('Content-Encoding');
+					c.response.removeValue('Content-Length');
+					c.response.removeValue('Transfer-Encoding');
+					c.response.setValue('Connection','close');
+					c.parent.fire('proxyResponse',{connection:c,response:res});
+					
+					if(!c.ready){
+					}else if((c.method=='HEAD') || c.status.match(/^1\d\d|20[45]|304/)){
+						c.write("");
+					}else{
+						var ct=res.headers.getValue('Content-Type')||"";
+						
+						if(ct.match(/html|xml|javascript/) && (c.__scripts__.length>0)){
+							let s=c.__scripts__.join('');
+							var h=(new Date()).getTime()+'/'+SHA256.calc(s);
+							var ps=c.parent.__proxyScripts__;
+							var rem=[];
+							var t=(new Date()).getTime()-(c.parent.timeout||30000);
+							for(let n in ps){
+								if(1*n.split('/')[0]<t){
+									rem[rem.length]=n;
+								}
+							}
+							for(var i=0,l=rem.length;i<l;i++){
+								delete(ps[rem[i]]);
+							}
+							ps[h]=s;
+							var base='http://localhostalternative.example.com:1234/script/'+h;
+							var nonce=(new Date()).getTime();
+							var url=[base,nonce,c.parent.calculateDigest(c.url.toString(),base,nonce)].join('/');
+							var tag=/^((?:<(?:html|head|meta|\!|\?)[^>]*>|\s)*)([\s\S]*)$/i;
+							c.filter(let(inserted=false)(function(l)(inserted?l:l.replace(tag,function($0,$1,$2){
+								if($2){
+									inserted=true;
+									return($1+'<script type="text/javascript" src="'+url+'"></script>'+$2);
+								}else{
+									return($0);
+								}
+							}))));
+						}
+						
+						
+						var tf,xf,res2;
+						if(ct.match(/text|xml/) && !res.encoding){
+							res2=new (require('Charset').Detector)(res, ct.match(/xml|html/));
+							res2.observe('detect',function(o){
+								res.__stream__.encoding=res.encoding=c.__stream__.encoding=o.encoding;
+								if(c.__outputStream__){
+									c.__outputStream__.encoding=o.encoding;
+								}
+							});
+							
+						}else{
+							res2=res;
+						}
+						
+						if(ct.match(/text|xml/) && (c.__filters__.length>0)){
+							tf=new TextFilter(res2,c.__filters__);
+						}
+						if(ct.match(/html/)){
+							var ef=c.__elementFilters__.concat(c.__htmlFilters__);
+							if((ef.length+c.__textNodeFilters__.length+c.__commentFilters__.length)>0){
+								xf=new uLooseXML.HTML(tf?tf.strings:res2,{
+									events:{
+										begin:ef,
+										text:c.__textNodeFilters__,
+										comment:c.__commentFilters__,
+									},
+								});
+								/*
+								if(!res.encoding){
+									var enc;
+									xf.observe('begin',function(e){
+										if(!enc && (e.node.name=='meta')&&((e.node.get('http-equiv')||"").toLowerCase()=='content-type')){
+											var m=(e.node.get('content')||"").match(/;\s*charset=([^\s">]*)/i);
+											if(m){
+												enc=res.__stream__.encoding=res.encoding=c.__stream__.encoding=m[1];
+											}
+										}
+									});
+								}
+								*/
+							}
+						}else if(ct.match(/xml/)){
+							var ef=c.__elementFilters__.concat(c.__xmlFilters__);
+							if((ef.length+c.__textNodeFilters__.length+c.__commentFilters__.length)>0){
+								xf=new uLooseXML.LooseXML(tf?tf.strings:res2,{
+									events:{
+										begin:ef,
+										text:c.__textNodeFilters__,
+										comment:c.__commentFilters__,
+									},
+								});
+								/*
+								if(!res.encoding){
+									var enc;
+									xf.observe('begin',function(e){
+										if(!enc && (e.node.name=='meta')&&((e.node.get('http-equiv')||"").toLowerCase()=='content-type')){
+											var m=(e.node.get('content')||"").match(/;\s*charset=([^\s">]*)/i);
+											if(m){
+												enc=res.__stream__.encoding=res.encoding=c.__stream__.encoding=m[1];
+												c.__outputStream__&&(c.__outputStream__.encoding=enc);
+											}
+										}
+									});
+								}
+								*/
+							}
+						}
+						if(!xf&&tf){
+							/*
+							if(!res.encoding){
+								var enc;
+								tf.add(function(l){
+									if(!enc){
+										var m=l.match(/<\?xml\s[^>]*encoding="([^"]*)"|<meta\s[^>]*content-type[^>]*;\s*charset=\s*([^\s">]*)/i);
+										if(m){
+											enc=res.__stream__.encoding=res.encoding=c.__stream__.encoding=m[1]||m[2];
+										}
+									}
+									return(l);
+								});
+							}
+							*/
+							xf=tf;
+						}
+						if(xf){
+							try{
+								var out=(c.method=='GET') && c.cache && (c.status=='200') && c.cache.openNew();
+								c.__outputStream__=out;
+								c.__stream__.encoding=res.encoding;
+								out && (out.encoding=res.encoding);
+								for(let l in xf.strings){
+									c.write(l);
+									out && out.writeText(l);
+								}
+							}finally{
+								xf.free();
+								out && out.free();
+							}
+						}else{
+							try{
+								var out=(c.method=='GET') && c.cache && (c.status=='200') && c.cache.openNew();
+								var len=c.parent.bufferSize||8192;
+								var buf=Byte.alloc(len);
+								var ptr=new (Byte.pointer)(buf.valueOf());
+								var sent=0;
+								while(!res.eof){
+									sent+=(ptr.count=res.readTo(buf.valueOf(), len));
+									c.write(ptr);
+									out && out.write(ptr);
+								}
+							}finally{
+								buf&&buf.free();
+								out && out.free();
+							}
+						}
+					}
+				}finally{
+					res&&res.free();
+					req&&req.free();
+				}
+			}
+		},
+		
+		
+		
+		
+		
+		
+		
+		directoryIndex:['index.html'],
+		index:function(c,dir){
+			println(dir);
+			
+			c.contentType='html';
+			c.write('<html><head><title>'+c.url+'</title><style>.size{width:6em;text-align:right}</style></head><body><h1>Index of '+c.url.path
+					+'</h1><table><thead><tr><th>Name</th><th>Size</th><th>Last Modified</th></tr></thead><tbody>');
+			
+			if(c.url.path!='/'){
+				c.write('<tr><td><a href="../">..</a></td><td>[Parent]</td><td></td></tr>');
+			}
+			for(let d in dir.directories){
+				c.write('<tr><td><a href="'+d.name+'/">'+d.name+'</a></td><td class="size">[Directory]</td><td>'+(('mtime' in d)?d.mtime.format("yyyy/mm/dd hh:nn:ss"):'')+'</td></tr>');
+			}
+			for(let f in dir.files){
+				c.write('<tr><td><a href="'+f.name+'">'+f.name+'</a></td><td class="size">'+f.size+'</td><td>'+(('mtime' in f)?f.mtime.format("yyyy/mm/dd hh:nn:ss"):'')+'</td></tr>');
+			}
+			c.write('</tbody></table></body></html>');
+		},
+		get protectKey(){
+			if(!this.__protectKey__){
+				var file=pref('HTTPD\\',true).directory('protectKeys').create().file(this.name+'.txt');
+				if(file.exists){
+					this.__protectKey__=file.load();
+				}else{
+					file.update(this.__protectKey__=String.random(16,62));
+				}
+			}
+			return(this.__protectKey__);
+		},
+		calculateDigest:function(ref,url,nonce){
+			for(var s,x=0,i=0,L={},a=[ref,this.protectKey,url,nonce].join(':').split('');s=a.pop();x=((L[s]||(L[s]=++i))+x*i)%0x1fffffffffff91);
+			return(x);
+		},
+		bookmarkletURL:function(n)let([,ns,name]=n.match(/^(.*?)\/(.*)$/)||[,'_',n])("javascript:(function(U,B,T,K,d,x,i,L,s){for(K=[U,K,B,T].join(':').split('');s=K.pop();x=((L[s]||(L[s]=++i))+x*i)%0x1fffffffffff91);"
+					+"(s=d.createElement('script')).src=[B,T,x].join('/');d.body.appendChild(s);})((location.protocol=='http:')?'':location.href,'"+this.url+'/bookmarklet/'+ns+'/'+name
+					+"',(new Date).getTime(),'"+this.protectKey+"',document,0,0,{})"),
+		
+		
+		map:function(obj,ns){
+			ns=ns?('/'+ns):'';
+			for each(let [n,v] in Iterator(obj||{})){
+				n=String(n).replace(/^\/?/,'/').replace(/\/$/,'');
+				if(typeof(v.openRead)=='function'){
+					let file=v;
+					v=function(c){
+						if(file.exists){
+							c.send(file);
+						}else{
+							c.error(404);
+						}
+					}
+				}else if(typeof(v.file)=='function'){
+					let len=n.length,dir=v;
+					v=function(c){
+						if(!c.pathInfo||c.pathInfo.match(/\/$/)){
+							for(var i=0,a=c.parent.directoryIndex||[],l=a.length;i<l;i++){
+								var f=dir.file((c.pathInfo||'')+a[i]);
+								if(f&&f.exists){
+									c.send(f);
+									return(this);
+								}
+							}
+							var dir2=c.pathInfo?dir.directory(c.pathInfo):dir;
+							if(dir2.exists){
+								c.parent.index(c,dir2);
+							}else{
+								c.error(404);
+							}
+						}else{
+							var file=dir.file(c.pathInfo);
+							if(file.exists){
+								c.send(file);
+							}else{
+								c.error(404);
+							}
+						}
+					};
+				}else if(typeof(v)!='function'){
+					var str=String(v);
+					v=function(c){
+						c.send(str);
+					};
+				}
+				this.__path__[ns+n]=v;
+			}
+			return(this);
+		},
+		
+		__observeProxy__:function(event,func)(this.observe(event,function(e)(func.call(e.connection,e.connection,e.response)))),
+		
+		addProxyRequestHandlers:function(h){
+			if(!(h instanceof Array)){
+				h=[h];
+			}
+			for(var i=0,a=[].concat(h),l=a.length;i<l;i++){
+				this.__observeProxy__('proxyRequest',a[i]);
+			}
+			return(this);
+		},
+		addProxyResponseHandlers:function(h){
+			if(!(h instanceof Array)){
+				h=[h];
+			}
+			for(var i=0,a=[].concat(h),l=a.length;i<l;i++){
+				this.__observeProxy__('proxyResponse',a[i]);
+			}
+			return(this);
+		},
+		addProxyOverrideHandlers:function(h){
+			if(!(h instanceof Array)){
+				h=[h];
+			}
+			for(var i=0,a=[].concat(h),l=a.length;i<l;i++){
+				this.__observeProxy__('proxyOverride',a[i]);
+			}
+			return(this);
+		},
+		
+		addUseProxy:function(p){
+			if(!(p instanceof Array)){
+				p=[p];
+			}
+			for(var i=0,l=p.length;i<l;i++){
+				if(p[i]===true){
+					this.__useProxyPatterns__=['(url.indexOf("http://")==0)'];
+					break;
+				}else if(typeof(p[i])=='function'){
+					this.__useProxyPatterns__.push('('+p[i].toSource()+')(url,host)');
+				}else if(p[i] instanceof RegExp){
+					this.__useProxyPatterns__.push('url.match('+p[i].toSource()+')');
+				}else if(p[i]){
+					this.__useProxyPatterns__.push('(url.indexOf('+String(p[i]).quote()+')!=-1)');
+				}
+			}
+			return(this);
+		},
+		addNoProxy:function(p){
+			if(!(p instanceof Array)){
+				p=[p];
+			}
+			for(var i=0,l=p.length;i<l;i++){
+				if(p[i]===true){
+					this.__noProxyPatterns__=['(url.indexOf("http://")==0)'];
+					break;
+				}else if(typeof(p[i])=='function'){
+					this.__noProxyPatterns__.push('('+p[i].toSource()+')(url,host)');
+				}else if(p[i] instanceof RegExp){
+					this.__noProxyPatterns__.push('url.match('+p[i].toSource()+')');
+				}else if(p[i]){
+					this.__noProxyPatterns__.push('(url.indexOf('+String(p[i]).quote()+')!=-1)');
+				}
+			}
+		},
+		
+		
+		resetProtectKey:function(first){
+			pref('HTTPD',true).directory('protectKeys').create().file(this.name+'.txt').remove();
+			delete(this.__protectKey__);
+			return(this);
+		},
+		
+		
+		addScripts:function(a){
+			if(!(a instanceof Array)){
+				a=[a];
+			}
+			for(var i=0,l=a.length;i<l;i++){
+				if((typeof(a[i])=='object')&&('load' in a[i])){
+					a[i]=a[i].load();
+				}else if(typeof(a[i])=='function'){
+					a[i]='('+a[i].toSource()+')();';
+				}
+				this.__scripts__.push(a[i]);
+			}
+			return(this);
+		},
+		
+		addClientSide:function(obj,ns){
+			var cs=ns?(this.__clientSideNS__[ns]||(this.__clientSideNS__[ns]={})):this.__clientSide__;
+			for each(let [n,v] in Iterator(obj||{})){
+				cs[n]=v.toSource();
+			}
+			return(this);
+		},
+		addServerSide:function(obj,ns){
+			var cs=ns?(this.__clientSideNS__[ns]||(this.__clientSideNS__[ns]={})):this.__clientSide__;
+			var ss=this.__serverSide__[ns||"_"]||(this.__serverSide__[ns]={});
+			for each(let [n,v] in Iterator(obj||{})){
+				ss[n]=(typeof(v)=='function')?v:function()(v);
+				cs[n]='function(a,c){CallServerSideFunction("'+(ns||'_')+'","'+n+'",this,a,c);}';
+			}
+			return(this);
+		},
+		
+		addBookmarklets:function(obj,ns){
+			var b=this.__bookmarklets__[ns||"_"]||(this.__bookmarklets__[ns]={});
+			for each(let [n,v] in Iterator(obj||{})){
+				b[n]=v.toSource();
+			}
+			return(this);
+		},
+		
+		addOptionMembers:function(m){
+			for each(let [N,v] in Iterator(m||{})){
+				let n=N;
+				if(v instanceof Array){
+					this[n]=v.slice(0);
+					this.__optionMembers__[n]=function(a){
+						if(!(a instanceof Array)){
+							a=[a];
+						}
+						for(var i=0,l=a.length;i<l;i++){
+							this[n].push(a[i]);
+						}
+					};
+				}else if(typeof(v)=='object'){
+					this[n]=Object.extend({},v);
+					this.__optionMembers__[n]=function(o){
+						for(let [p,v] in Iterator(o||{})){
+							this[n][p]=v;
+						}
+					};
+				}else if(this[v]){
+					this.__optionMembers__[n]=this[v];
+				}else{
+					this.__optionMembers__[n]=function(value)(this[n]=value);
+				}
+			}
+			return(this);
+		},
+		
+		__applyOptions__:function(obj){
+			for each(let [n,v] in Iterator(this.__optionMembers__||{})){
+				v.call(this,obj[n]);
+			}
+		},
+		
+		use:function(){
+			for(var i=0,l=arguments.length;i<l;i++){
+				var name=arguments[i];
+				if(!this.__loadedPlugins__[name]){
+					var p=this.constructor.plugins.item(name);
+					if(!p.__registered__){
+						if(!p.exists){
+							throw('HTTPD Error: plugin not found "'+name+'"');
+						}
+						p.load();
+						p.__registered__=true;
+						this.__loadedPlugins__[name]=p;
+						this.use.apply(this, p.require||[]);
+						p.initialize();
+						this.constructor.addMembers(p.httpdMembers||{});
+						Connection.addMembers(p.connectionMembers||{});
+						
+						this.addOptionMembers(p.options||{});
+						this.addScripts(p.scripts||[]);
+						this.addClientSide(p.clientSide||{},name);
+						this.addBookmarklets(p.bookmarklets||{},name);
+						this.addProxyRequestHandlers(p.proxyRequest||[]);
+						this.addProxyResponseHandlers(p.proxyResponse||[]);
+						this.addProxyOverrideHandlers(p.proxyOverride||[]);
+						this.addUseProxy(p.useProxy||[]);
+						this.addNoProxy(p.noProxy||[]);
+						this.__applyOptions__(p);
+						
+						var ss={};
+						for each(let [n,v] in Iterator(p.serverSide||{})){
+							ss[n]=v;
+						}
+						this.addServerSide(ss,name);
+						this.map(p.paths||{},name);
+					}
+					
+				}
+			}
+			return(this);
+		},
+	});
+	
+	var blank=MBString.from("\r\n\r\n");
+	var Connection=new Class({
+		__class__:{
+			Closed:new Error("Connection closed"),
+		},
+		__new__:function(parent,stream){
+			this.parent=parent;
+			this.encoding=this.parent.encoding;
+			this.__stream__=stream;
+			this.handle=stream.handle;
+			this.host=stream.host;
+			this.__stream__.lineSeparator="\r\n";
+			var line=this.__stream__.readLine().split(' ');
+			
+			if(line.length<3){
+				throw(this.constructor.Closed);
+			}
+			
+			this.__filters__=[];
+			this.__htmlFilters__=[];
+			this.__xmlFilters__=[];
+			this.__elementFilters__=[];
+			this.__textNodeFilters__=[];
+			this.__commentFilters__=[];
+			this.__scripts__=[];
+			
+			this.method=line[0].toUpperCase();
+			this.headers=uHTTP.Headers.parse(this.__stream__);
+			this.state='received';
+			this.response=new uHTTP.Headers();
+			this.status=200;
+			
+			if(line[1].match(/^\w+:/)){
+				this.__proxy__="received";
+				this.url=new uHTTP.URL(line[1],this.encoding);
+			}else{
+				var host=this.headers.getValue('Host');
+				this.url=new uHTTP.URL((host?('http://'+host+((this.parent.port!=80)?(':'+this.parent.port):'')):this.parent.url)+line[1],this.encoding);
+			}
+			
+			var cookies=(this.cookies={});
+			this.__setCookies__=[];
+			var c=(this.headers.getValue('Cookie')||"").split(/[^\,]\s*/);
+			for(var i=0,l=c.length;i<l;i++){
+				var m=c[i].match(/^(.*?)=(.*)$/);
+				if(m){
+					cookies[m[1]]=m[2];
+				}else{
+					cookies[m]=void(0);
+				}
+			}
+			
+			
+			this.referer=this.headers.getValue('Referer');
+			
+			
+		},
+		filter:function(o,p1,p2)(this.__filters__.push([o,p1,p2])),
+		filterHTML:function(h)(this.__htmlFilters__.push(function(e)(h(e.node,e.empty)))),
+		filterXML:function(h)(this.__xmlFilters__.push(function(e)(h(e.node,e.empty)))),
+		filterElements:function(h)(this.__elementFilters__.push(function(e)(h(e.node,e.empty)))),
+		filterTextNodes:function(h)(this.__textNodeFilters__.push(function(e)(h(e.node)))),
+		filterComments:function(h)(this.__commentFilters__.push(function(e)(h(e.node)))),
+		addScripts:function(a){
+			if(!(a instanceof Array)){
+				a=[a];
+			}
+			for(var i=0,l=a.length;i<l;i++){
+				if((typeof(a[i])=='object')&&('load' in a[i])){
+					a[i]=a[i].load();
+				}else if(typeof(a[i])=='function'){
+					a[i]='('+a[i].toSource()+')();';
+				}
+				this.__scripts__.push(a[i]+";\n");
+			}
+			return(this);
+		},
+		
+		get ready()(this.state=='received'),
+		get closed()(this.state=='closed'),
+		get sending()(this.state=='sending'),
+		free:function(){
+			this.close();
+			this.__body__&&this.__body__.free();
+		},
+		close:function(){
+			if(this.state!='closed'){
+				this.__stream__&&this.__stream__.free();
+				this.state='closed';
+			}
+		},
+		
+		get path()(this.url.path),
+		get query()(this.url.query),
+		get params()(this.url.params),
+		
+		get body(){
+			if(!this.__body__ && (this.method=='POST')){
+				var l=this.headers.getValue('Content-Length');
+				if(l && (l!='0')){
+					this.__body__=this.__stream__.readBytes(parseInt(l));
+					this.__body__.encoding='utf8';
+				}
+			}
+			return(this.__body__);
+		},
+		get post(){
+			if(!this.__post__ && this.body){
+				var ct=this.headers.getValue('Content-Type')||"";
+				if(ct.match(/^multipart\//)){
+					var bound=MBString.from("\r\n--"+(ct.match(/boundary=([^,]*)/i)||['',''])[1]);
+					var bsize=bound.size;
+					var post=(this.__post__={});
+					var body=this.body;
+					var size=body.size;
+					while(size>0){
+						var idx=body.indexOf(blank);
+						if(idx==-1){
+							break;
+						}
+						var h=body.inc(0);
+						h.count=idx;
+						var d=uHTTP.Headers.parse(h.toString()).getValue('Content-Disposition');
+						var name=(d.match(/name="([^"]*)"/)||["",""])[1];
+						var ptr=body.inc(idx+4);
+						var len=ptr.indexOf(bound);
+						if(len==-1){
+							break;
+						}
+						ptr.count=len;
+						ptr.filename=(d.match(/filename="([^"]*)"/)||[])[1];
+						if(ptr.filename){
+							post[name]=ptr;
+						}else{
+							ptr.encoding=this.encoding;
+							post[name]=ptr.toString();
+						}
+						size-=idx+6+len+bsize;
+						body=ptr.inc(len+bsize+2);
+						body.count=size;
+					}
+				}else{
+					var a=(this.body||"").toString().replace(/\+/g,"%20").split('&');
+					var params=(this.__post__={});
+					for(var i=0,l=a.length;i<l;i++){
+						var m=a[i].match(/^(.*?)=(.*)$/);
+						if(m){
+							params[MBString.decodeURIComponent(m[1],this.encoding)]=MBString.decodeURIComponent(m[2],this.encoding);
+						}else{
+							params[MBString.decodeURIComponent(a[i],this.encoding)]=void(0);
+						}
+					}
+				}
+			}
+			return(this.__post__);
+		},
+		
+		write:function(obj){
+			if(this.state=='closed'){
+			}else if(Object.isGenerator(obj)){
+				for(let v in obj){
+					this.write(v);
+				}
+			}else if(obj instanceof Array){
+				for(var i=0,l=obj.length;i<l;i++){
+					this.write(obj[i]);
+				}
+			}else if(typeof(obj.readTo)=='function'){
+				try{
+					var size=this.parent.bufferSize;
+					var buf=Byte.alloc(size);
+					var b=buf.valueOf();
+					while(!obj.eof){
+						buf.count=obj.readTo(b,size);
+						this.write(buf);
+					}
+				}finally{
+					buf&&buf.free();
+				}
+			}else if(typeof(obj.openRead)=='function'){
+				try{
+					var s=obj.openRead();
+					this.write(s);
+				}finally{
+					s && s.free();
+				}
+			}else{
+				obj=obj||"";
+				if(obj instanceof XML){
+					obj=obj.toXMLString();
+				}
+				if(this.state=='received'){
+					if("contentLength" in this){
+						this.response.setValue('Content-Length',this.contentLength);
+					}
+					if(this.contentType){
+						if(this.parent.contentTypes[this.contentType]){
+							this.contentType=this.parent.contentTypes[this.contentType];
+						}
+						if(this.contentType.match(/^text\//)){
+							this.contentType+='; charset='+this.parent.encoding;
+						}
+						this.response.setValue('Content-Type',this.contentType);
+					}
+					if(this.__proxy__=='received'){
+						this.parent.fire('proxyOverride',{connection:this});
+					}
+					this.__stream__.writeLine('HTTP/1.0 '+this.status+' '+this.parent.statusTexts[this.status]);
+					this.__stream__.write(this.response.toString());
+					for(var i=0,a=this.__setCookies__,l=a.length;i<l;i++){
+						this.__stream__.writeLine(a[i]);
+					}
+					this.__stream__.writeLine("");
+					this.state='sending';
+				}
+				this.__stream__.write(obj);
+			}
+			return(this);
+		},
+		send:function(obj){
+			obj=obj||"";
+			if(this.state=='received'){
+				if((typeof(obj.openRead)=='function')&&('size' in obj)){
+					this.contentType=((obj.name||"").match(/\.(.*)$/)||['',''])[1];
+					this.contentLength=obj.size;
+				}else if(obj instanceof Pointer){
+					this.contentLength=obj.size;
+				}
+				this.write(obj);
+				this.close();
+			}
+			return(this);
+		},
+		
+		error:function(code,msg){
+			this.status=(code=code||403);
+			var doc=this.parent.errorDocuments[code];
+			if(typeof(doc)=='function'){
+				doc(this,msg);
+			}else{
+				this.contentType='html';
+				this.send(doc||'<html><head><title>Error</title></head><body><h1>'+code+' '+this.parent.statusTexts[code]+'</h1><p>'+(msg||"")+'</p></body></html>');
+			}
+			return(this);
+		},
+		redirect:function(url){
+			this.status=302;
+			url=this.url.build(url)
+			this.response.setValue('Location',url);
+			this.send('<html><head><meta http-equiv="Refresh" content="0;URL='+url+'"></head></html>');
+			return(this);
+		},
+		
+		protect:function(msg){
+			var ref=this.headers.referer;
+			if(ref && (String(this.url.build('/'))==String((new uHTTP.URL(ref)).build('/')))){
+				if(this.url.params.__protect__hash__){
+					this.url.query=this.url.params.__original__query__;
+				}
+				return(true);
+			}else if((this.method=='GET') && this.url.params.__protect__hash__){
+				var hash=this.url.params.__protect__hash__;
+				this.url.query=this.url.params.__original__query__;
+				if(SHA256.calc(this.url+'::'+this.parent.protectKey)==hash){
+					return(true);
+				}
+			}
+			this.beginHTML('protected page');
+			this.write('<h1>protected page</h1><p>This page execute '+(msg?'the following':'some critical')+' operation.');
+			if(msg){
+				this.write('<blockquote>'+msg+'</blockquote>');
+			}
+			this.write('<p>Click the following link to continue.</p>');
+			this.a(this.url);
+			
+			if(this.method=='GET'){
+				this.write('<h2>URL for bookmark</h2>');
+				var url2=new uHTTP.URL(this.url);
+				url2.params={__protect__hash__:SHA256.calc(this.url+'::'+this.parent.protectKey)};
+				if(typeof(this.url.query)!='undefined'){
+					url2.params.__original__query__=this.url.query;
+				}
+				this.a(url2);
+			}
+			this.endHTML();
+		},
+		
+		lastModified:function(time){
+		},
+		
+		setCookie:function(name,value,expire){
+		},
+		removeCookie:function(name){
+		},
+		
+		
+		__sendInitScript__:function(callSS){
+			this.write(jQuery+';\nvar $=jQuery=window.jQuery.noConflict(true);\n');
+			this.write(jQueryJSON+';\n');
+			
+			this.write('var CallServerSideFunction=('+callSS.toSource()+');\n');
+			var cs=[];
+			var ini=[];
+			for each(let [n,v] in Iterator(this.parent.__clientSide__)){
+				cs[cs.length]=n+'='+v;
+			}
+			for each(let [n,v] in Iterator(this.parent.__clientSideNS__)){
+				var ns=[];
+				for each(let [N,V] in Iterator(v)){
+					ns[ns.length]=N.quote()+':'+V;
+					if(N=='__new__'){
+						ini[ini.length]=n+'.__new__();';
+					}
+				}
+				cs[cs.length]=n+'={'+ns.join(",\n")+'}';
+			}
+			if(cs.length>0){
+				this.write('var '+cs.join(',\n')+';\n');
+			}
+			this.write(ini.join("\n"));
+			for(var i=0,a=this.parent.__scripts__||[],l=a.length;i<l;i++){
+				this.write(a[i]+";\n");
+			}
+		},
+		
+		beginHTML:function(opt){
+			opt=opt||{};
+			if(typeof(opt)=='string'){
+				opt={title:opt};
+			}
+			this.contentType='html';
+			this.response.setValue('Content-Language',this.parent.lang);
+			this.write('<html lang="'+this.parent.lang+'">\n<head>\n');
+			if('title' in opt){
+				this.write((<title>{opt.title||""}</title>).toXMLString());
+			}
+			for each(let [n,v] in Iterator(opt.meta||{})){
+				this.write('<meta http-equiv="'+n+'" content="'+(String(v).escapeHTML())+'" />\n');
+			}
+			this.write('<base href="'+(new uHTTP.URL(opt.baseURL||this.url))+'" target="'+(opt.baseTarget||'_self')+'" />');
+			if(!opt.noScript){
+				this.write('<script type="text/javascript"><!--\n');
+				this.__sendInitScript__(function(ns,name,_this,args,callback){
+					$.ajax({
+						type:'POST',
+						url:['/__ajax__',ns,name].join('/'),
+						data:$.toJSON(args),
+						success:function(data,state){
+							(callback||(function(){})).apply(_this,[$.evalJSON(data||'""'),args]);
+						},
+					});
+				});
+				
+				for(var i=0,a=(opt.scripts instanceof Array)?opt.scripts:((opt.scripts&&[opt.scripts])||[]),l=a.length;i<l;i++){
+					if(typeof(a[i].load)=='function'){
+						this.write(a[i].load()+"\n");
+					}else if(typeof(a[i])=='function'){
+						this.write('('+(a[i].toSource())+')();');
+					}else{
+						this.write(a[i]+"\n");
+					}
+				}
+				this.write('//--></script>\n');
+			}
+			if('styles' in opt){
+				this.write('<style type="text/css"><!--\n');
+				for(var i=0,a=(opt.styles instanceof Array)?opt.styles:[opt.styles],l=a.length;i<l;i++){
+					if(typeof(a[i].load)=='function'){
+						this.write(a[i].load()+"\n");
+					}else{
+						this.write(a[i]+"\n");
+					}
+				}
+				this.write('//--></style>\n');
+			}
+			this.write('</head><body>');
+			
+			if(opt.requireScript){
+				this.write('<noscript>'+opt.requireScript+'</noscript>');
+			}
+			
+			return(this);
+		},
+		endHTML:function(opt)(this.write('</body></html>').close()),
+		html:function(opt,body)(this.beginHTML(opt).write(body).endHTML()),
+		script:function(src){
+			this.write('<script type="text/javascript"><!--\n');
+			if(typeof(src.load)=='function'){
+				this.write(src.load()+"\n");
+			}else if(typeof(src)=='function'){
+				this.write('('+(src.toSource())+')();');
+			}else{
+				this.write(src+"\n");
+			}
+			this.write('//--></script>\n');
+			return(this);
+		},
+		
+		tag:function(name,attrs,body,escapeBody){
+			var a=[name];
+			for each(let [n,v] in Iterator(attrs||{})){
+				a[a.length]=n+'="'+String(v).escapeHTML()+'"';
+			}
+			if(arguments.length<3){
+				this.write('<'+a.join(' ')+'>');
+			}else if(!body && (typeof(body)!='string')){
+				this.write('<'+a.join(' ')+' />');
+			}else{
+				if(escapeBody){
+					body=String(body||"").escapeHTML();
+				}
+				this.write('<'+a.join(' ')+'>');
+				this.write(body);
+				this.write('</'+name+'>');
+			}
+			return(this);
+		},
+		a:function(url,text,attrs)(this.tag('a',Object.extend({href:url},attrs),text||url,true)),
+		br:function()(this.write('<br />')),
+		bookmarkletURL:function(n)let([,ns,name]=n.match(/^(.*?):(.*)$/)||[,'_',n])("javascript:(function(U,B,T,K,d,x,i,L,s){for(K=[U,K,B,T].join(':').split('');s=K.pop();x=((L[s]||(L[s]=++i))+x*i)%0x1fffffffffff91);"
+					+"(s=d.createElement('script')).src=[B,T,x].join('/');d.body.appendChild(s);})((location.protocol=='https:')?'':location.href,'"+this.url.build('/bookmarklet/'+ns+'/'+name)
+					+"',(new Date).getTime(),'"+this.parent.protectKey+"',document,0,0,{})"),
+		bookmarklet:function(name,text,attrs)(this.a(this.bookmarkletURL(name),text||name,attrs)),
+	});
+	this.HTTPD=HTTPD;
+	this.Connection=Connection;
+	this.HTTPDPlugin=HTTPDPlugin;
+})

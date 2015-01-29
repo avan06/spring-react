@@ -1,0 +1,13 @@
+var s=Main.params[0]||prompt("作成する実行ファイルの名前","");
+var editor="notepad";
+if(s){
+	Main.file.copy(Main.directory.file(s+".exe"),true);
+	Main.directory.file(s+".js").update(String(<![CDATA[__NG__EvalFile(__NG__HostPath().replace(/([^\\]+)$/,"lib\\Base.ng"));
+Main.main=function(){
+	/* script body */
+	
+}
+Main.execute();
+]]>));
+	run(editor+' "'+Main.directory.file(s+".js")+'"');
+}

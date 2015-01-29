@@ -1,0 +1,248 @@
+(function(){
+	
+	
+/*
+#define RID_INPUT               0x10000003
+#define RID_HEADER              0x10000005
+
+#define RIM_TYPEMOUSE       0
+#define RIM_TYPEKEYBOARD    1
+#define RIM_TYPEHID         2
+
+#define RIDEV_REMOVE            0x00000001
+#define RIDEV_EXCLUDE           0x00000010
+#define RIDEV_PAGEONLY          0x00000020
+#define RIDEV_NOLEGACY          0x00000030
+#define RIDEV_INPUTSINK         0x00000100
+#define RIDEV_CAPTUREMOUSE      0x00000200  // effective when mouse nolegacy is specified, otherwise it would be an error
+#define RIDEV_NOHOTKEYS         0x00000200  // effective for keyboard.
+#define RIDEV_APPKEYS           0x00000400  // effective for keyboard.
+
+Rid[0].usUsagePage = 0x01; 
+Rid[0].usUsage = 0x02; 
+Rid[0].dwFlags = RIDEV_NOLEGACY;   // adds HID mouse and also ignores legacy mouse messages
+Rid[0].hwndTarget = 0;
+
+Rid[1].usUsagePage = 0x01; 
+Rid[1].usUsage = 0x06; 
+Rid[1].dwFlags = RIDEV_NOLEGACY;   // adds HID keyboard and also ignores legacy keyboard messages
+Rid[1].hwndTarget = 0;
+
+*/
+	
+	
+	var RawInputDeviceList=new Struct({handle:UInt,type:UInt});
+	
+	var RawInputDevice=new Struct({
+		page:		UShort,
+		usage:		UShort,
+		flags:		UInt,
+		hwnd:		UInt,
+	});
+	
+	var RawInputHeader=new Struct({
+		type:		UInt,
+		size:		UInt,
+		hDevice:	UInt,
+		wParam:		UInt,
+	});
+	var RawHidInput=new Struct({
+		type:		UInt,
+		size:		UInt,
+		hDevice:	UInt,
+		wParam:		UInt,
+		size:		UInt,
+		count:		UInt,
+		data:		[Byte,1],
+	});
+	var RawKeyboardInput=new Struct({
+		type:		UInt,
+		size:		UInt,
+		hDevice:	UInt,
+		wParam:		UInt,
+		makeCode:	UShort,
+		flags:		UShort,
+		reserved:	UShort,
+		vkey:		UShort,
+		message:	UInt,
+		exInfo:		UInt,
+	});
+	var RawMouseInput=new Struct({
+		type:		UInt,
+		size:		UInt,
+		hDevice:	UInt,
+		wParam:		UInt,
+		flags:		UShort,
+		reserved:	UShort,
+		buttonFlags:UShort,
+		buttonData:	UShort,
+		rawButtons:	UInt,
+		x:			Int,
+		y:			Int,
+		exInfo:		UInt,
+	});
+	
+	var HidInfo=new Struct({
+		size:			UInt,
+		type:			UInt,
+		vendorId:		UInt,
+		productId:		UInt,
+		version:		UInt,
+		page:			UInt,
+		usage:			UInt,
+		res1:			UInt,
+	});
+	var KeyboadInfo=new Struct({
+		size:			UInt,
+		type:			UInt,
+		kbType:			UInt,
+		kbSubType:		UInt,
+		mode:			UInt,
+		functionKeyCount:	UInt,
+		ledCount:		UInt,
+		keyCount:		UInt,
+	});
+	var MouseInfo=new Struct({
+		size:			UInt,
+		type:			UInt,
+		id:				UInt,
+		buttonCount:	UInt,
+		sampleRate:		UInt,
+		hasTilt:		UInt,
+		res1:			UInt,
+		res2:			UInt,
+	});
+	
+	
+	var
+		DefRawInputProc=				user32.proc('DefRawInputProc',[Pointer,UInt,UInt],UInt),
+		GetRawInputBuffer=				user32.proc('GetRawInputBuffer',[Pointer,Pointer,UInt],UInt),
+		GetRawInputData=				user32.proc('GetRawInputData',[UInt,UInt,Pointer,Pointer,UInt],UInt),
+		GetRawInputDeviceInfo=			user32.proc('GetRawInputDeviceInfoW',[UInt,UInt,Pointer,Pointer],UInt,true),
+		GetRawInputDeviceList=			user32.proc('GetRawInputDeviceList',[Pointer,Pointer,UInt],UInt,true),
+		GetRegisteredRawInputDevices=	user32.proc('GetRegisteredRawInputDevices',[Pointer,Pointer,UInt],UInt),
+		RegisterRawInputDevices=		user32.proc('RegisterRawInputDevices',[Pointer,UInt,UInt],UInt)
+		;
+	
+	
+	
+	
+	
+	
+	var Device=new Class({},EventMixin,{
+		__class__:{
+			__observeFirst__:function(){
+			},
+			__unobserveLast__:function(){
+			},
+			
+			__messageHandler__:function(wp,lp){
+			},
+			
+			get all(){
+				try{
+					var cnt=UInt.alloc();
+					GetRawInputDeviceList(null,cnt,8);
+					var buf=RawInputDeviceList.alloc(cnt.item());
+					GetRawInputDeviceList(buf,cnt,8);
+					for(var i=0,l=cnt.item();i<l;i++){
+						var item=buf.inc(i);
+						var obj=new this(item.handle,item.type);
+						if(obj.valid){
+							yield(obj);
+						}
+					}
+				}finally{
+					cnt&&cnt.free();
+					buf&&buf.free();
+				}
+			},
+		},
+		__new__:function(handle,type){
+			this.__instanceIdentifier__=this.handle=handle;
+			this.__type__=type;
+		},
+		
+		
+		get info(){
+			if(!this.__info__){
+				try{
+					var s=UInt.alloc();
+					GetRawInputDeviceInfo(this.handle,0x2000000B,null,s);
+					var b=Byte.alloc(Math.max(s.item(),32));
+					GetRawInputDeviceInfo(this.handle,0x2000000B,b,s);
+					this.__info__=(new ([MouseInfo,KeyboadInfo,HidInfo][this.__type__])(b.valueOf())).convert();
+				}finally{
+					s&&s.free();
+					b&&b.free();
+				}
+			}
+			return(this.__info__);
+		},
+		
+		get vendorId()(this.info.vendorId),
+		get productId()(this.info.productId),
+		get version()(this.info.version),
+		get usagePage()(this.info.page),
+		get usage()(this.info.usage),
+		
+		
+		get type()(['mouse','keyboard'][this.__type__]),
+		
+		get name(){
+			try{
+				var s=UInt.alloc();
+				GetRawInputDeviceInfo(this.handle,0x20000007,null,s);
+				var b=WChar.alloc(s.item());
+				GetRawInputDeviceInfo(this.handle,0x20000007,b,s);
+				return(b.toString());
+			}finally{
+				s&&s.free();
+				b&&b.free();
+			}
+		},
+		
+		
+		
+	});
+	
+	var RawMouse=new Class(Device,{
+		get valid()(this.__type__==0),
+		usagePage:1,
+		usage:2,
+		get id()(this.info.id),
+		get buttonCount()(this.info.buttonCount),
+		get sampleRate()(this.info.sampleRate),
+		get hasTilt()(this.info.hasTilt),
+		
+	});
+	
+	var RawKeyboard=new Class(Device,{
+		get valid()(this.__type__==1),
+		usagePage:1,
+		usage:6,
+		get keyboardType()(this.info.type),
+		get keyboardSubType()(this.info.kbSubType),
+		get mode()(this.info.mode),
+		get functionKeyCount()(this.info.functionKeyCount),
+		get ledCount()(this.info.ledCount),
+		get keyCount()(this.info.keyCount),
+		
+		
+		__observe__:function(){
+		},
+		
+	});
+	
+	this.Device=Device;
+	this.RawMouse=RawMouse;
+	this.RawKeyboard=RawKeyboard;
+	
+	
+	var kbd=require('Keyboard');
+	var ms=require('Mouse');
+	this.Mouse=ms.Mouse;
+	this.Keyboard=kbd.Keyboard;
+	this.Key=kbd.Key;
+	
+})

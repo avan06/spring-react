@@ -1,0 +1,1259 @@
+(function(){
+	
+	var {URL,HTTP,Response}=require('HTTP');
+	var {HTML}=require('LooseXML');
+	var {ContentExtractor,NotFound}=require('ContentExtractor');
+	var DB=require('SQLite').DB;
+	var {SHA1}=require('Hash');
+	
+	var NotebookFilterPlugin=new Class(Plugin,{
+		filter:function(o)(o),
+		filters:{},
+	});
+	var Filter=new Class({
+		__class__:{
+			plugins:new Pluggable('NotebookFilter',NotebookFilterPlugin),
+		},
+		__new__:function(src){
+			if(typeof(src)=='function'){
+				this.filter=src;
+			}else if((typeof(src)=='object') && (src instanceof Array)){
+				var a=[],l=a.length;
+				for(var i=0;i<l;i++){
+					a[i]=new this.constructor(src[i]);
+				}
+				this.filter=function(o){
+					for(var i=0;i<l;i++){
+						if(a[i].filter(o)){
+							return(true);
+						}
+					}
+				};
+			}else if(src){
+				src=String(src);
+				var [,name,arg]=String(src).match(/^(.*?)\s*,\s*(.*)$/)||['',src,''];
+				var m,f;
+				if(m=name.match(/^(.*?)\.(.*)$/)){
+					var p=this.constructor.plugins.item(m[1]);
+					if(!p){
+						throw(new Error('Plugin not found: '+m[1]));
+					}
+					f=p.filters[m[2]];
+					if(!f){
+						throw(new Error('Plugin filter not found: '+name));
+					}
+				}else{
+					var p=this.constructor.plugins.item(name);
+					if(!p){
+						throw(new Error('Plugin not found: '+m[1]));
+					}
+					f=p.filter;
+				}
+				this.filter=function(o)(f(o,arg));
+			}
+		},
+		
+		filter:function(o)(false),
+	});
+	
+	var NotebookFormatPlugin=new Class(Plugin,{
+		test:function(n)((this.name==n)?50:0),
+		extractText:function(doc)(doc),
+		split:function(doc)(doc.split(/\r?\n/)),
+		viewHTML:function(doc)('<pre>'+doc.escapeHTML()+'</pre>'),
+	});
+	
+	
+	var Notebook=new Class({},EventMixin,{
+		__class__:{
+			formatPlugins:new Pluggable('NotebookFormat',NotebookFormatPlugin),
+		},
+		__new__:function(dir,opt){
+			this.directory=pref().directory(dir);
+			this.file=this.directory.file('notebook.db');
+			opt=opt||{};
+			this.segmenter=require('Segmenter').Segmenter.create(opt.segmenter||System.locale.langShortName);
+			this.defaultFormat=opt.defaultFormat||'HTML';
+		},
+		
+		__openDB__:function(){
+			var create=!this.file.exists;
+			this.file.parent.create();
+			var db=DB.open(this.file);
+			db.timeout=10000;
+			db.execute('PRAGMA foreign_keys = ON');
+			if(create){
+				db.execute(<![CDATA[CREATE TABLE IF NOT EXISTS pages(
+					pid INTEGER PRIMARY KEY AUTOINCREMENT,
+					parent INTEGER DEFAULT NULL,
+					url TEXT DEFAULT NULL,
+					link TEXT DEFAULT NULL,
+					title TEXT,
+					summary TEXT,
+					content TEXT,
+					ctime INTEGER,
+					mtime INTEGER,
+					vtime INTEGER DEFAULT NULL,
+					vcount INTEGER,
+					score INTEGER DEFAULT 0,
+					revision INTEGER DEFAULT 1,
+					format TEXT,
+					segmenter TEXT
+				)]]>);
+				//pages.pid,pages.url,pages.link,pages.title,pages.summary,pages.content,pages.ctime,pages.mtime,pages.vtime,pages.vcount,pages.score,pages.revision
+
+				db.execute("CREATE VIRTUAL TABLE fts USING fts4(pid INTEGER, data TEXT, tags TEXT)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_url ON pages(url,mtime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_link ON pages(link)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_ctime ON pages(ctime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_mtime ON pages(mtime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_vtime ON pages(vtime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_vcount ON pages(vcount)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_score ON pages(score)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_purl ON pages(parent,url)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_plink ON pages(parent,link)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_pctime ON pages(parent,ctime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_pmtime ON pages(parent,mtime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_pvtime ON pages(parent,vtime)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_pvcount ON pages(parent,vcount)");
+				db.execute("CREATE INDEX IF NOT EXISTS pages_pscore ON pages(parent,score)");
+				db.execute(<![CDATA[CREATE TABLE IF NOT EXISTS tags(
+					tid INTEGER PRIMARY KEY AUTOINCREMENT,
+					text TEXT UNIQUE
+				)]]>);
+				db.execute(<![CDATA[CREATE TABLE IF NOT EXISTS synonym(
+					tid INTEGER REFERENCES tags(tid) ON DELETE CASCADE,
+					text TEXT UNIQUE
+				)]]>);
+				db.execute(<![CDATA[CREATE TABLE IF NOT EXISTS tagof(
+					pid INTEGER REFERENCES pages(pid) ON DELETE CASCADE,
+					tid INTEGER REFERENCES tags(tid) ON DELETE CASCADE,
+					PRIMARY KEY(pid,tid)
+				)]]>);
+				db.execute("CREATE INDEX IF NOT EXISTS tagof_tpid ON tagof(tid,pid)");
+				
+				db.execute(<![CDATA[CREATE TABLE IF NOT EXISTS history(
+					pid INTEGER REFERENCES pages(pid) ON DELETE CASCADE,
+					revision INTEGER,
+					url TEXT,
+					link TEXT,
+					title TEXT,
+					summary TEXT,
+					content TEXT,
+					mtime INTEGER,
+					PRIMARY KEY(pid,revision)
+				)]]>);
+				
+				db.execute(<![CDATA[ CREATE TABLE IF NOT EXISTS crawls(
+					cid INTEGER PRIMARY KEY AUTOINCREMENT,
+					parent INTEGER DEFAULT NULL,
+					pid INTEGER,
+					url TEXT,
+					name TEXT,
+					rule TEXT,
+					options TEXT,
+					backnumbers TEXT,
+					atime INTEGER,
+					mtime INTEGER,
+					lastError TEXT
+				)]]>);
+				
+				
+				
+				
+				
+			}
+			return(db);
+		},
+		
+		
+		
+		__buildFTSContent__:function(obj,seg){
+			var content=this.constructor.formatPlugins.find(obj.format||"text").extractText(obj.content||"");
+			var summary=(obj.summary||"").replace(/<[^>]*>/g,'');
+			return(this.segmenter.segment([content,summary,obj.title||""].join("\n")).join(' ').replace(/\s+/g,' '));
+		},
+		
+		get tags(){
+			try{
+				var db=this.__openDB__();
+				for(let row in db.query("SELECT tid FROM tags")){
+					yield(new Tag(this,row.tid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		tag:function(id,create){
+			if((""+id).match(/^\d+$/)){
+				return(new Tag(this,id*1));
+			}else{
+				try{
+					var db=this.__openDB__();
+					var tid=(db.query("SELECT tid FROM tags WHERE text=$n",{n:id}).first()||{}).tid;
+					if(tid){
+						return(new Tag(this,tid));
+					}else if(create){
+						db.execute('INSERT INTO tags(text) VALUES($n)',{n:id});
+						return(new Tag(this,db.lastID));
+					}
+				}finally{
+					free(db);
+				}
+			}
+		},
+		get pages(){
+			try{
+				var db=this.__openDB__();
+				for(let row in db.query("SELECT pid FROM pages")){
+					yield(new Page(this,row.pid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		get rootPages(){
+			try{
+				var db=this.__openDB__();
+				for(let row in db.query("SELECT pid FROM pages WHERE parent IS NULL")){
+					yield(new Page(this,row.pid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		page:function(id)(new Page(this,id)),
+		
+		query:function(q){
+			try{
+				var db=this.__openDB__();
+				for(let row in db.query(q)){
+					if("pid" in row){
+						row.page=new Page(this,row.pid);
+					}
+					if("tid" in row){
+						row.tag=new Tag(this,row.tid);
+					}
+					yield(row);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		search:function(q,count,offset){
+			var sw=0;
+			var conds=[];
+			var kws=[];
+			var ph={};
+			var phid=0;
+			(' '+q+' ').replace(/\s(-?)"(.*?)"\s/g,function($0,$1,$2){
+				kws.push($1+$2);
+			}).replace(/\b([cmv])t([<>])(\d+)([hdwmy]?)/ig,function($0,$1,$2,$3,$4){
+				conds.push($1+"time"+$2+($4?(now().getTime()-parseInt($3)*({h:1,d:24,w:24*7,m:24*30,y:24*365})[$4.toLowerCase()]*60*60*1000):Date.from($3).getTime()));
+				return("");
+			}).replace(/\br([<>])(\d+)/ig,function($0,$1,$2){
+				conds.push("revision"+$1+$2);
+				return("");
+			}).replace(/\bv([<>])(\d+)/ig,function($0,$1,$2){
+				conds.push("vcount"+$1+$2);
+				return("");
+			}).replace(/\bs([<>])([\d\.]+)/ig,function($0,$1,$2){
+				conds.push("score"+$1+$2);
+				return("");
+			}).replace(/\ss\*([\d\.]+)/ig,function($0,$1){
+				sw=$1*1;
+				return("");
+			}).replace(/\s(-?)([ults]+):(?:"(.+)"|(\S+))\s/ig,function($0,$1,$2,$3,$4){
+				var kw=$3||$4;
+				ph['ph'+phid]='%'+kw.replace(/[%_\\]/g,'\\$0')+'%';
+				if($2.match(/u/i)){
+					conds.push("url "+($1?"NOT ":"")+"LIKE $ph"+phid+" ESCAPE '\\'");
+				}
+				if($2.match(/l/i)){
+					conds.push("link "+($1?"NOT ":"")+"LIKE $ph"+phid+" ESCAPE '\\'");
+				}
+				if($2.match(/t/i)){
+					conds.push("title "+($1?"NOT ":"")+"LIKE $ph"+phid+" ESCAPE '\\'");
+				}
+				if($2.match(/s/i)){
+					conds.push("summary "+($1?"NOT ":"")+"LIKE $ph"+phid+" ESCAPE '\\'");
+				}
+				if(!$1 && $2.match(/[ts]/)){
+					kws.push(kw);
+				}
+				phid++;
+				return("");
+			}).replace(/\S+/g,function($0){
+				kws.push($0);
+			});
+			
+			var query="SELECT pages.pid AS pid, link,url,title,summary,ctime,mtime,vtime,vcount,revision,score";
+			if(kws.length){
+				var a=[];
+				for(var i=0,l=kws.length;i<l;i++){
+					var [,exclude,term]=kws[i].match(/^(-?)(.*)$/)||[,,kws[i]];
+					
+					if(term.match(/^:/)){
+						term=[term];
+					}else{
+						term=this.segmenter.segment(term);
+					}
+					
+					ph['ph'+phid]='%'+term.join(' ').replace(/\s+/g,' ').replace(/[%_\\]/g,'\\$0')+'%';
+					if(exclude){
+						if(term.length>1){
+							conds.push("fts.data NOT LIKE $ph"+phid+" ESCAPE '\\'");
+						}else{
+							a.push('-'+term[0]);
+						}
+					}else{
+						if(term.length>1){
+							a.push('"'+term.join(' ')+'"');
+						}else{
+							a.push(term[0]);
+						}
+					}
+					phid++;
+				}
+				if(a.length>0){
+					ph['ph'+phid]=a.join(' ');
+					conds.unshift("fts MATCH $ph"+phid);
+					query+=',snippet(fts,"<!>","</!>","...",1,-40) AS snippet';
+				}
+				query+=' FROM fts INNER JOIN pages USING(pid) WHERE ('+conds.join(') AND (')+')';
+				
+				if(sw){
+					query+=" ORDER BY length(offsets(fts))+score*"+sw+" DESC";
+				}else{
+					query+=" ORDER BY length(offsets(fts)) DESC";
+				}
+			}else{
+				query+=' FROM pages WHERE ('+conds.join(') AND (')+') ORDER BY score DESC';
+			}
+			if(count){
+				query+=' LIMIT '+count;
+			}
+			if(offset){
+				query+=' OFFSET '+offset;
+			}
+			try{
+				var db=this.__openDB__();
+				for(let row in db.query(query,ph)){
+					row.page=new Page(this,row.pid);
+					if(row.snippet){
+						row.snippet=row.snippet
+							.replace(/<(\s*[a-z])/gi,'&lt;$1')
+							.replace(/>/g,'&gt;')
+							.replace(/<!&gt;/g,'<em>')
+							.replace(/<\/!&gt;/g,'</em>')
+							.replace(/<(?!\/?em)/ig,'&lt;')
+							.replace(/<\/em>\s+<em>/g,' ')
+							.replace(/([^\w>])\s|\s([^\w<])/g,'$1$2');
+					}
+					yield(row);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		addCrawl:function(url,name,rule,options){
+			try{
+				var db=this.__openDB__();
+				var page=this.add({
+					format:'HTML',
+					title:url,
+					url:url,
+					summary:"",
+					content:"",
+				},db);
+				db.table('crawls').insert([{
+					pid:page.id,
+					url:url,
+					name:name,
+					rule:serialize(rule||null),
+					options:serialize(options||[{}]),
+					backnumbers:"{}",
+					atime:0,
+					mtime:0,
+					lastError:"",
+				}]);
+				
+				return(db.lastID);
+			}finally{
+				free(db);
+			}
+		},
+		getCrawl:function(cid){
+			try{
+				var db=this.__openDB__();
+				var o=db.query('SELECT * FROM crawls WHERE cid='+cid).first();
+				if(o){
+					o.rule=eval(o.rule);
+					o.options=eval(o.options);
+					o.backnumbers=eval(o.backnumbers);
+					o.atime=new Date(o.atime*1);
+					o.mtime=new Date(o.mtime*1);
+				}
+				return(o);
+			}finally{
+				free(db);
+			}
+		},
+		updateCrawl:function(cid,o){
+			o=o||{};
+			if(o.rule){
+				o.rule=serialize(o.rule);
+			}
+			if(o.options){
+				o.options=serialize(o.options);
+			}
+			if(o.backnumbers){
+				o.backnumbers=serialize(o.backnumbers);
+			}
+			try{
+				var db=this.__openDB__();
+				db.table('crawls').update("cid="+cid,o);
+			}finally{
+				free(db);
+			}
+		},
+		removeCrawl:function(cid){
+			try{
+				var db=this.__openDB__();
+				db.execute('DELETE FROM crawls WHERE cid='+cid);
+			}finally{
+				free(db);
+			}
+		},
+		
+		crawl:function(httpOpt){
+			httpOpt=Object.extend({},httpOpt||{});
+			try{
+				var nextTime=now().getTime()+24*60*60*1000;
+				
+				var db=this.__openDB__();
+				var crawls=db.query("SELECT * FROM crawls").toArray();
+				this.fire('beginCrawl');
+				for(var i=0,l=crawls.length;i<l;i++){
+					var options=eval(crawls[i].options||"[{}]");
+					var opt=options[0];
+					var cid=crawls[i].cid;
+					var pid=crawls[i].pid;
+					var url=crawls[i].url;
+					var interval=Math.abs(opt.interval||20)*60000;
+					var warn=[];
+					if((now().getTime()>(crawls[i].atime+interval)) && this.fire('crawl',{url:url})){
+						try{
+							var updateCount=0;
+							var bak=eval(crawls[i].backnumbers||"{}")||{}, bak2={}, upd=opt.update;
+							var deep=(options.length>1)&& serialize(options.slice(1));
+							var filt=new Filter(opt.filters);
+							var mtime=crawls[i].mtime||0, err="",remove;
+							var http=new HTTP(Object.extend(httpOpt,opt.http||{}));
+							var def=eval(crawls[i].rule);
+							
+							var x,m;
+							if(!def){
+								x=ContentExtractor.extract(url,{http: http,directory:this.directory});
+							}else if((typeof(def)=='string') && (m=def.match(/^(.*?)\/(.*)$/))){
+								x=(new ContentExtractor(m[1])).rules[m[2]].extract(url,'',http,this.directory);
+							}else{
+								x=(new ContentExtractor(def));
+								x=x.extract(url,'',http,this.directory) || x.extractFeed(url,http,this.directory);
+							}
+							var page=db.query("SELECT * FROM pages WHERE pid="+pid).first();
+							var oc=page.content, nc=x.content;
+							
+							
+							if(oc && !nc){
+								warn.push('Extracted content is blank');
+							}
+							if(nc && ((upd!='text')?(oc!=nc):(oc.replace(/<[^>]*>|\s+/g,'')!=nc.replace(/<[^>]*>|\s+/g,'')))){
+								let page=(new Page(this, pid));
+								if(this.fire('update',{url:url,item:x,page:page})){
+									page.update({
+										content:x.content||"",
+										summary:x.summary||"",
+										title:x.title||"",
+										link:x.link||"",
+										url:url||"",
+										mtime:(x.time||now()).getTime()||"",
+									},db);
+								}
+								updateCount++;
+								mtime=Math.max(mtime,(x.time||now()).getTime());
+							}
+							var addChild=(function(c){
+								try{
+									if(upd){
+										var hash=bak2[c.url]=SHA1.calc((upd=='html')?c.content:(c.content||"").replace(/<[^>]*>|\s+/g,''));
+										if((bak[c.url]||'')==hash){
+											return(false);
+										}
+										bak[c.url]=hash;
+									}else{
+										var t=bak2[c.url]=c.time?c.time.getTime():1;
+										if(bak[c.url] && (bak[c.url]>=t)){
+											return(false);
+										}
+										bak[c.url]=t;
+									}
+									mtime=Math.max(mtime,(c.time||now()).getTime());
+									updateCount++;
+									c.tags=[];
+									c.downloads={};
+									c.score=0;
+									if(!filt.filter(c)){
+										for(let [n,v] in Iterator(c.downloads)){
+											if(this.fire('download',{url:(typeof(v)=='object')?v.url:v})){
+												http.saveTo(v,this.directory.file(n));
+											}
+											http.saveTo(v,this.directory.file(n));
+										}
+										var o=db.query("SELECT pid,mtime FROM pages WHERE parent="+pid+" AND url='"+String(c.url).replace(/'/g,"''")+"'").first();
+										if(o){
+											let page=(new Page(this,o.pid));
+											if(this.fire('update',{url:c.url, item:c, page:page})){
+												page.update(c,db);
+											}
+										}else if(this.fire('add',{url:c.url,item:c})){
+											let page=this.add({
+												parent:pid,
+												format:'HTML',
+												title:c.title,
+												url:c.url,
+												link:c.link,
+												summary:c.summary,
+												content:c.content,
+												ctime:c.time,
+											},db);
+											if(deep){
+												db.table('crawls').insert([{
+													parent:cid,
+													pid:page.id,
+													url:c.url,
+													options:deep,
+													backnumbers:"{}",
+													atime:0,
+													mtime:0,
+													lastError:"",
+												}]);
+											}
+										}
+									}else{
+										this.fire('deny',{url:c.url,item:c});
+									}
+								}catch(e){
+									println(e);
+									this.fire('error',{url:c.url,error:e});
+									if(e === NotFound){
+										warn.push('Not Found: '+c.url);
+									}else if(e instanceof Error){
+										warn.push(e+'@'+e.fileName+':'+e.lineNumber+"\n"+e.stack.replace(/[\n\r\s]*$/,"").replace(/^(.{48}).*\)@/mg,'$1 ...)@'));
+									}else if(e instanceof Response){
+										warn.push(e.status+': '+e.url);
+									}else{
+										warn.push(e.toSource());
+									}
+								}
+								return(true);
+							}).bind(this);
+							
+							var hasChild=false;
+							if(opt.order=='asc'){
+								if(bak.count=bak.count||0){
+									var check=false;
+									for(let c in x.slice(bak.count-1)){
+										hasChild=true;
+										if(!check){
+											if(!bak[c.url]){
+												bak.count=0;
+												break;
+											}
+											check=true;
+										}else{
+											addChild(c);
+											bak.count++;
+										}
+									}
+								}
+								if(!bak.count){
+									for(let c in x.children){
+										hasChild=true;
+										addChild(c);
+										bak.count++;
+									}
+								}
+							}else if(opt.order=='desc'){
+								for(let c in x.children){
+									hasChild=true;
+									if(!addChild(c)){
+										break;
+									}
+								}
+							}else{
+								for(let c in x.children){
+									hasChild=true;
+									addChild(c);
+								}
+								if(hasChild){
+									bak=bak2;
+								}
+							}
+							
+							if(!hasChild && (bak.count||Object.keys(bak).length)){
+								warn.push("Extracted children is blank (maybe failure)");
+							}
+							
+							if((opt.interval||20)<0){
+								if(updateCount==0){
+									interval=Math.max(interval,(now().getTime()-crawls[i].atime)/4);
+								}else if(crawls[i].atime && (updateCount>1)){
+									interval=Math.min(7*24*60*60*1000, interval,(now().getTime()-crawls[i].atime)/updateCount);
+								}
+								opt.interval=-Math.ceil(interval/60000);
+							}
+							
+							db.execute("UPDATE crawls SET backnumbers=$back, atime=$acc, mtime=$mod, lastError=$err WHERE cid="+cid,{
+								back:serialize(bak),
+								acc:now().getTime(),
+								mod:mtime,
+								err:warn.join('\n'),
+							});
+							nextTime=Math.min(nextTime,now().getTime()+interval);
+							
+							
+						}catch(e){
+							this.fire('error',{url:url,error:e});
+							if(e === NotFound){
+								if(crawls[i].parent){
+									db.execute('DELETE FROM crawls WHERE cid='+cid);
+								}else{
+									db.execute('UPDATE crawls SET atime=$acc, lastError=$err WHERE cid='+cid,{
+										back:serialize(bak),
+										err:'Page Not Found: '+url,
+									});
+								}
+							}else if(e instanceof Error){
+								db.execute('UPDATE crawls SET backnumbers=$back, atime=$acc, mtime=$mod, lastError=$err WHERE cid='+cid,{
+									back:serialize(bak),
+									err:e+'@'+e.fileName+':'+e.lineNumber+"\n"+e.stack.replace(/[\n\r\s]*$/,"").replace(/^(.{48}).*\)@/mg,'$1 ...)@'),
+								});
+							}else if(e instanceof Response){
+								db.execute('UPDATE crawls SET backnumbers=$back, atime=$acc, mtime=$mod, lastError=$err WHERE cid='+cid,{
+									back:serialize(bak),
+									err:e.status+': '+e.url,
+								});
+							}else{
+								db.execute('UPDATE crawls SET backnumbers=$back, atime=$acc, mtime=$mod, lastError=$err WHERE cid='+cid,{
+									back:serialize(bak),
+									err:e.toSource(),
+								});
+							}
+						}
+					}else{
+						nextTime=Math.min(nextTime,crawls[i].atime+interval);
+					}
+				}
+				this.fire('endCrawl');
+			}finally{
+				free(db);
+			}
+			return(nextTime);
+		},
+		
+		addScan:function(url,opt){
+			opt=Object.extend({directory:this.directory},opt||{});
+			var filt=new Filter(opt.filters||[]);
+			try{
+				var db=this.__openDB__();
+				var _this=this;
+				var events=opt.events={
+					beginScan:function(o)(!_this.fire('beginScan',o)),
+					get:function(o)(!_this.fire('get',o)),
+					login:function(o)(!_this.fire('login',o)),
+					pass:function(o)(!_this.fire('pass',o)),
+					download:function(o)(!_this.fire('download',o)),
+					downloadComplete:function(o)(!_this.fire('downloadComplete',o)),
+					endScan:function(o)(!_this.fire('endScan',o)),
+					scan:function(obj){
+						if(!_this.fire('scan')){
+							return(true);
+						}
+						var item=obj.item;
+						item.tags=[];
+						item.downloads={};
+						item.score=0;
+						if(!filt.filter(item)){
+							for(let [n,v] in Iterator(item.downloads)){
+								if(_this.fire('download',{url:(typeof(v)=='object')?v.url:v})){
+									http.saveTo(v,_this.directory.file(n));
+								}
+							}
+							var o=db.query("SELECT * FROM pages WHERE url='"+String(item.url).replace(/'/g,"''")+"' ORDER BY mtime DESC").first();
+							if(!o){
+								if(_this.fire('new',{url:item.url, item:item})){
+									var page=_this.add({
+										format:	'HTML',
+										title:	item.title,
+										url:	item.url,
+										link:	item.link,
+										summary:item.summary,
+										content:item.content,
+										ctime:	item.time,
+									},db);
+									_this.fire('add',{url:item.url, item:item, page:page});
+								}
+							}else if(((o.title||"")!=(item.title||""))||((o.url||"")!=(item.url||""))||((o.link||"")!=(item.link||""))||((o.summary||"")!=(item.summary||""))||((o.content||"")!=(item.content||""))){
+								var page=new Page(_this,o.pid);
+								if(_this.fire('update',{url:item.url, page:page, item:item})){
+									page.update(item,db);
+								}
+							}else{
+								_this.fire('notModified',{url:obj.url,page:page,item:item});
+							}
+						}else{
+							_this.fire('filtered',{url:obj.url,item:item});
+						}
+					},
+				};
+				if(opt.rule){
+					var x=(new ContentExtractor(opt.rule));
+					for(let[n,v] in Iterator(events)){
+						x.observe(n,v);
+					}
+					x.scan(url,opt.referer,opt.http,this.directory);
+				}else{
+					ContentExtractor.scan(url,opt);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		addExtract:function(url,rule,opt){
+			var x,m;
+			opt=opt||{};
+			if(!rule){
+				x=ContentExtractor.extract(url,{directory:this.directory});
+			}else if((m=rule.match(/^(.*?)\/(.*)$/))){
+				x=(new ContentExtractor(m[1])).rules[m[2]].extract(url,opt.referer,opt.http,this.directory);
+			}else{
+				x=(new ContentExtractor(rule)).extract(url,opt.referer,opt.http,this.directory);
+			}
+			if(x){
+				return(this.add({
+					format:'HTML',
+					title:x.title,
+					url:x.url,
+					link:x.link,
+					summary:x.summary,
+					content:x.content,
+					ctime:x.time,
+				}));
+			};
+		},
+		
+		addHTML:function(a){
+			if(!(a instanceof Array)){
+				return(this.addHTML([a])[0]);
+			}
+			for(var i=0,l=a.length;i<l;i++){
+				var html=String(a[i].content);
+				var url=a[i].url;
+				var base=new URL(a[i].baseURL || (html.match(/<base\b[^>]*href\s*=\s*["']?([^\s"']*)/i)||[,url])[1]);
+				var dir=this.directory;
+				
+				a[i].title=a[i].title||(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)||html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)||[,a[i].url||a[i].link])[1];
+				
+				a[i].content=String(new HTML(html.replace(/^[\s\S]*?<body\b[^>]*>|^[\s\S]*?<\/head>|^[\s\S]*?<html\b[^>]*>|<\/body>[\s\S]*$|<\/html>[\s\S]*$/ig,"")))
+				.replace(/(<[^>]* (?:href|src)=")([^"]+)/ig,function($0,$1,$2)($1+String(base.build(($2||"").unescapeHTML())).escapeHTML()))
+				.replace(/(<(?:img|audio|video)\b[^>]* src=")([^"]+)("[^>]*>)/ig,function($0,$1,$2,$3){
+					var bef=$1;
+					var u=($2||"").unescapeHTML();
+					var aft=$3;
+					try{
+						var u2=base.build(u);
+						var a=[u2.port,u2.host], p=u2.path.split('/'),l=p.length;
+						p[l-1]=p[l-1]||'index.html';
+						for(var i=1;i<l;i++){
+							a[a.length]=p[i].replace(/[\?\*\<\>\|\/\\\'\"]/g,function($0)('%'+('00'+$0.charCodeAt(0).toString(16)).slice(-2)));
+						}
+						HTTP.saveTo({url:u2, referer:url},dir.file(a.join('\\')));
+						u=a.join('/');
+					}catch(e){
+					}
+					return(bef+u.escapeHTML()+aft);
+				}).replace(/\s+(?:id|class)="[^">]*"(?=[^<>]*>)/ig,'');
+				
+			}
+			return(this.add(a));
+		},
+		
+		
+		
+		add:function(a, __db__){
+			if(!(a instanceof Array)){
+				return(this.add([a])[0]);
+			}
+			var res=[];
+			try{
+				var db=__db__||this.__openDB__();
+				db.begin();
+				for(var i=0,l=a.length;i<l;i++){
+					var mt;
+					var obj={
+						url:		a[i].url||"",
+						link:		a[i].link||"",
+						title:		a[i].title||"",
+						summary:	a[i].summary||"",
+						content:	a[i].content||"",
+						format:		a[i].format||'HTML',
+						ctime:		Date.from(a[i].ctime||now()).getTime(),
+						mtime:		mt=Date.from(a[i].mtime||now()).getTime(),
+						vcount:		a[i].vcount||0,
+						score:		a[i].score||0,
+						revision:	a[i].revision||1,
+						segmenter:this.segmenter.type,
+						parent:		1*((a[i].parent && (a[i].parent instanceof Page))?a[i].parent.id:(a[i].parent||0)),
+					};
+					db.table('pages').insert([obj]);
+					var pid=db.lastID;
+					
+					var pairs=[];
+					var tagfts=[];
+					for(var i=0,tags=a[i].tags||[],l=tags.length;i<l;i++){
+						pairs[pairs.length]={pid:pid,tid:(db.query("SELECT tid FROM tags WHERE text=$n",{n:tags[i]}).first()||{}).tid};
+						tagfts.push(':'+tags[i]+' '+this.segmenter.segment(tags[i])+' ::');
+					}
+					db.table('tagof').insert(pairs);
+					db.table('fts').insert([{pid:pid,data:this.__buildFTSContent__(obj),tags:tagfts.join(' ')}]);
+					res.push(new Page(this,pid));
+				}
+				return(res);
+			}finally{
+				db.end();
+				!__db__ && free(db);
+			}
+		},
+	});
+	
+	
+	var Page=new Class({
+		__new__:function(parent,id){
+			this.notebook=parent;
+			this.id=1*id;
+		},
+		
+		
+		get snapshot(){
+			try{
+				var db=this.notebook.__openDB__();
+				var obj=db.query("SELECT * FROM pages WHERE pid="+this.id).first();
+				if(obj){
+					obj.mtime=new Date(obj.mtime);
+					obj.ctime=new Date(obj.ctime);
+					obj.vtime=new Date(obj.vtime);
+					var p=this.notebook.constructor.formatPlugins.find(obj.format);
+					if(p){
+						obj.html=p.viewHTML(obj.content);
+					}
+					return(obj);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		get url(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT url FROM pages WHERE pid="+this.id).first().url);
+			}finally{
+				free(db);
+			}
+		},
+		get link(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT link FROM pages WHERE pid="+this.id).first().link);
+			}finally{
+				free(db);
+			}
+		},
+		get title(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT title FROM pages WHERE pid="+this.id).first().title);
+			}finally{
+				free(db);
+			}
+		},
+		get summary(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT summary FROM pages WHERE pid="+this.id).first().summary);
+			}finally{
+				free(db);
+			}
+		},
+		get content(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT content FROM pages WHERE pid="+this.id).first().content);
+			}finally{
+				free(db);
+			}
+		},
+		get html(){
+			try{
+				var db=this.notebook.__openDB__();
+				var obj=db.query("SELECT content,format FROM pages WHERE pid="+this.id).first();
+				var p=this.notebook.constructor.formatPlugins.find(obj.format);
+				if(p){
+					return(p.viewHTML(obj.content));
+				}else{
+					return(obj.content);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		get format(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT format FROM pages WHERE pid="+this.id).first().format);
+			}finally{
+				free(db);
+			}
+		},
+		get ctime(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(Date.from(db.query("SELECT ctime FROM pages WHERE pid="+this.id).first().ctime));
+			}finally{
+				free(db);
+			}
+		},
+		get mtime(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(Date.from(db.query("SELECT mtime FROM pages WHERE pid="+this.id).first().mtime));
+			}finally{
+				free(db);
+			}
+		},
+		get vtime(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(Date.from(db.query("SELECT vtime FROM pages WHERE pid="+this.id).first().vtime));
+			}finally{
+				free(db);
+			}
+		},
+		get revision(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT revision FROM pages WHERE pid="+this.id).first().revision);
+			}finally{
+				free(db);
+			}
+		},
+		get vcount(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT vcount FROM pages WHERE pid="+this.id).first().vcount);
+			}finally{
+				free(db);
+			}
+		},
+		get score(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT score FROM pages WHERE pid="+this.id).first().score);
+			}finally{
+				free(db);
+			}
+		},
+		
+		set score(v){
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute("UPDATE pages SET score="+v+" WHERE pid="+this.id);
+			}finally{
+				free(db);
+			}
+		},
+		
+		
+		get children(){
+			try{
+				var db=this.notebook.__openDB__();
+				for(let row in db.query("SELECT pid FROM pages WHERE parent="+this.id)){
+					yield(new Page(this.notebook,row.pid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		get parent(){
+			try{
+				var db=this.notebook.__openDB__();
+				var p=db.query("SELECT parent FROM pages WHERE pid="+this.id).first().parent;
+				if(p){
+					return(new Page(this.notebook,p));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		view:function(){
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute("UPDATE pages SET vcount=vcount+1, vtime="+now().getTime()+" WHERE pid="+this.id);
+				return(this);
+			}finally{
+				free(db);
+			}
+		},
+		
+		
+		
+		addChild:function(id){
+			if(id instanceof Page){
+				id=id.id;
+			}else if(typeof(id)=='object'){
+				id=this.notebook.add(id).id;
+			}
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute("UPDATE pages SET parent="+this.id+" WHERE pid="+id);
+			}finally{
+				free(db);
+			}
+		},
+		
+		remove:function(){
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute("DELETE FROM fts WHERE pid="+this.id);
+//				db.execute("DELETE FROM tagof WHERE pid="+this.id);
+//				db.execute("DELETE FROM history WHERE pid="+this.id);
+				db.execute("DELETE FROM pages WHERE pid="+this.id);
+				while(db.query("SELECT changes() AS c").first().c){
+					db.execute("DELETE FROM pages WHERE (parent IS NOT NULL) AND (parent<>0) AND NOT EXISTS(SELECT * FROM pages AS p2 WHERE p2.pid=pages.parent)");
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		update:function(obj,__db__){
+			try{
+				var o={
+					time:now().getTime(),
+					url:obj.url||null,
+					link:obj.link||null,
+					title:obj.title||"",
+					summary:obj.summary||"",
+					content:obj.content||"",
+				};
+				var fts=this.notebook.__buildFTSContent__(Object.extend({format:this.format},o));
+				var db=__db__||this.notebook.__openDB__();
+				db.begin();
+				db.execute("INSERT OR IGNORE INTO history(pid,revision,url,link,title,summary,content,mtime) SELECT pid,revision,url,link,title,summary,content,mtime FROM pages WHERE pid="+this.id);
+				db.execute("UPDATE pages SET revision=revision+1, mtime=$time, url=$url,link=$link, title=$title, summary=$summary, content=$content WHERE pid="+this.id,o);
+				db.execute("UPDATE fts SET data=$data WHERE pid="+this.id,{data:fts});
+				return(this);
+			}catch(e){
+				println(e);
+			}finally{
+				db && db.end();
+				
+				!__db__ && free(db);
+			}
+		},
+		
+		
+		get tags(){
+			try{
+				var db=this.notebook.__openDB__();
+				for(let row in db.query("SELECT tid FROM tagof WHERE pid=$id",{id:this.id})){
+					yield(new Tag(this.notebook,row.tid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		__saveTags__:function(db){
+			var tags=[];
+			for(let row in db.query('SELECT tags.text FROM tagof INNER JOIN tags USING(tid) WHERE tagof.pid='+this.id)){
+				tags.push(':'+row.text+' '+this.notebook.segmenter.segment(row.text)+' ::');
+			}
+			db.execute('UPDATE fts SET tags=$tags WHERE pid='+this.id,{tags:tags.join(' ')});
+		},
+		addTag:function(id){
+			id=this.notebook.tag(id,true).id;
+			try{
+				var db=this.notebook.__openDB__();
+				db.begin();
+				db.execute("INSERT INTO tagof(pid,tid) VALUES("+this.id+","+id+")");
+				this.__saveTags__(db);
+				return(this);
+			}finally{
+				db.end();
+				free(db);
+			}
+		},
+		removeTag:function(id){
+			id=this.notebook.tag(id,true).id;
+			try{
+				var db=this.notebook.__openDB__();
+				db.begin();
+				db.execute("DELETE FROM tagof WHERE pid="+this.id+" AND tid="+id);
+				this.__saveTags__(db);
+				return(this);
+			}finally{
+				db.end();
+				free(db);
+			}
+		},
+		
+		
+		
+		get histories(){
+			try{
+				var db=this.notebook.__openDB__();
+				var format=db.query('SELECT format FROM pages WHERE pid='+this.id).first().format;
+				var p=this.notebook.constructor.formatPlugins.find(format);
+				for(let o in db.query("SELECT revision,url,link,title,summary,content,mtime FROM history WHERE pid=$id ORDER BY revision DESC",{id:this.id})){
+					o.mtime=new Date(o.mtime);
+					o.format=format;
+					o.html=p?p.viewHTML(o.content):o.content;
+					yield(o);
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		history:function(rev){
+			if(rev<0){
+				rev=this.revision+rev;
+			}
+			try{
+				var db=this.notebook.__openDB__();
+				var format=db.query('SELECT format FROM pages WHERE pid='+this.id).first().format;
+				var p=this.notebook.constructor.formatPlugins.find(format);
+				var o=db.query("SELECT revision,url,link,title,summary,content,mtime FROM history WHERE pid="+this.id+" AND revision="+rev).first();
+				o.mtime=new Date(o.mtime);
+				o.format=format;
+				o.html=p?p.viewHTML(o.content):o.content;
+				return(o);
+			}finally{
+				free(db);
+			}
+		},
+		rollback:function(rev)(this.update(this.history(rev))),
+		
+		removeHistories:function(rev){
+			if(rev<0){
+				rev=this.revision+rev;
+			}
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute("DELETE FROM history WHERE pid=$id AND revision<=$rev",{id:this.id,rev:rev});
+				return(this);
+			}finally{
+				free(db);
+			}
+		},
+		diff:function(rev1,rev2){
+			var bef=rev1?this.history(rev1):this.snapshot;
+			var aft=rev2?this.history(rev2):this.snapshot;
+			var p=this.notebook.constructor.formatPlugins.find(this.format);
+			if(p){
+				return({
+					before:bef,
+					after:aft,
+					diff:require('Diff').Diff.calc(p.split(bef.content||""),p.split(aft.content||"")),
+				});
+			}
+		},
+		
+		
+		
+	});
+	
+	var Tag=new Class({
+		__new__:function(parent,id){
+			this.notebook=parent;
+			this.id=id;
+		},
+		get name(){
+			try{
+				var db=this.notebook.__openDB__();
+				return(db.query("SELECT text FROM tags WHERE tid="+this.id).first().text);
+			}finally{
+				free(db);
+			}
+		},
+		remove:function(){
+			try{
+				var db=this.notebook.__openDB__();
+				db.execute('DELETE FROM tags WHERE tid='+this.id);
+			}finally{
+				free(db);
+			}
+		},
+		
+		get pages(){
+			try{
+				var db=this.notebook.__openDB__();
+				for(var row in db.query('SELECT pid FROM tagof WHERE tid='+this.id)){
+					yield(new Page(this.notebook,row.pid));
+				}
+			}finally{
+				free(db);
+			}
+		},
+		
+		
+		
+		
+		
+		
+		
+		
+		get texts(){
+			try{
+				var db=this.notebook.__openDB__();
+			}finally{
+				free(db);
+			}
+		},
+		addText:function(text){
+			try{
+				var db=this.notebook.__openDB__();
+			}finally{
+				free(db);
+			}
+		},
+		removeText:function(text){
+			try{
+				var db=this.notebook.__openDB__();
+			}finally{
+				free(db);
+			}
+		},
+		
+		
+	});
+	
+	
+	this.Notebook=Notebook;
+	this.Filter=Filter;
+	
+})

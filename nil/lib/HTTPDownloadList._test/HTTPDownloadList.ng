@@ -1,0 +1,102 @@
+(function(){
+	var {URL,HTTP}=require('HTTP');
+	var HTTPDownloadList=new Class(require('JobList').JobList,{
+		maxConnectionsPerServer:2,
+		jobIsExecutable:function(job)(((this.__connectedServers__||(this.__connectedServers__={}))[(new URL((typeof(job.src)=='string')?job.src:job.src.url)).host]||0)<this.maxConnectionsPerServer),
+		jobBefore:function(job){
+			var host=(new URL((typeof(job.src)=='string')?job.src:job.src.url)).host;
+			this.__connectedServers__[host]=(this.__connectedServers__[host]||0)+1;
+		},
+		jobAfter:function(job){
+			this.__connectedServers__[(new URL((typeof(job.src)=='string')?job.src:job.src.url)).host]--;
+		},
+		jobMain:function(job){
+			var obj=Object.extend(this.options||{},(typeof(job.src)=='string')?{url:job.src}:job.src);
+			var url=new URL(obj.url);
+			try{
+				var file;
+				
+				if(obj.file){
+					file=obj.file;
+					if(typeof(file.openNew)!='function'){
+						file=new File(file);
+					}
+					delete(obj.file);
+				}
+				var dir=obj.directory||this.directory||Main.scriptDirectory;
+				if(typeof(dir.file)!='function'){
+					dir=new Directory(dir);
+				}
+				delete(obj.directory);
+				
+				var http=new HTTP();
+				var res=http.open(obj);
+				if(res){
+					job.total=res.headers['content-length'];
+					if(file){
+					}else if(this.tree||obj.tree){
+						var a=[url.port,url.host],p=url.path.split('/'),l=p.length;
+						p[l-1]=p[l-1]||this.defaultName||'index.html';
+						for(var i=1;i<l;i++){
+							a[a.length]=p[i].replace(/[\?\*\<\>\|\/\\\'\"]/g,function($0)('%'+('00'+$0.charCodeAt(0).toString(16)).slice(-2)));
+						}
+						file=dir.file(a.join('\\'));
+					}else{
+						var name=String(obj.name||url.filename||this.defaultName||'index.html');
+						if(!obj.name || !this.ignoreFileNameHeader){
+							if(res.headers['content-location']){
+								name=url.build(res.headers['content-location']).filename||name;
+							}else if(res.headers['content-disposition']){
+								name=(res.headers['content-disposition'].match(/;\s*filename="[^"]*?([^\|\<\>\*\:"\\\/]*)"/i)||["",name])[1];
+							}
+						}
+						var [,baseName,ext]=name.match(/^(.*)(\..*)$/)||[name,""],num=1;
+						if(obj.baseName){
+							baseName=obj.baseName;
+						}
+						name=name.format('E');
+						file=dir.file(name);
+						while(file.exists){
+							if(!this.rename && !this.overwrite){
+								throw(Error('file already exists('+file+')'));
+							}else if(this.errorIfNotModified && res.mtime && (res.mtime<=file.mtime)){
+								throw(Error('file already exists('+file+')'));
+							}else if(this.errorIfSameSize && job.total && (job.total==file.size)){
+								throw(Error('file already exists('+file+')'));
+							}
+							if(this.rename){
+								file=dir.file(baseName+'('+(num++)+')'+ext);
+							}else{
+								break;
+							}
+						}
+						delete(obj.name);
+					}
+					
+					try{
+						var stream=file.openNew();
+						if(stream){
+							var size=this.bufferSize||32768;
+							var buf=Byte.alloc(size);
+							job.current=0;
+							while(!res.eof){
+								var r=res.readTo(buf.valueOf(),size);
+								buf.count=r;
+								stream.write(buf);
+								job.current+=r;
+								yield;
+							}
+						}
+					}finally{
+						free(stream,buf);
+					}
+				}else{
+					throw(http.error||new Error('download failed: '+obj.url));
+				}
+			}finally{
+				free(res,http);
+			}
+		},
+	});
+	this.HTTPDownloadList=HTTPDownloadList;
+})

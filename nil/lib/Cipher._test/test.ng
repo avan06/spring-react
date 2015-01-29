@@ -1,0 +1,21 @@
+({
+	rsa_sign:function(test){
+		var {RSA,Cipher}=require('Cipher');
+		test.add('sign,valid,invalid');
+		
+		var aaa="aaaaaaaaaa";
+		var rsa=RSA.create();
+		var pub=new RSA(rsa.publicKey);
+		
+		var sig=rsa.sign(aaa,"SHA512");
+		test.sign.assert(sig);
+		test.valid.assert(pub.verify(aaa,sig,"SHA512"));
+		test.invalid.assert(!pub.verify("false",sig,"SHA512"));
+	},
+	random:function(test){
+		var {Random}=require('Cipher');
+		var r1=new Random('aaa');
+		var r2=new Random('aaa');
+		test.eq(r1.next(),r2.next());
+	},
+})

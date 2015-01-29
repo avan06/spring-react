@@ -1,0 +1,549 @@
+(function(){
+	var OpenClipboard=				user32.proc('OpenClipboard',[UInt],Int);
+	var CloseClipboard=				user32.proc('CloseClipboard',[],Int);
+	var EmptyClipboard=				user32.proc('EmptyClipboard',[],Int);
+	
+	var CountClipboardFormats=		user32.proc('CountClipboardFormats',[],Int);
+	var EnumClipboardFormats=		user32.proc('EnumClipboardFormats',[UInt],UInt,true);
+	var GetClipboardData=			user32.proc('GetClipboardData',[UInt],UInt,true);
+	var SetClipboardData=			user32.proc('SetClipboardData',[UInt,UInt],UInt,true);
+	
+	var GlobalAlloc=				kernel32.proc('GlobalAlloc',[UInt,UInt],UInt);
+	var GlobalLock=					kernel32.proc('GlobalLock',[UInt],UInt);
+	var GlobalUnlock=				kernel32.proc('GlobalUnlock',[UInt],Int);
+	var GlobalFree=					kernel32.proc('GlobalFree',[UInt],Int);
+	var GlobalSize=					kernel32.proc('GlobalSize',[UInt],UInt);
+	var RtlMoveMemory=				kernel32.proc('RtlMoveMemory',[UInt,UInt,UInt],Int);
+	
+	var SetClipboardViewer=			user32.proc('SetClipboardViewer',[UInt],UInt);
+	var ChangeClipboardChain=		user32.proc('ChangeClipboardChain',[UInt,UInt],UInt);
+	
+	var GetClipboardFormatName=		user32.proc('GetClipboardFormatNameW',[UInt,WideString,UInt],UInt,true);
+	var RegisterClipboardFormat=	user32.proc('RegisterClipboardFormatW',[WideString],UInt,true);
+	var IsClipboardFormatAvailable=	user32.proc('IsClipboardFormatAvailable',[UInt],Int);
+	var SendMessage=				user32.proc('SendMessageW',[UInt,UInt,UInt,UInt],UInt);
+	
+	var GetClipboardViewer=			user32.proc('GetClipboardViewer',[],UInt);
+	
+	var Clipboard=new Class({},EventMixin,{__class__:{
+		
+		__useWindow__:function(){
+			if(!this.__window__ && (this.__observed__ || this.__opened__)){
+				var _this=this
+				this.__window__=require('Window').MessageReceiver.create({
+					events:{
+						'destroy':function(){
+							if(_this.__nextClipboardViewer__){
+								ChangeClipboardChain(this.handle,_this.__nextClipboardViewer__);
+								_this.__nextClipboardViewer__=0;
+							}
+						},
+						0x440:function(){
+							_this.__nextClipboardViewer__=SetClipboardViewer(this.handle);
+						},
+						0x441:function(){
+							ChangeClipboardChain(this.handle,_this.__nextClipboardViewer__);
+							_this.__nextClipboardViewer__=0;
+						},
+						0x0308:function(obj){
+							if(_this.__observed__ && _this.__registeredAsViewer__){
+								_this.fire('change',{internal:_this.__updating__});
+								_this.__updating__=false;
+							}
+							if(_this.__nextClipboardViewer__){
+								obj.result=SendMessage(_this.__nextClipboardViewer__,0x0308,0,0);
+							}
+							return(true);
+						},
+						0x030D:function(obj){
+							if(obj.wparam==_this.__nextClipboardViewer__){
+								_this.__nextClipboardViewer__=obj.lparam;
+							}else if(_this.__nextClipboardViewer__){
+								obj.result=SendMessage(_this.__nextClipboardViewer__,0x030D,obj.wparam,obj.lparam);
+							}
+							return(true);
+						},
+					},
+				});
+			}
+			return(this.__window__);
+		},
+		__freeWindow__:function(){
+			if(this.__window__ && !this.__observed__ && !this.__opened__){
+				this.__window__.close();
+				this.__window__=null;
+			}
+		},
+		__observeFirst__:function(){
+			this.__observed__=true;
+			this.__updating__=false;
+			this.__useWindow__().send(0x440);
+			this.__registeredAsViewer__=true;
+		},
+		__unobserveLast__:function(){
+			if(this.__observed__){
+				this.__registeredAsViewer__=false;
+				this.__window__.send(0x441);
+				this.__observed__=false;
+				this.__freeWindow__();
+			}
+		},
+		recoverObservation:function(){
+			if(this.__observed__ && (GetClipboardViewer()!=Main.window.handle)){
+				Main.window.send(0x0441);
+				Main.window.send(0x0440);
+			}
+		},
+		open:function(){
+			if(!this.__opened__){
+				this.__opened__=1;
+				var w=this.__useWindow__().handle;
+				
+				for(var cnt=this.retryCount||8;cnt--;){
+					if(OpenClipboard(this.__window__.handle)){
+						return(this);
+					}
+					sleep(this.retryInterval||20);
+				}
+				this.__opened__=0;
+				return(void(0));
+			}else{
+				this.__opened__++;
+				return(this);
+			}
+		},
+		close:function(){
+			this.__opened__--;
+			if(!this.__opened__){
+				CloseClipboard(this.__window__.handle);
+				this.__freeWindow__();
+			}
+		},
+		
+		__predefinedIds__:{
+			1:"TEXT",
+			2:"BITMAP",
+			3:"METAFILEPICT",
+			4:"SYLK",
+			5:"DIF",
+			6:"TIFF",
+			7:"OEMTEXT",
+			8:"DIB",
+			9:"PALETTE",
+			10:"PENDATA",
+			11:"RIFF",
+			12:"WAVE",
+			13:"UNICODETEXT",
+			14:"ENHMETAFILE",
+			15:"HDROP",
+			16:"LOCALE",
+			17:"DIBV5",
+			0x0080:"OWNERDISPLAY",
+			0x0081:"DSPTEXT",
+			0x0082:"DSPBITMAP",
+			0x0083:"DSPMETAFILEPICT",
+			0x008E:"DSPENHMETAFILE",
+		},
+		__formatById__:{},
+		__formats__:{},
+		__idof__:function(name){
+			if(typeof(name)=='number'){
+				return(name);
+			}else{
+				if(!this.__formats__[name]){
+					this.registerFormat(name);
+				}
+				return(this.__formats__[name].id);
+			}
+		},
+		__nameof__:function(format){
+			if(this.__formatById__[format]){
+				return(this.__formatById__[format].name);
+			}else if(this.__predefinedIds__[format]){
+				return(this.__predefinedIds__[format]);
+			}else{
+				try{
+					var buf=WChar.alloc(64);
+					GetClipboardFormatName(format,buf,63);
+					return(buf.toString());
+				}finally{
+					buf&&buf.free();
+				}
+			}
+		},
+		registerFormat:function(obj){
+			if(typeof(obj)!='object'){
+				obj={name:String(obj)};
+			}
+			if(!('id' in obj)){
+				obj.id=RegisterClipboardFormat(obj.name);
+			}
+			if('type' in obj){
+				if(typeof(obj.type)=='string'){
+					if(obj.type=='unicode'){
+						obj.read=obj.read||function(p)((new WideString(p.valueOf())).toString());
+						obj.write=obj.write||function(v,alloc){
+							try{
+								v=String(v);
+								var buf=WideString.from(v);
+								buf.copy(alloc(2*(v.length+1)),v.length);
+							}finally{
+								buf&&buf.free();
+							}
+						};
+					}else{
+						let encoding=(obj.type=='ansi')?void(0):obj.type;
+						obj.read=obj.read||function(p){
+							var s=new MBString(p.valueOf());
+							s.count=p.size;
+							s.encoding=encoding;
+							return(s.toString());
+						};
+						obj.write=obj.write||function(v,alloc){
+							try{
+								var buf=MBString.from(v,encoding);
+								var len=buf.length;
+								buf.copy(alloc(len+1),len);
+							}finally{
+								buf&&buf.free();
+							}
+						};
+					}
+				}else{
+					let type=obj.type;
+					obj.read=obj.read||function(p){
+						var res=type.alloc(Math.ceil(p.size/type.size));
+						(new (Byte.pointer)(p.valueOf())).copy(res);
+						return(res);
+					};
+					obj.write=obj.write||function(v,alloc){
+						if(v instanceof type.pointer){
+							v.copy(alloc(v.size));
+						}else{
+							try{
+								var buf=type.from(v);
+								buf.copy(alloc(v.size));
+							}finally{
+								buf&&buf.free();
+							}
+						}
+					};
+				}
+			}
+			obj.read=obj.read||function(p){
+				var res=Byte.alloc(p.size);
+				(new (Byte.pointer)(p.valueOf())).copy(res.valueOf(),p.size);
+				return(res);
+			};
+			obj.write=obj.write||function(v,alloc){
+				if(v.size && v.copy){
+					v.copy(alloc(v.size));
+				}else{
+					throw(new Error('not supported'));
+				}
+			};
+			this.__formatById__[obj.id]=obj;
+			this.__formats__[obj.name]=obj;
+			var members={};
+			var name=obj.name;
+			var getter=function()(this.read(name));
+			var setter=function(v){
+				if(this.open()){
+					try{
+						EmptyClipboard();
+						this.write(name,v);
+					}finally{
+						this.close();
+					}
+				}
+			};
+			members.__defineGetter__(obj.name,getter);
+			members.__defineSetter__(obj.name,setter);
+			for(var i=0,a=obj.aliases||[],l=a.length;i<l;i++){
+				this.__formats__[a[i]]=obj;
+				members.__defineGetter__(a[i],getter);
+				members.__defineSetter__(a[i],setter);
+			}
+			this.addClassMembers(members);
+			return(this);
+		},
+		
+		
+		
+		clear:function(){
+			if(this.open()){
+				EmptyClipboard();
+				this.close();
+			}
+		},
+		read:function(name){
+			if(!this.hasFormat(name)){
+				return(void(0));
+			}
+			if(this.open()){
+				try{
+					var hData=GetClipboardData(this.__formats__[name].id);
+					if(this.__formats__[name].type=='handle'){
+						return(this.__formats__[name].read(hData));
+					}else{
+						var ptr=new (Byte.pointer)(GlobalLock(hData));
+						ptr.count=GlobalSize(hData);
+						return(this.__formats__[name].read(ptr));
+					}
+				}finally{
+					hData && GlobalUnlock(hData);
+					this.close();
+				}
+			}
+		},
+		write:function(name,value){
+			if(!this.__formats__[name]){
+				this.registerFormat(name);
+			}
+			if(this.open()){
+				try{
+					var hData;
+					if(this.__formats__[name].type=='handle'){
+						if(hData=this.__formats__[name].write(value)){
+							this.__updating__=true;
+							GlobalUnlock(hData);
+							SetClipboardData(this.__formats__[name].id,hData);
+						}
+					}else{
+						this.__formats__[name].write(value,function(size)(GlobalLock(hData=GlobalAlloc(0x2042,size))));
+						if(hData){
+							this.__updating__=true;
+							GlobalUnlock(hData);
+							SetClipboardData(this.__formats__[name].id,hData);
+						}
+					}
+				}finally{
+					hData && GlobalFree(hData);
+					this.close();
+				}
+			}
+		},
+		
+		hasFormat:function(name)(0!=IsClipboardFormatAvailable(this.__idof__(name))),
+		
+		get contents(){
+			var _this=this;
+			var res={};
+			var fmt=0;
+			if(this.open()){
+				try{
+					while(fmt=EnumClipboardFormats(fmt)){
+						let name=this.__nameof__(fmt);
+						res.__defineGetter__(name,function()(_this.read(name)));
+					}
+					return(res);
+				}finally{
+					this.close();
+				}
+			}
+		},
+		
+		set contents(obj){
+			if(this.open()){
+				try{
+					EmptyClipboard();
+					for each(let [n,v] in Iterator(obj)){
+						this.write(n,v);
+					}
+				}finally{
+					this.close();
+				}
+			}
+		},
+		
+		
+		update:function(obj,timeout){
+			try{
+				var s=new Signal();
+				var cb=function(){s.turnOn();}
+				this.observe("change",cb);
+				this.contents=obj;
+				return(s.wait(timeout));
+			}finally{
+				this.unobserve("change",cb);
+				s.free();
+			}
+		},
+		
+		waitFormat:function(name,timeout){
+			if(this.hasFormat(name)){
+				return(true);
+			}
+			try{
+				var s=new Signal();
+				var cb=function(){if(this.hasFormat(name)){s.turnOn();}}
+				this.observe("change",cb);
+				return(this.hasFormat(name) || s.wait(timeout));
+			}finally{
+				this.unobserve("change",cb);
+				s.free();
+			}
+		},
+		
+		
+		get text()(this.content.unicodetext),
+		set text(s)(this.content={unicodetext:String(s)}),
+		
+	}});
+	
+	Clipboard.registerFormat({
+		name:'UNICODETEXT',
+		id:13,
+		aliases:['text'],
+		type:'unicode',
+	});
+	
+	
+	var HTMLFormat=new Class({
+		__new__:function(p){
+			var s=new MBString(p.valueOf());
+			s.count=p.size;
+			s.encoding='utf8';
+			this.data=s.toString();
+			var a=this.data.split(/\r?\n/);
+			for(var i=0,l=a.length;i<l;i++){
+				var m=a[i].match(/^(\w+):(.*)$/);
+				if(!m){
+					break;
+				}
+				this[m[1].toLowerCase()]=m[2];
+			}
+			this.url=this.sourceurl;
+			var s2=s.inc(this.starthtml);
+			s2.encoding='utf8';
+			s2.count=this.endhtml-this.starthtml;
+			this.html=s2.toString();
+			var s3=s.inc(this.startfragment);
+			s3.encoding='utf8';
+			s3.count=this.endfragment-this.startfragment;
+			this.fragment=s3.toString();
+		},
+		toString:function()this.html,
+	});
+	Clipboard.registerFormat({
+		name:'HTML Format',
+		aliases:['html'],
+		read:function(p){
+			return(new HTMLFormat(p));
+		},
+		write:function(v,alloc){
+			try{
+				var str="Version:0.9\r\nStartHTML:00000120\r\nEndHTML:00000000\r\nStartFragment:00000153\r\nEndFragment:00000000\r\nSourceURL:about:blank\r\n<html><body><!--StartFragment -->"+v+"<!--EndFragment--></body></html>\r\n";
+				var buf=MBString.from(str,"utf8");
+				var len=buf.length;
+				var s1=""+(len-2);
+				for(var i=s1.length;i--;){
+					buf.inc(49-i).update(s1.charCodeAt(s1.length-i-1));
+				}
+				s1=""+(len-34);
+				for(var i=s1.length;i--;){
+					buf.inc(94-i).update(s1.charCodeAt(s1.length-i-1));
+				}
+				buf.copy(alloc(len+1),len);
+			}finally{
+				buf&&buf.free();
+			}
+		},
+	});
+	
+	Clipboard.registerFormat({
+		name:'BITMAP',
+		id:2,
+		type:'handle',
+		aliases:['image'],
+		read:function(h){
+			return(require('Image').Image.fromHBITMAP(h));
+		},
+		write:function(image){
+			var Image=require('Image').Image;
+			if(image instanceof Image){
+				return(image.getHBITMAP());
+			}
+		},
+	});
+	
+	var shell32=WinLibrary.load('shell32.dll');
+	var DragQueryPoint=			shell32.proc('DragQueryPoint',[UInt,Pointer],Int);
+	var DragQueryFile=			shell32.proc('DragQueryFileW',[UInt,UInt,WideString,UInt],UInt);
+	var DragFinish=				shell32.proc('DragFinish',[UInt],Int);
+	var DropFiles=new Struct({
+		offset:	UInt,
+		x:				Int,
+		y:				Int,
+		isNonClient:	UInt,
+		isWideString:	UInt,
+	});
+	
+	
+	Clipboard.registerFormat({
+		name:'HDROP',
+		id:15,
+		aliases:['files'],
+		read:function(p){
+			try{
+				var hDrop=p.valueOf();
+				var s=512, buf=WChar.alloc(s), l=DragQueryFile(hDrop,0xFFFFFFFF,null,0), a=new Array(l);
+				for(var i=0;i<l;i++){
+					if(DragQueryFile(hDrop,i,null,0)>s){
+						s=s*2;
+						buf.free();
+						buf=WChar.alloc(s);
+					}
+					DragQueryFile(hDrop,i,buf,s-1);
+					a[i]=new File(buf.toString());
+					if(!a[i].exists){
+						a[i]=new Directory(buf.toString());
+					}
+				}
+				return(a);
+			}finally{
+//				DragFinish(hDrop);
+				buf&&buf.free();
+			}
+		},
+		write:function(v,alloc){
+			v=(v instanceof Array)?v:[v];
+			var size=DropFiles.size+4;
+			for(var i=0,l=v.length;i<l;i++){
+				size+=2*(String(v[i]).length+1);
+			}
+			var drop=new (DropFiles.pointer)(alloc(size));
+			drop.offset=DropFiles.size;
+			drop.isWideString=1;
+			var dest=new WideString(drop.inc(1));
+			for(var i=0,l=v.length;i<l;i++){
+				var str=String(v[i]);
+				dest.update(str);
+				dest.inc(str.length).update(0);
+				dest=dest.inc(str.length+1);
+			}
+			dest.update(0);
+			dest.inc(1).update(0);
+		},
+	});
+	Clipboard.registerFormat({
+		name:"Preferred DropEffect",
+		aliases:['isMove'],
+		read:function(p)(!!((new (UInt.pointer)(p)).item()&0x2)),
+		write:function(v,alloc){
+			(new (UInt.pointer)(alloc(4))).update(v?2:1);
+		},
+	});
+	Clipboard.registerFormat({
+		name:"Preferred DropEffect",
+		aliases:['isCopy'],
+		read:function(p)(!!((new (UInt.pointer)(p)).item()&0x1)),
+		write:function(v,alloc){
+			(new (UInt.pointer)(alloc(4))).update(v?1:2);
+		},
+	});
+	
+	
+	
+	this.Clipboard=Clipboard;
+})

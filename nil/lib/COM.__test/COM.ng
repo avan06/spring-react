@@ -1,0 +1,1519 @@
+(function(){
+	var methodCaller=(new StdCallFunction(Hex.decode('8b 04 24 83 c4 04 8b 0c 24 89 04 24 8b 44 24 04 8b 00 8b 04 08 ff e0')));
+	var ole32=WinLibrary.load('ole32.dll');
+	var oleaut32=WinLibrary.load('oleaut32.dll');
+	var MSG=new Struct({
+		hwnd:		UInt,
+		message:	UInt,
+		wParam:		UInt,
+		lParam:		UInt,
+		time:		UInt,
+		x:			Int,
+		y:			Int,
+	});
+	var
+		GetMessage=				user32.proc("GetMessageW",[MSG,UInt,UInt,UInt],Int),
+		PeekMessage=			user32.proc("PeekMessageW",[MSG,UInt,UInt,UInt,UInt],Int),
+		TranslateMessage=		user32.proc('TranslateMessage',[MSG],Int),
+		DispatchMessage=		user32.proc('DispatchMessageW',[MSG],Int),
+		PostQuitMessage=		user32.proc('PostQuitMessage',[UInt],Int),
+		PostThreadMessage=		user32.proc('PostThreadMessageW',[UInt,UInt,UInt,UInt],Int),
+		GetCurrentThreadId=		kernel32.proc('GetCurrentThreadId',[],UInt),
+		FormatMessage=			kernel32.proc('FormatMessageW',[UInt,UInt,UInt,UInt,Pointer,UInt,Pointer],UInt),
+		SetTimer=				user32.proc('SetTimer',[UInt,UInt,UInt,UInt],UInt),
+		
+		CreateStreamOnHGlobal=ole32.proc('CreateStreamOnHGlobal',[UInt,Int,Pointer],UInt),
+		CoInitializeEx=		ole32.proc('CoInitializeEx',[UInt,UInt],UInt),
+		CoInitialize=		ole32.proc('CoInitialize',[UInt],UInt),
+		CoUninitialize=		ole32.proc('CoUninitialize',[UInt],UInt),
+		OleInitialize=		ole32.proc('OleInitialize',[UInt,UInt],UInt),
+		OleUninitialize=	ole32.proc('OleUninitialize',[UInt],UInt),
+		CoCreateInstance=	ole32.proc('CoCreateInstance',[Pointer,Pointer,UInt,Pointer,Pointer],Int),
+		LoadTypeLib=		oleaut32.proc('LoadTypeLib',[WideString,Pointer],Int),
+		
+		StringFromGUID2=	ole32.proc('StringFromGUID2',[Pointer,WideString,Int],Int),
+		CLSIDFromString=	ole32.proc('CLSIDFromString',[WideString,Pointer],Int),
+		CLSIDFromProgID=	ole32.proc('CLSIDFromProgID',[WideString,Pointer],Int),
+		CoTaskMemAlloc=		ole32.proc('CoTaskMemAlloc',[UInt],UInt),
+		CoTaskMemFree=		ole32.proc('CoTaskMemFree',[UInt],UInt),
+		SysAllocString=		oleaut32.proc('SysAllocString',[WideString],UInt),
+		SysFreeString=		oleaut32.proc('SysFreeString',[Pointer],Int),
+		VariantInit=		oleaut32.proc('VariantInit',[Pointer],Int),
+		VariantClear=		oleaut32.proc('VariantClear',[Pointer],Int),
+		VariantChangeTypeEx=oleaut32.proc('VariantChangeTypeEx',[Pointer,Pointer,UInt,UShort,UShort],Int),
+	var_end;
+	
+	
+	
+	var Result=new Class({
+		__class__:{
+			succeeded:function(v)(!(v&0x80000000)),
+			failed:function(v)(!!(v&0x80000000)),
+			check:function(v,s){
+				if(this.failed(v)){
+					throw(this.createError(v,s));
+				}
+				return(v);
+			},
+			createError:function(v,s){
+				try{
+					var buf=WChar.alloc(2048);
+					FormatMessage(0x00001200,0,v,0x409,buf,2046,null);
+					return(new Error((s?(s+': '):'')+buf.toString().replace(/[\n\r\s]*$/,"")+'(0x'+v.toString(16)+')'));
+				}finally{
+					free(buf);
+				}
+			},
+			
+		},
+	});
+	
+	
+	
+	
+	var LOCALE_USER_DEFAULT=System.userLocale.id;
+	var string2GUID=function(s){
+		var buf=Byte.alloc(16);
+		CLSIDFromString(s,buf);
+		return(buf);
+	};
+	var progID2GUID=function(s){
+		var buf=Byte.alloc(16);
+		CLSIDFromProgID(s,buf);
+		return(buf);
+	}
+	var guid2String=function(p){
+		try{
+			var buf=WChar.alloc(40);
+			StringFromGUID2(p,buf,40);
+			return(buf.toString());
+		}finally{
+			free(buf);
+		}
+	}
+	var BStr=new Class(WideString,{
+		__class__:{
+			from:function(s)(new this(SysAllocString(String(s)))),
+		},
+		free:function(){
+			SysFreeString(this);
+		},
+	});
+	var isGUID=function(str)(!!String(str).match(/^\{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\}$/i));
+	var IID_NULL=string2GUID('{00000000-0000-0000-0000-000000000000}');
+	
+	var COM=new Class(Pointer,EventMixin,{
+		__class__:{
+			__threads__:{},
+			__methodsCount__:0,
+			__methodTypes__:{},
+			inheritedInterface:null,
+			interfacesByName:{},
+			interfacesByID:{},
+			
+			init:function(){
+				var tid=Thread.current.id;
+				if(!COM.__threads__[tid]){
+					CoInitialize(0);
+					COM.__threads__[tid]=true;
+					Thread.current.observe('exit',function(){
+						if(COM.__threads__[tid]){
+							CoUninitialize();
+							delete(COM.__threads__[tid]);
+						}
+					});
+				}
+				return(this);
+			},
+			free:function(){
+				var tid=Thread.current.id;
+				if(COM.__threads__[tid]){
+					OleUninitialize();
+					delete(COM.__threads__[tid]);
+				}
+			},
+			processMessages:function(){
+				try{
+					var msg=MSG.alloc();
+					this.init();
+					PeekMessage(msg,0,0x400,0x400,0);
+					PostThreadMessage(GetCurrentThreadId(),0x401,0,0);
+					while(GetMessage(msg,0,0,0)){
+						if((msg.hwnd==0)&&(msg.message==0x401)){
+							break;
+						}else{
+							TranslateMessage(msg);
+							DispatchMessage(msg);
+						}
+					}
+				}finally{
+					free(msg);
+				}
+			},
+			loop:function(func,interval){
+				func=func||Function.doNothing;
+				try{
+					this.init();
+					var msg=MSG.alloc();
+					PeekMessage(msg,0,0x400,0x400,0);
+					SetTimer(0,0,interval||100,0);
+					while(GetMessage(msg,0,0,0)>0){
+						if((msg.hwnd==0)&&(msg.message==0x113)){
+							try{
+								if(func() ||('exitCode' in Main)){
+									PostQuitMessage(0);
+								}
+							}catch(e){
+								println(e);
+							}
+						}else{
+							TranslateMessage(msg);
+							DispatchMessage(msg);
+						}
+					}
+				}catch(e){
+					println(e);
+				}finally{
+					free(msg);
+				}
+			},
+			defaultContextFlags:5,
+			create:function(id,ctx){
+				try{
+					this.init();
+					var itf=this.interfaceID?this:Dispatch;
+					if(typeof(id)=='number'){
+						ctx=id;
+						id=null;
+					}
+					id=id||itf.programID||itf.classID;
+					var guid=isGUID(id)?string2GUID(id):progID2GUID(id);
+					var pres=itf.alloc();
+					if(0==CoCreateInstance(guid,null,ctx||itf.defaultContextFlags,itf.interfaceIDBytes,pres)){
+						return(pres.item());
+					}
+				}finally{
+					free(guid,pres);
+				}
+			},
+			define:function(name,iid,vtbl){
+				var riid=string2GUID(iid);
+				iid=String(iid).toLowerCase();
+				var mem={__class__:{
+					inheritedInterface:this,
+					interfaceName:name,
+					interfaceID:iid,
+					interfaceIDBytes:riid,
+				}};
+				var mc=this.__methodsCount__;
+				var mt=Object.extend({},this.__methodTypes__);
+				for(let [n,v] in Iterator(vtbl||{})){
+					let offset=mc*4, func=methodCaller.toFunction([Int,Pointer].concat(v||[]),UInt);
+					mem[n]=function()(func.apply(null,[offset,this].concat(Array.slice(arguments))));
+					mt[n]=ThreadSafeStdCallback/*StdCallFunction*/.define([UInt].concat(v||[]),UInt);
+					mc++;
+				}
+				mem.__class__.__methodsCount__=mc;
+				mem.__class__.__methodTypes__=mt;
+				var klass=COM.interfacesByName[name]=COM.interfacesByID[iid]=new Class(this,mem);
+				
+				mem={};
+				mem['to'+name]=function(freeThis){
+					try{
+						var p=klass.alloc();
+						if(0==this.queryInterface(riid,p)){
+							return(p.item());
+						}
+					}finally{
+						free(p);
+						freeThis && this.free();
+					}
+				};
+				COM.addMembers(mem);
+				return(klass);
+			},
+			__instances__:{},
+		},
+		
+		
+		
+	});
+	
+	var MinimumCOMObjectStruct=new Struct({
+		pVtbl:Pointer,
+	});
+	var eventNameTables={};
+	
+	var notImplFunction=function()(0x80004001);
+	
+	var Unknown=COM.define('Unknown','{00000000-0000-0000-C000-000000000046}',{
+		queryInterface:[Pointer,Pointer],
+		addReference:[],
+		release:[],
+	}).addMembers({
+		__class__:{
+			from:function(struct){
+				var _this=this,i=0,ptr;
+				if(struct instanceof Class){
+					ptr=struct.alloc();
+					i=1;
+				}else{
+					ptr=(this.instanceStruct||MinimumCOMObjectStruct).alloc();
+				}
+				var vtbl=Pointer.alloc(this.__methodsCount__),offset=0;
+				var methods=ptr.__methodWrappedFunctions__={};
+				for(let [n,v] in Iterator(this.__methodTypes__)){
+					let name=n;
+					vtbl.inc(offset).update(methods[name]=v.from(function()((ptr[name]||notImplFunction).apply(ptr,Array.slice(arguments,1)))));
+					offset++;
+				}
+				ptr.queryInterface=function(piid,pres){
+					var iid=guid2String(piid).toLowerCase();
+					for(var klass=_this; klass; klass=klass.inheritedInterface){
+						if(iid==klass.interfaceID){
+							refc++;
+							(new Pointer.pointer(pres)).update(ptr.valueOf());
+							return(0);
+						}
+					}
+					var itf=COM.interfacesByID[iid];
+					var res=itf && ptr['to'+itf.interfaceName] && ptr['to'+itf.interfaceName]();
+					if(res){
+						(new Pointer.pointer(pres)).update(res.valueOf());
+						return(0);
+					}else{
+						return(0x80004002);//E_NOINTERFACE
+					}
+				};
+				var refc=1;
+				ptr.addReference=function(){
+					refc++;
+					return(refc);
+				};
+				ptr.release=function(){
+					refc--;
+					if(refc==0){
+						if(typeof(ptr.destroy)=='function'){
+							ptr.destroy();
+						}
+						for(let [n,v] in Iterator(methods)){
+							v.free();
+						}
+						vtbl.free();
+						ptr.free();
+						delete(COM.__instances__[ptr.valueOf()]);
+					}
+					return(refc);
+				};
+				for(var l=arguments.length;i<l;i++){
+					Object.extend(ptr,arguments[i]||{});
+				}
+				(new Pointer.pointer(ptr)).update(vtbl.valueOf());
+				COM.__instances__[ptr.valueOf()]=ptr;
+				return(new this(ptr.valueOf()));
+			},
+		},
+		
+		__getTypeInfo__:function(){
+			try{
+				var prov=this.toProvideClassInfo();
+				if(prov){
+					var pti=TypeInfo.alloc();
+					if(0==prov.getClassInfo(pti)){
+						return(pti.item());
+					}
+				}
+			}finally{
+				free(pti,prov);
+			}
+		},
+		__getTypeLib__:function(){
+			try{
+				var ti=this.__getTypeInfo__();
+				if(ti){
+					var ptl=TypeLib.alloc();
+					var pidx=UInt.alloc();
+					if(0==ti.getContainingTypeLib(ptl,pidx)){
+						return(ptl.item());
+					}
+				}
+			}finally{
+				free(pidx,ptl,ti);
+			}
+		},
+		get __connectioonPoints__(){
+			try{
+				var container=this.toConnectionPointContainer();
+				if(container){
+					var penum=EnumConnectionPoints.alloc();
+					container.enumConnectionPoints(penum);
+					var enum=penum.item();
+					while(true){
+						try{
+							var pcp=ConnectionPoint.alloc();
+							var count=UInt.alloc();
+							if((0!=enum.next(1,pcp,count))||(count.item()==0)){
+								break;
+							}
+							var cp=pcp.item();
+							yield(cp);
+						}finally{
+							free(cp,pcp,count);
+						}
+					}
+				}
+			}finally{
+				free(enum,penum,container);
+			}
+		},
+		__createEventSink__:function(_this,eventIID,events){
+			var methods={
+				queryInterface:function(piid,pres){
+					var iid=guid2String(piid).toLowerCase();
+					
+					if((iid==eventIID)||(iid==Dispatch.interfaceID)||(iid==Unknown.interfaceID)){
+						this.addReference();
+						(new Pointer.pointer(pres)).update(this.valueOf());
+						return(0);
+					}else{
+						//TODO other sink type(if exists)
+						/*
+						var itf=COM.interfacesByID[iid];
+						var res=itf && ptr['to'+itf.interfaceName] && ptr['to'+itf.interfaceName]();
+						if(res){
+							(new Pointer.pointer(pres)).update(res.valueOf());
+							return(0);
+						}else{
+							return(0x80004002);//E_NOINTERFACE
+						}
+						*/
+						return(0x80004002);//E_NOINTERFACE
+					}
+				},
+				getTypeInfoCount:function(ptr)(0),
+				getTypeInfo:function()(0x8002000B),
+				getIDsOfNames:function()(0x80020006),
+				__invoke__:function(id,riid,lcid,flags,params,result,ex,argErr){
+					var e=events[id];
+					if(e && (_this.isObserved(events.name+'_'+e.name) || _this.isObserved(e.name))){
+						var b=[];
+						var o={result:void(0),source:events.name};
+						var p=new PDispParams(params);
+						var argv=new PVariant(p.argv);
+						for(var i=0,a=e.params,l=p.argc;i<l;i++){
+							b[i]=o[i]=argv.inc(l-1-i).get();
+							if(a[i]){
+								o[a[i]]=o[i];
+							}
+						}
+						_this.fire(events.name+'_'+e.name,o);
+						_this.fire(e.name,o);
+						for(var i=0,a=e.params,l=p.argc;i<l;i++){
+							var v=argv.inc(l-1-i);
+							if(e.output[i] && a[i] && (o[a[i]]!==b[i]) && (v.type&0x4000)){
+								v.set(o[a[i]]);
+							}
+						}
+						if(typeof(o.result)!='undefined'){
+							(new PVariant(result)).set(o.result);
+						}
+					}
+				},
+			};
+			return(Dispatch.from(methods));
+		},
+		__observeFirst__:function(){
+			try{
+				this.__connections__=[];
+				var tl=this.__getTypeLib__();
+				var riid=Byte.alloc();
+				for(let cp in this.__connectioonPoints__){
+					if(0==cp.getConnectionInterface(riid)){
+						var iid=guid2String(riid).toLowerCase();
+						try{
+							var table=eventNameTables[iid];
+							if(!table){
+								try{
+									var pti=TypeInfo.alloc();
+									if(0==tl.getTypeInfoOfGuid(riid,pti)){
+										var ti=pti.item();
+										table=eventNameTables[iid]={name:ti.name};
+										for(let func in ti.methods){
+											var a=[];
+											var o=[];
+											for(let param in func.params){
+												a[a.length]=param.name||"";
+												o[o.length]=param.output;
+											}
+											table[func.id]={name:func.name, params:a, output:o};
+										}
+									}
+								}finally{
+									free(ti,pti);
+								}
+							}
+							if(table){
+								var pcookie=UInt.alloc();
+								var sink=this.__createEventSink__(this.addRef(),iid,table);
+								if(0==cp.advise(sink,pcookie)){
+									this.__connections__.push({
+										point:cp.addRef(),
+										sink:sink.addRef(),
+										cookie:pcookie.item(),
+									});
+								}
+							}
+						}finally{
+							free(sink,pcookie);
+						}
+					}
+				}
+			}finally{
+				free(tl,riid);
+			}
+		},
+		__unobserveLast__:function(){
+			for(var i=0,a=this.__connections__||[],l=a.length;i<l;i++){
+				a[i].point.unadvise(a[i].cookie);
+				a[i].point.free();
+				a[i].sink.free();
+			}
+		},
+		
+		
+		addRef:function(){
+			this.addReference();
+			return(this);
+		},
+		free:function(){
+			this.release();
+		},
+	});
+	
+	var ConnectionPointContainer=Unknown.define('ConnectionPointContainer','{B196B284-BAB4-101A-B69C-00AA00341D07}',{
+		enumConnectionPoints:		[Pointer],
+		findConnectionPoint:		[Pointer,Pointer],
+	}).addMembers({
+	});
+	var EnumConnectionPoints=Unknown.define('EnumConnectionPoints','{B196B285-BAB4-101A-B69C-00AA00341D07}',{
+		next:	[UInt,Pointer,Pointer],
+		skip:	[UInt],
+		reset:	[],
+		clone:	[Pointer],
+	}).addMembers({
+	});
+	var ConnectionPoint=Unknown.define('ConnectionPoint','{B196B286-BAB4-101A-B69C-00AA00341D07}',{
+		getConnectionInterface:		[Pointer],
+		getConnectionPointContainer:[Pointer],
+		advise:						[Pointer,Pointer],
+		unadvise:					[UInt],
+		enumConnections:			[Pointer],
+	}).addMembers({
+	});
+	var ProvideClassInfo=Unknown.define('ProvideClassInfo','{B196B283-BAB4-101A-B69C-00AA00341D07}',{
+		getClassInfo:				[Pointer],
+	}).addMembers({
+	});
+	var ProvideClassInfo2=ProvideClassInfo.define('ProvideClassInfo2','{A6BC3AC0-DBAA-11CE-9DE3-00AA004BB851}',{
+		getGUID:					[UInt,Pointer],
+	}).addMembers({
+	});
+	
+	var TypeKinds={
+		0:'enum',
+		1:'record',
+		2:'module',
+		3:'interface',
+		4:'dispatch',
+		5:'coclass',
+		6:'alias',
+		7:'union',
+	};
+	var VariantTypes={
+		0:"empty",
+		1:"null",
+		2:"short",
+		3:"int",
+		4:"float",
+		5:"double",
+		6:"currency",
+		7:"date",
+		8:"string",
+		9:"dispatch",
+		10:"error",
+		11:"boolean",
+		12:"variant",
+		13:"unknown",
+		14:"bignum",
+		15:"",
+		16:"char",
+		17:"byte",
+		18:"ushort",
+		19:"uint",
+		20:"int64",
+		21:"uint64",
+		22:"int",
+		23:"uint",
+		24:"void",
+		25:"hresult",
+		26:"pointer",
+		27:"safeArray",
+		28:"cArray",
+		29:"userDefined",
+		30:"mbString",
+		31:"wideString",
+		36:"record",
+		37:"intPointer",
+		38:"uintPointer",
+		64:"fileTime",
+		65:"blob",
+		66:"stream",
+		67:"storage",
+		68:"streamedObject",
+		69:"storedObject",
+		70:"blobObject",
+		71:"clipboard",
+		72:"clsid",
+		73:"versionedStream",
+		0xfff:"blobString",
+		0x1000:"vector",
+		0x2000:"array",
+		0x4000:"byRef",
+		0x8000:"",
+		0xFFFF:"illegal",
+	};
+	var TLibAttr=new Struct({
+		guid:			[Byte,16],
+		lcid:			UInt,
+		syskind:		UInt,
+		majorVersion:	UShort,
+		minorVersion:	UShort,
+		flags:			UInt,
+	});
+	var TypeAttr=new Struct({
+		guid:			[Byte,16],
+		lcid:			UInt,
+		reserved:		UInt,
+		constructorID:	Int,
+		desstructorID:	Int,
+		schema:			WideString,
+		instanceSize:	UInt,
+		typeKind:		UInt,
+		cFuncs:			UShort,
+		cVars:			UShort,
+		cImplTypes:		UShort,
+		vtblSize:		UShort,
+		byteAign:		UShort,
+		typeFlags:		UShort,
+		majorVersion:	UShort,
+		minorVersion:	UShort,
+		aliasPointer:	Pointer,
+		aliasType:		UInt,
+		idlPointer:		Pointer,
+		idlFlags:		UInt,
+	});
+	var ElemDesc=new Struct({
+		ptr:			Pointer,
+		type:			Int,
+		extra:			Pointer,
+		flags:			UInt,
+	});
+	var ParamDesc=new Struct({
+		extra:			Pointer,
+		flags:			UShort,
+	});
+	var FuncDesc=new Struct({
+		memid:			Int,
+		rgScode:		Pointer,
+		params:			Pointer,
+		funcKind:		Int,
+		invKind:		Int,
+		callConv:		Int,
+		cParams:		Short,
+		cParamsOpt:		Short,
+		vtblOffset:		Short,
+		cScodes:		Short,
+		elemdescPointer:Pointer,
+		elemdescType:	Int,
+		paramExtra:		Pointer,
+		paramFlags:		UInt,
+		funcFlags:		UInt,
+	});
+	var VarDesc=new Struct({
+		memid:			Int,
+		schema:			WideString,
+		val:			UInt,
+		elemdescPointer:Pointer,
+		elemdescType:	Int,
+		paramExtra:		Pointer,
+		paramFlags:		UInt,
+		varFlags:		UInt,
+		varKind:		Int,
+	});
+	var TypeLib=Unknown.define('TypeLib','{00020402-0000-0000-C000-000000000046}',{
+		getTypeInfoCount:	[],
+		getTypeInfo:		[UInt,Pointer],
+		getTypeInfoType:	[UInt,Pointer],
+		getTypeInfoOfGuid:	[Pointer,Pointer],
+		getLibAttr:			[Pointer],
+		getTypeComp:		[Pointer],
+		getDocumentation:	[Int,Pointer,Pointer,Pointer,Pointer],
+		isName:				[Pointer,UInt,Int],
+		findName:			[Pointer,UInt,Pointer,Pointer,Pointer],
+		releaseTLibAttr:	[Pointer],
+	}).addMembers({
+		__class__:{
+			load:function(file){
+				try{
+					var p=this.alloc();
+					var r=LoadTypeLib(String(file),p);
+					if(r==0){
+						return(p.item());
+					}
+				}finally{
+					free(p);
+				}
+			},
+		},
+		__getLibAttr__:function(){
+			try{
+				var pattr=TLibAttr.pointer.alloc();
+				this.getLibAttr(pattr);
+				return(pattr.item());
+			}finally{
+				free(pattr);
+			}
+		},
+		get guid(){
+			try{
+				var attr=this.__getLibAttr__();
+				return(guid2String(attr.guid));
+			}finally{
+				attr && this.releaseTLibAttr(attr);
+			}
+		},
+		get majorVersion(){
+			try{
+				var attr=this.__getLibAttr__();
+				return(attr.majorVersion);
+			}finally{
+				attr && this.releaseTLibAttr(attr);
+			}
+		},
+		get minorVersion(){
+			try{
+				var attr=this.__getLibAttr__();
+				return(attr.minorVersion);
+			}finally{
+				attr && this.releaseTLibAttr(attr);
+			}
+		},
+		
+		get name(){
+			try{
+				var pname=BStr.alloc();
+				if(0==this.getDocumentation(-1,pname,null,null,null)){
+					return(pname.item().toString());
+				}
+			}finally{
+				free(pname.item(),pname);
+			}
+		},
+		
+		get description(){
+			try{
+				var pdesc=BStr.alloc();
+				if(0==this.getDocumentation(-1,null,pdesc,null,null)){
+					return(pdesc.item().toString());
+				}
+			}finally{
+				free(pdesc.item(),pdesc);
+			}
+		},
+		
+		get types(){
+			for(var i=0,l=this.getTypeInfoCount();i<l;i++){
+				try{
+					var pinfo=TypeInfo.pointer.alloc();
+					this.getTypeInfo(i,pinfo);
+					var info=pinfo.item();
+					yield(info);
+				}finally{
+					free(info,pinfo);
+				}
+			}
+		},
+		get classes(){
+			for(var i=0,l=this.getTypeInfoCount();i<l;i++){
+				try{
+					var pkind=UInt.alloc();
+					this.getTypeInfoType(i,pkind);
+					if(pkind.item()==5){
+						var pinfo=TypeInfo.pointer.alloc();
+						if(0==this.getTypeInfo(i,pinfo)){
+							var info=pinfo.item();
+							yield(info);
+						}
+					}
+				}finally{
+					free(info,pinfo,pkind);
+				}
+			}
+		},
+		coClass:function(name){
+			name=name.toLowerCase();
+			for(var i=0,l=this.getTypeInfoCount();i<l;i++){
+				try{
+					var pkind=UInt.alloc();
+					var pname=BStr.alloc();
+					if((0==this.getTypeInfoType(i,pkind))
+						&&(pkind.item()==5) 
+						&&(0==this.getDocumentation(i,pname,null,null,null))
+						&&(pname.item().toString().toLowerCase()==name)
+					){
+						var pinfo=TypeInfo.alloc();
+						if(0==this.getTypeInfo(i,pinfo)){
+							return(pinfo.item());
+						}
+					}
+				}finally{
+					free(pinfo,pkind,pname.item(),pname);
+				}
+			}
+		},
+		
+		
+	});
+	
+	var FuncInfo=new Class({
+		__new__:function(parent,index){
+			this.parent=parent.addRef();
+			try{
+				var pdesc=FuncDesc.pointer.alloc();
+				if(0==parent.getFuncDesc(index,pdesc)){
+					this.__desc__=pdesc.item();
+				}else{
+					throw(Error("getFuncDesc failed"));
+				}
+			}finally{
+				free(pdesc);
+			}
+		},
+		free:function(){
+			this.parent.releaseFuncDesc(this.__desc__);
+			this.parent.free();
+		},
+		
+		
+		get returnType(){
+		},
+		get returnByRef(){
+		},
+		get returnArray(){
+		},
+		
+		get mode(){
+		},
+		get kind(){
+		},
+		get id()(this.__desc__.memid),
+		get name(){
+			try{
+				var pnames=BStr.alloc();
+				var pcount=UInt.alloc().update(1);
+				if(0==this.parent.getNames(this.__desc__.memid,pnames,1,pcount)){
+					return(pnames.item().toString());
+				}
+			}finally{
+				free(pcount,pnames.item(),pnames);
+			}
+		},
+		get params(){
+			try{
+				var count=this.__desc__.cParams+1;
+				var pnames=BStr.alloc(count);
+				var pcount=UInt.alloc().update(count);
+				this.parent.getNames(this.__desc__.memid,pnames,count,pcount);
+				
+				var elems=new ElemDesc.pointer(this.__desc__.params);
+				for(var i=1;i<pcount.item();i++){
+					try{
+						var bstr=pnames.inc(i).item();
+						var {flags,type}=elems.inc(i-1);
+						yield({
+							name:		bstr.toString(),
+							type:		VariantTypes[type&0xfff],
+							byRef:		!!(type&0x4000),
+							array:		!!(type&0x2000),
+							vector:		!!(type&0x1000),
+							
+							input:		!!(flags&0x1),
+							output:		!!(flags&0x2),
+							lcid:		!!(flags&0x4),
+							retVal:		!!(flags&0x8),
+							optional:	!!(flags&0x10),
+							hasDefault:	!!(flags&0x20),
+							hasCustData:!!(flags&0x40),
+						});
+					}finally{
+						bstr.free();
+					}
+				}
+			}finally{
+				free(pcount,pnames);
+			}
+		},
+		
+		
+		
+	});
+	
+	var TypeInfo=Unknown.define('TypeInfo','{00020401-0000-0000-C000-000000000046}',{
+		getTypeAttr:			[Pointer],
+		getTypeComp:			[Pointer],
+		getFuncDesc:			[Int,Pointer],
+		getVarDesc:				[Int,Pointer],
+		getNames:				[Int,Pointer,UInt,Pointer],
+		getRefTypeOfImplType:	[UInt,Pointer],
+		getImplTypeFlags:		[UInt,Pointer],
+		getIDsOfNames:			[WideString,UInt,Pointer],
+		invoke:					[Pointer,UInt,UShort,Pointer,Pointer,Pointer,Pointer],
+		getDocumentation:		[UInt,Pointer,Pointer,Pointer,Pointer],
+		getDllEntry:			[UInt,UInt,Pointer,Pointer,Pointer],
+		getRefTypeInfo:			[UInt,Pointer],
+		addressOfMember:		[UInt,UInt,Pointer],
+		createInstance:			[Pointer,Pointer,Pointer],
+		getMops:				[UInt,Pointer],
+		getContainingTypeLib:	[Pointer,Pointer],
+		releaseTypeAttr:		[Pointer],
+		releaseFuncDesc:		[Pointer],
+		releaseVarDesc:			[Pointer],
+	}).addMembers({
+		get name(){
+			try{
+				var pname=BStr.alloc();
+				if(0==this.getDocumentation(-1,pname,null,null,null)){
+					return(pname.item().toString());
+				}
+			}finally{
+				free(pname.item(),pname);
+			}
+		},
+		get description(){
+			try{
+				var pdesc=BStr.alloc();
+				if(0==this.getDocumentation(-1,null,pdesc,null,null)){
+					return(pdesc.item().toString());
+				}
+			}finally{
+				free(pdesc.item(),pdesc);
+			}
+		},
+		
+		get interfaces(){
+			try{
+				var pattr=TypeAttr.pointer.alloc();
+				this.getTypeAttr(pattr);
+				var attr=pattr.item();
+				for(var i=0,l=attr.cImplTypes;i<l;i++){
+					try{
+						var phref=UInt.alloc();
+						this.getRefTypeOfImplType(i,phref);
+						var pti=TypeInfo.alloc();
+						this.getRefTypeInfo(phref.item(),pti);
+						var ti=pti.item();
+						yield(ti);
+					}finally{
+						free(ti,pti,phref);
+					}
+				}
+			}finally{
+				this.releaseTypeAttr(attr);
+				free(pattr);
+			}
+			
+		},
+		
+		
+		get methods(){
+			try{
+				var pattr=TypeAttr.pointer.alloc();
+				if(0==this.getTypeAttr(pattr)){
+					var attr=pattr.item();
+					for(var i=0,l=attr.cFuncs;i<l;i++){
+						try{
+							var inf=new FuncInfo(this,i);
+							yield(inf);
+						}finally{
+							free(inf);
+						}
+					}
+				}
+			}finally{
+				attr && this.releaseTypeAttr(attr);
+				free(pattr);
+			}
+		},
+		
+		
+		
+		
+		
+	});
+	
+	
+
+	
+	
+	var Variant=new Struct({
+		type:		UInt,
+		reserved:	UInt,
+		value:		UInt,
+		valueHigh:	UInt,
+	});
+	var PVariant=Variant.pointer;
+	PVariant.addMembers({
+		__class__:{
+			create:function(){
+				var res=Variant.alloc();
+				VariantInit(res);
+				return(res);
+			},
+			from:function(value)(this.create().set(value)),
+		},
+		set:function(value){
+			if(this.type&0x4000){
+				var pval=this.value;
+				var t=this.type&0xFFF;
+				switch(t){
+					case(8):{
+						var pbs=new BStr.pointer(pval);
+//						pbs.item().free();
+						(new Pointer.pointer(pval)).update(BStr.from(value));
+						break;
+					}case(9):{
+						if(value instanceof Dispatch){
+							var pd=(new Dipsatch.pointer(pval));
+//							pd.item().free();
+							(new Pointer.pointer(pval)).update(value);
+						}
+						break;
+					}case(12):{
+						var v=(new PVariant(pval));
+						v.clear().set(value);
+						break;
+					}case(13):{
+						if(value instanceof Unknown){
+							var pd=(new Unknown.pointer(pval));
+							pd.item().free();
+							(new Pointer.pointer(pval)).update(value);
+						}
+						break;
+					}case(11):{
+						(new UShort.pointer(pval)).update(value?0xFFFF:0);
+						break;
+					}default:{
+						var type=({2:Short,3:Int,22:Int,4:Float,5:Double,16:Char,17:Byte,18:UShort,19:UInt,23:UInt,})[t];
+						if(type){
+							(new (type.pointer)(pval)).update(value);
+						}
+						break;
+					}
+				}
+			}else{
+				switch(typeof(value)){
+					case('object'):case('undefined'):{
+						if(!value){
+							this.type=1;//VT_NULL
+						}else if(value instanceof Dispatch){
+							this.type=9;
+							this.value=value.valueOf();
+						}else if(value instanceof Unknown){
+							this.type=13;
+							this.value=value.valueOf();
+						}
+						break;
+					}case('boolean'):{
+						this.type=11;
+						this.value=value?0xFFFF:0;
+						break;
+					}case('number'):{
+						this.type=5;
+						(new Double.pointer(this.valueOf())).inc(1).update(value);
+						break;
+					}case('string'):default:{
+						this.type=8;
+						this.value=BStr.from(value).valueOf();
+						break;
+					}
+				}
+			}
+			return(this);
+		},
+		get:function(addRef){
+			if(this.type==0x400C){
+				return((new PVariant(this.value)).get(addRef));
+			}else{
+				var pval=(this.type&0x4000)?this.value:(this.valueOf()+8);
+				switch(this.type&0xFFF){
+					case(11):{
+						return((new Int.pointer(pval)).item()!=0);//BOOL
+						break;
+					}case(1):{
+						return(null);
+						break;
+					}case(9):{
+						if(this.value){
+							if(addRef){
+								return((new Dispatch(this.value)).addRef());
+							}else{
+								return((new Dispatch(this.value)));
+							}
+						}
+						break;
+					}case(13):{
+						if(this.value){
+							if(addRef){
+								return((new Unknown(this.value)).addRef());
+							}else{
+								return((new Unknown(this.value)));
+							}
+						}
+						break;
+					}case(2):{
+						return((new Short.pointer(pval)).item());
+						break;
+					}case(3):case(22):{
+						return((new Int.pointer(pval)).item());
+						break;
+					}case(4):{
+						return((new Float.pointer(pval)).item());
+						break;
+					}case(5):{
+						return((new Double.pointer(pval)).item());
+						break;
+					}case(16):{
+						return((new Char.pointer(pval)).item());
+						break;
+					}case(17):{
+						return((new Byte.pointer(pval)).item());
+						break;
+					}case(18):{
+						return((new UShort.pointer(pval)).item());
+						break;
+					}case(19):case(23):{
+						return((new UInt.pointer(pval)).item());
+						break;
+					}case(20):case(21):{
+						try{
+							var res=PVariant.create();
+							VariantChangeTypeEx(res,this,LOCALE_USER_DEFAULT,0,5);
+							return(res.get(addRef));
+						}finally{
+							res&&res.clear().free();
+						}
+						break;
+					}case(8):{
+						return((new BStr(this.value)).toString());
+						break;
+					}default:{
+						try{
+							var res=PVariant.create();
+							VariantChangeTypeEx(res,this,LOCALE_USER_DEFAULT,0,8);
+							return(res.get(addRef));
+						}finally{
+							res&&res.clear().free();
+						}
+						break;
+					}
+				}
+			}
+		},
+		clear:function(){
+			VariantClear(this);
+			return(this);
+		},
+	});
+	
+	var DispParams=new Struct({
+		argv:	UInt,
+		names:	UInt,
+		argc:	UInt,
+		namec:	UInt,
+	});
+	var PDispParams=DispParams.pointer;
+	PDispParams.addMembers({
+		__class__:{
+			from:function(args){
+				var res=DispParams.alloc();
+				args=args||[];
+				var l=args.length;
+				if(l>0){
+					var argv=Variant.alloc(l);
+					for(var i=0;i<l;i++){
+						argv.inc(l-1-i).set(args[i]);
+					}
+					res.argv=argv.valueOf();
+					res.argc=l;
+				}
+				return(res);
+			},
+		},
+		clear:function(){
+			var argv=new PVariant(this.argv);
+			for(var i=0,l=this.argc;i<l;i++){
+				argv.inc(i).clear();
+			}
+			argv.free();
+			if(this.names){
+				(new Pointer(this.names)).free();
+			}
+			return(this);
+		},
+	});
+	
+	
+	var Dispatch=Unknown.define('Dispatch','{00020400-0000-0000-C000-000000000046}',{
+		getTypeInfoCount:	[Pointer],
+		getTypeInfo:		[UInt,UInt,Pointer],
+		getIDsOfNames:		[Pointer,Pointer,UInt,UInt,Pointer],
+		__invoke__:			[UInt,Pointer,UInt,UInt,Pointer,Pointer,Pointer,Pointer],
+	}).addMembers({
+		__class__:{
+			wrap:function(){
+				
+				
+				
+			},
+		},
+		__getTypeInfo__:function(){
+			try{
+				var prov=this.toProvideClassInfo();
+				if(prov){
+					var pti=TypeInfo.alloc();
+					if(0==prov.getClassInfo(pti)){
+						return(pti.item());
+					}
+				}
+			}finally{
+				free(pti,prov);
+			}
+		},
+		__getTypeLib__:function(){
+			try{
+				var pti=TypeInfo.alloc();
+				if(0==this.getTypeInfo(0,LOCALE_USER_DEFAULT,pti)){
+					var ti=pti.item();
+					var ptl=TypeLib.alloc();
+					var pidx=UInt.alloc();
+					if(0==ti.getContainingTypeLib(ptl,pidx)){
+						return(ptl.item());
+					}
+				}
+				return(Unknown.prototype.__getTypeLib__.call(this));
+			}finally{
+				free(ti,pti,ptl,pidx);
+			}
+		},
+		
+		
+		
+		__getID__:function(name){
+			try{
+				var p=UInt.alloc();
+				var buf=WideString.from(name);
+				var list=Pointer.alloc().update(buf.valueOf());
+				var s=this.getIDsOfNames(IID_NULL,list,1,LOCALE_USER_DEFAULT,p);
+				if(0==s){
+					return(p.item());
+				}else{
+					throw(new TypeError('dispatch member not found: '+name));
+				}
+			}finally{
+				free(p,buf,list);
+			}
+		},
+		__invokeByID__:function(id,mode,args){
+			try{
+				var params=PDispParams.from(args||[]);
+				if(mode==4){
+					params.names=UInt.alloc().update(0xFFFFFFFD).valueOf();
+					params.namec=1;
+				}
+				var res=PVariant.create();
+				var s=this.__invoke__(id,IID_NULL,LOCALE_USER_DEFAULT,mode,params,res,null,null);
+				if(0==s){
+					return(res.get(true));
+				}else{
+					throw(Result.createError(s,"dispatch invoke error"));
+				}
+			}finally{
+				res&&res.clear().free();
+				params&&params.clear().free();
+			}
+		},
+		get value()(this.__invokeByID__(0,2,[])),
+		set value(v)(this.__invokeByID__(0,4,[v])),
+		call:function()(this.__invokeByID__(0,1,Array.slice(arguments))),
+		apply:function(args)(this.__invokeByID__(0,1,args)),
+		
+		toString:function()(String(this.value)),
+		
+		
+		
+		get:function(name)(this.__invokeByID__(this.__getID__(name),2,Array.slice(arguments,1))),
+		set:function(name)(this.__invokeByID__(this.__getID__(name),4,Array.slice(arguments,1))),
+		invoke:function(name)(this.__invokeByID__(this.__getID__(name),1,Array.slice(arguments,1))),
+		__noSuchMethod__:function(name,args){
+			try{
+				return(this.__invokeByID__(this.__getID__(name),1,args));
+			}catch(e){
+				var m;
+				if(m=name.match(/^set(.*)$/)){
+					return(this.__invokeByID__(this.__getID__(m[1]),4,args));
+				}else if(m=name.match(/^get(.*)$/)){
+					return(this.__invokeByID__(this.__getID__(m[1]),2,args));
+				}else{
+					throw(e);
+				}
+			}
+		},
+	});
+	
+	var JScript=new Class(Dispatch,{
+		__class__:{
+			programID:'MSScriptControl.ScriptControl.1',
+			eval:function(){
+				try{
+					var js=this.create().__initAsJScript__();
+					var a=[];
+					for(var i=0,l=arguments.length;i<l;i++){
+						if(typeof(arguments[i])=='function'){
+							a[a.length]='('+arguments[i].toSource()+')();';
+						}else if(typeof(arguments[i])=='string'){
+							a[a.length]=arguments[i]+';';
+						}else if(!arguments[i]){
+							a[a.length]='void(0);';
+						}else{
+							js.add(arguments[i]);
+						}
+					}
+					return(js.invoke('Eval',a.join("")));
+				}finally{
+					free(js);
+				}
+			},
+			apply:function(func,obj,args){
+				try{
+					var js=this.create();
+					var o={_this:obj,_function:func},a=[];
+					if(args instanceof Array){
+						for(var i=0,l=arguments.length;i<l;i++){
+							o[a[a.length]='$'+i]=arguments[i];
+						}
+					}else{
+						for(let [n,v] in Iterator(args)){
+							o[a[a.length]=n]=v;
+						}
+					}
+					return(js.add(o).eval('_function.call(_this,'+a.join(',')+')'));
+				}finally{
+					free(js);
+				}
+			},
+			call:function(func,obj)(this.apply(func,obj,Array.slice(arguments,2))),
+		},
+		__initAsJScript__:function(){
+			if(!this.__initialized__){
+				this.set('Language','jscript');
+				this.__initialized__=true;
+			}
+			return(this);
+		},
+		add:function(){
+			this.__initAsJScript__();
+			var rem;
+			for(var i=0,l=arguments.length;i<l;i++){
+				for(let [n,v] in Iterator(arguments[i])){
+					if(v instanceof Dispatch){
+						this.invoke('AddObject',n,v.addRef());
+					}else if(v instanceof Unknown){
+						var d=v.toDispatch();
+						if(d){
+							this.invoke('AddObject',n,d);
+						}else{
+							throw(new TypeError("can't get dispatch"));
+						}
+					}else if((typeof(v)=='function')||(typeof(v)=='object')){
+						
+						
+					}else{
+						(rem||(rem={}))[n]=v;
+					}
+				}
+			}
+			if(rem){
+				this.eval(rem);
+			}
+			return(this);
+		},
+		eval:function(){
+			var a=[];
+			for(var i=0,l=arguments.length;i<l;i++){
+				if(typeof(arguments[i])=='function'){
+					a[a.length]='('+arguments[i].toSource()+')();';
+				}else if(typeof(arguments[i]=='string')){
+					a[a.length]=arguments[i]+';';
+				}else if(!arguments[i]){
+					a[a.length]='void(0);';
+				}else{
+					for(let [n,v] in Iterator(arguments[i])){
+						if((typeof(v)=='function')||(v instanceof RegExp)||(v instanceof Date)){
+							v=v.toSource();
+						}else{
+							v=JSON.stringify(v);
+						}
+						a[a.length]='var '+n+'='+v+';';
+					}
+				}
+			}
+			if(a.length>0){
+				return(this.__initAsJScript__().invoke('Eval',a.join("")));
+			}
+		},
+	});
+	Dispatch.addMembers({
+		$:function(){
+			try{
+				var js=JScript.create().add({_this:this});
+				var a=[];
+				for(var i=0,l=arguments.length;i<l;i++){
+					if(typeof(arguments[i])=='function'){
+						a[a.length]='('+arguments[i].toSource()+').call(_this);';
+					}else if(typeof(arguments[i])=='string'){
+						a[a.length]='(function(){return('+arguments[i]+');}).call(_this);';
+					}else if(!arguments[i]){
+						a[a.length]='void(0);';
+					}else{
+						js.eval(arguments[i]);
+					}
+				}
+				return(js.invoke('Eval',a.join("")));
+			}finally{
+				free(js);
+			}
+		}
+	});
+	
+	
+	var StatStg=new Struct({
+		name:WideString,
+		type:UInt,
+		size:UInt64,
+		mtime:UInt64,
+		ctime:UInt64,
+		atime:UInt64,
+		mode:UInt,
+		lockable:UInt,
+		clsid:[Byte,16],
+		state:UInt,
+		res:UInt,
+	});
+	
+	var Stream=Unknown.define('Stream','0000000c-0000-0000-C000-000000000046',{
+		_read		:[UInt,UInt,Pointer],
+		_write		:[UInt,UInt,Pointer],
+		_seek		:[UInt,UInt,UInt,Pointer],
+		setSize		:[UInt,UInt],
+		copyTo		:[Pointer,UInt,UInt,UInt,UInt],
+		commit		:[UInt],
+		revert		:[],
+		lockRegion	:[UInt,UInt,UInt,UInt,UInt],
+		unlockRegion:[UInt,UInt,UInt,UInt,UInt],
+		stat		:[Pointer,UInt],
+		clone		:[Pointer],
+	}).addMembers(StreamMixin,{
+		
+		get __size__(){
+			try{
+				var buf=StatStg.alloc();
+				Result.check(this.stat(buf,1));
+				return(buf.size.toNumber());
+			}finally{
+				free(buf);
+			}
+		},
+		
+		__read__:function(addr,size){
+			try{
+				var p=UInt64.alloc();
+				Result.check(this._read(addr,size,p));
+				return(p.toNumber());
+			}finally{
+				free(p);
+			}
+		},
+		__write__:function(addr,size){
+			try{
+				var p=UInt64.alloc();
+				Result.check(this._write(addr,size,p));
+				return(p.toNumber());
+			}finally{
+				free(p);
+			}
+		},
+		
+		__seek__:function(offset){
+			try{
+				var p=UInt64.pointer.from(offset);
+				Result.check(this._seek(p.low,p.high,1,p));
+				return(p.toNumber());
+			}finally{
+				free(p);
+			}
+		},
+		__move__:function(pos){
+			try{
+				var p=UInt64.pointer.from(pos);
+				Result.check(this._seek(p.low,p.high,0,p));
+				return(p.toNumber());
+			}finally{
+				free(p);
+			}
+		},
+	});
+	var MemoryStream=new Class(Stream,{
+		__class__:{
+			create:function(){
+				try{
+					var p=this.alloc();
+					CreateStreamOnHGlobal(null,1,p);
+					return(p.item());
+				}finally{
+					free(p);
+				}
+			},
+		},
+	});
+	
+	this.Result=Result;
+	this.guid2String=guid2String;
+	this.BStr=BStr;
+	this.TLibAttr=TLibAttr;
+	this.TypeAttr=TypeAttr;
+	this.ElemDesc=ElemDesc;
+	this.ParamDesc=ParamDesc;
+	this.FuncDesc=FuncDesc;
+	this.VarDesc=VarDesc;
+	
+	this.COM=COM;
+	this.Unknown=Unknown;
+	this.TypeLib=TypeLib;
+	this.TypeInfo=TypeInfo;
+	this.Dispatch=Dispatch;
+	this.JScript=JScript;
+	
+	this.Stream=Stream;
+	this.MemoryStream=MemoryStream;
+	
+})

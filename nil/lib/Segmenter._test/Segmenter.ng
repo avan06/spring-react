@@ -1,0 +1,35 @@
+(function(){
+	var SegmenterPlugin=new Class(Plugin,{
+		type:'',
+		speed:5,
+		quality:1,
+		test:function(type){
+			if(!type){
+				return((this.speed+this.quality)+(this.lang?((this.lang.indexOf('*')!=-1)?10:0):20));
+			}else if(type.length==2){
+				return((this.speed+this.quality)+((!this.lang)?20:(this.lang.indexOf('*')!=-1)?10:(this.lang.indexOf(type)!=-1)?30:0));
+			}else{
+				return((this.type==type)?this.speed:0);
+			}
+		},
+	});
+	var Segmenter=new Class({
+		__class__:{
+			plugins:new Pluggable('Segmenter',SegmenterPlugin),
+			getClass:function(type){
+				var p=this.plugins.find(type);
+				if(p){
+					return(p.getClass());
+				}
+				return(this);
+			},
+			create:function(type)(new (this.getClass(type))()),
+		},
+		segment:function(src)(String(src).split(/\s+/)),
+		free:function(){},
+	});
+	SegmenterPlugin.addMembers({
+		Segmenter:Segmenter,
+	});
+	this.Segmenter=Segmenter;
+})

@@ -1,0 +1,30 @@
+<configuration>
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+                <target>System.out</target>
+                <encoder>
+                        <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                </encoder>
+        </appender>
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>./logger.log</file>　←ここは適当にパスを変えること。
+                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+                <!-- daily rollover -->
+                 <fileNamePattern>logger.%d{yyyy-MM-dd}.log</fileNamePattern>
+
+                <!-- keep 30 days' worth of history -->
+                  <maxHistory>5</maxHistory>
+                 </rollingPolicy>
+                <encoder>
+                        <charset>UTF-8</charset>
+                        <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                </encoder>
+        </appender>
+         <logger name="com.mssoftech" level="DEBUG" />
+         <logger name="org.dbflute" level="DEBUG" />
+         <logger name="org.springframework.jdbc.datasource" level="DEBUG" />
+        <root>
+                <level value="INFO" />
+                <appender-ref ref="STDOUT" />　←コンソールに出力したくない場合はここをコメントアウトする。
+                <appender-ref ref="FILE" />
+        </root>
+</configuration>

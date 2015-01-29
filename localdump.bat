@@ -1,0 +1,1 @@
+pg_dump -Fc --no-acl --no-owner -h localhost -U test springreact > springreact.dump

@@ -1,0 +1,190 @@
+(function(){
+	var Environment=new Class({
+		__class__:{
+			instances:{},
+			mutex:new Mutex(),
+			get:function(name){
+				name=name||"";
+				try{
+					this.mutex.lock();
+					if(!this.instances[name]){
+						this.instances[name]=new this(name);
+					}
+					return(this.instances[name]);
+				}finally{
+					this.mutex.unlock();
+				}
+			},
+			remove:function(name){
+				try{
+					this.mutex.lock();
+					delete(this.instances[name]);
+				}finally{
+					this.mutex.unlock();
+				}
+			}
+		},
+		__new__:function(name){
+			this.name=name||"";
+			this.startSignal=new Signal("",true);
+			this.completeSignal=new Signal("",true);
+			this.mutex=new Mutex();
+			this.used=[];
+			this.__outputs__=[];
+			this.__logs__=[];
+		},
+		start:function(){
+			this.thread=Thread.create(function($,__this__){
+				try{
+					var exit=function(c){
+						__this__.res=c;
+						__this__.ok=true;
+						__this__.__exit__=true;
+						throw(arguments.callee);
+					},
+					use=function(){
+						var a=[];
+						for(var i=0,l=arguments.length;i<l;i++){
+							if(__this__.used.indexOf(arguments[i])==-1){
+								__this__.used.push(arguments[i]);
+								a[a.length]='for(let [n,v] in Iterator(require('+arguments[i].quote()+')))if(["name","baseName","file","directory"].indexOf(n)==-1)eval("var "+n+"=v;");';
+							}
+						}
+						if(a.length>0){
+							__this__.using=a;
+							throw(arguments.callee);
+						}else{
+							return(__this__.used);
+						}
+					},
+					echo=function(){
+						__this__.__outputs__.push(Array.join(arguments,","));
+						return(arguments[arguments.length-1]);
+					},println=function(){
+						__this__.__outputs__.push(Array.join(arguments,",")+"\n");
+						return(arguments[arguments.length-1]);
+					};
+					__this__.__exit__=false;
+					while(!__this__.__exit__){
+						if(__this__.using){
+							eval(__this__.using.join(''));
+							delete(__this__.using);
+						}else{
+							__this__.completeSignal.turnOnAndWait(__this__.startSignal);
+						}
+						try{
+							__this__.res=($=eval(__this__.src||""));
+							__this__.ok=true;
+						}catch(e if ((e===use)||(e===exit))){
+						}catch(e){
+							__this__.err=e;
+							__this__.ok=false;
+						}
+					}
+				}catch(e){
+//					Main.stdout.writeLine(e);
+				}finally{
+					__this__.thread=null;
+					__this__.completeSignal.turnOn();
+				}
+			},["",this]);
+			this.completeSignal.wait();
+		},
+		evaluate:function(script){
+			try{
+				this.mutex.lock();
+				if(!this.thread){
+					this.start();
+				}
+				this.src=script;
+				this.startSignal.turnOnAndWait(this.completeSignal);
+				var res={script:script,output:this.__outputs__};
+				this.__outputs__=[];
+				if(this.__exit__){
+					res.exit=true;
+				}
+				if(script){
+					if(res.ok=this.ok){
+						if(this.res===null){
+							res.result='null';
+						}else if(typeof(this.res)=='undefined'){
+							res.result='undefined';
+						}else if(typeof(this.res)=='string'){
+							res.result=this.res.quote();
+						}else if(typeof(this.res)=='number'){
+							res.result=this.res.toString();
+						}else if(typeof(this.res)=='boolean'){
+							res.result=this.res.toString();
+						}else{
+							res.result=this.res.toSource();
+						}
+					}else{
+						res.error=String(this.err);
+					}
+				}
+				this.__logs__.push(res);
+				return(res);
+			}finally{
+				this.mutex.unlock();
+			}
+		},
+		get outputs(){
+			try{
+				this.mutex.lock();
+				var res=this.__outputs__;
+				this.__outputs__=[];
+				if(res.length){
+					this.__logs__.push({script:"",ok:true,result:"",output:res});
+				}
+				return(res);
+			}finally{
+				this.mutex.unlock();
+			}
+		},
+		get logs(){
+			try{
+				return(this.__logs__.slice(0));
+			}finally{
+				this.mutex.unlock();
+			}
+		},
+		clear:function(logs){
+			if(this.thread){
+				try{
+					this.mutex.lock();
+					this.src='exit()';
+					this.startSignal.turnOnAndWait(this.completeSignal);
+					if(logs){
+						this.__logs__=[];
+						return(null);
+					}else{
+						var res=({script:"//Reset environment",ok:true,output:[],result:"",exit:true});
+						this.__logs__.push(res);
+						return(res);
+					}
+				}finally{
+					this.mutex.unlock();
+				}
+			}
+		},
+		free:function(){
+			try{
+				this.mutex.lock();
+				if(this.name){
+					this.constructor.remove(this.name);
+				}
+				if(this.thread){
+					this.src='exit()';
+					this.startSignal.turnOnAndWait(this.completeSignal);
+				}
+				return(null);
+			}finally{
+				this.mutex.unlock();
+				this.mutex.free();
+				this.startSignal.free();
+				this.completeSignal.free();
+			}
+		},
+	});
+	this.Environment=Environment;
+})

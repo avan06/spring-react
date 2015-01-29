@@ -1,0 +1,121 @@
+({
+	func:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<b>test</b><br>aaa<br>bbb';
+		var r=new HTMLRewriter(function(html)('<body>'+html+'</body>'));
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<body><b>test</b><br />aaa<br />bbb</body>');
+	},
+	regexp_remove:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<b>test</b><br>aaa<br>bbb';
+		var r=new HTMLRewriter(/<b>(.*?)<\/b>/i);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<br />aaa<br />bbb');
+	},
+	regexp_replace:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<b>test</b><br>aaa<br>bbb';
+		var r=new HTMLRewriter([/<b>(.*?)<\/b>/i,'$1']);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'test<br />aaa<br />bbb');
+	},
+	
+	node_func:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<span class="aaa">test</span><br>aaa<br>bbb';
+		var r=new HTMLRewriter([function(o){
+			o.node.unset('class');
+			o.node.unset('id');
+		}]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<span>test</span><br />aaa<br />bbb');
+	},
+	node_remove:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='111<span id="test">test</span><br>aaa<br>bbb';
+		var r=new HTMLRewriter(["#test"]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'111<br />aaa<br />bbb');
+	},
+	node_match_remove:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<div id="aaa">111</div><div id="test">aaa<br>bbb<hr><a href="x">XXX</a><br>ccc<br>ddd<hr><a href="y">YYY</a><br></div>';
+		var r=new HTMLRewriter(["#test","<hr><a>"]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<div id="aaa">111</div><div id="test">aaa<br />bbb<br />ccc<br />ddd<br /></div>');
+	},
+	node_replace:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='111<span id="test">test</span><br>aaa<br>bbb';
+		var r=new HTMLRewriter(["#test",,"<ins>RRR</ins>"]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'111<ins>RRR</ins><br />aaa<br />bbb');
+	},
+	node_replace_func:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='111<span id="test">test</span><br>aaa<br>bbb';
+		var r=new HTMLRewriter(["#test",,function(h)('<del>'+h+'</del>')]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'111<del><span id="test">test</span></del><br />aaa<br />bbb');
+	},
+	
+	node_match_replace:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<div id="aaa">111</div><div id="test">aaa<br>bbb<hr><a href="x">XXX</a><br>ccc<br>ddd<hr><a href="y">YYY</a><br></div>';
+		var r=new HTMLRewriter(["#test","<hr><a>","<br><br>"]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<div id="aaa">111</div><div id="test">aaa<br />bbb<br /><br /><br />ccc<br />ddd<br /><br /><br /></div>');
+	},
+	
+	
+	node_match_replace_func:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<div id="aaa">111</div><div id="test">aaa<br>bbb<hr><a href="x">XXX</a><br>ccc<br>ddd<hr><a href="y">YYY</a><br></div>';
+		var r=new HTMLRewriter(["#test","<hr><a>",function(html)('<del>'+html.replace(/<.*?>/g,'')+'</del>')]);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<div id="aaa">111</div><div id="test">aaa<br />bbb<del>XXX</del><br />ccc<br />ddd<del>YYY</del><br /></div>');
+	},
+	
+	
+	plugin:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<b>test</b><script>document.write("SSS");</script><br>aaa<br>bbb';
+		var r=new HTMLRewriter('NoScript');
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'<b>test</b><br />aaa<br />bbb');
+	},
+	
+	
+	
+	
+/*
+
+	stub:function(test){
+		var {HTMLRewriter}=require('HTMLRewriter');
+		var html='<b>test</b><br>aaa<br>bbb';
+		var r=new HTMLRewriter([/<b>(.*?)<\/b>/i,'$1']);
+		var html2=r.rewrite(html);
+		test.echo(html2);
+		test.eq(html2,'test<br />aaa<br />bbb');
+	},
+*/
+	
+	
+	
+	
+	
+	
+	
+})

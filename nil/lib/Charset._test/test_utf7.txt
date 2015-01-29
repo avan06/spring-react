@@ -1,0 +1,36 @@
++MN4w6zDBMNAwpDDIZYdbV1IXMG5lh1tXMLMw/DDJMGuVojBZMIuP/VKgMG5qX4D9MJJj0E+bMFkwizAC-
+
+
++Jc8-Detector+MK8w6TC5-
+
+
+Detector.detect(buf,set)
+	+YwdbmjBXMF8w0DDDMNUwoTBuZYdbVzCzMPwwyTCSUiRSJTBXMGZlh1tXMLMw/DDJVA1lh1tXUhcwko/UMFkwAg-
+	buf+MG8w3jDrMMEw0DCkMMhlh1tXUhcwbg-Pointer+MKow1jC4MKcwrzDIMAI-
+	set+MJI-true+MGswWTCLMGgwAQ-buf.encoding+MGswuzDDMMgwVTCMMIswAg-
+
+Detector.load(file,isHTML)
+	file+MGdjB1uaMFcwXzDVMKEwpDDrMJIwAWWHW1cwszD8MMkwkoHqUtVSJFIlMFcwZoqtMH+PvDCAMAI-
+	file+MG8w1TChMKQw6zDRMLllh1tXUhcwSzAB-openRead()+MOEwvTDDMMkwkmMBMGQwqjDWMLgwpzCvMMg-(File+MGowaQ-)
+	isHTML+MEw-true+MG5YNFQIMAE-HTML/XML+MG5lh1tXMLMw/DDJYwdbmjC/MLAwTImLMGQwSzCMMHAwXTCMMGtfkzBGMAI-
+
+
+new Detector(stream,isHTML)
+	stream+MJIw6TDDMNcwVzBmMAFlh1tXMLMw/DDJgepS1VIkUiUwbjC5MMgw6jD8MOAwqjDWMLgwpzCvMMgwko/UMFk-
+	isHTML+MEw-true+MG5YNFQIMAE-HTML/XML+MG5lh1tXMLMw/DDJYwdbmjC/MLAwTImLMGQwSzCMMHAwXTCMMGtfkzBGMAI-
+
+
+Detector+MKow1jC4MKcwrzDIMGswbw-StreamMixin+MGg-EventMixin+MEww3zDDMK8wuTBVMIwwZjBEMIswAg-
++dShhDzBVMIwwZjBEMIswpDDZMPMwyDBvTuVOCzBukBowig-
+
+	detect
+		+ZYdbVzCzMPwwyTBMio2LWDBVMIwwX2ZC-
+		+XxVlcDCqMNYwuDCnMK8wyDBu-encoding+MOEw8zDQMGtlh1tXMLMw/DDJVA0wTDC7MMMwyDBVMIwwiw-
+	beforeFree
+		+MFMwbg-Detector+MKow1jC4MKcwrzDIMG4-free()+MOEwvTDDMMkwTFR8MHNR+jBVMIwwZg-
+		+MLkwyDDqMPww4DBMieNlPjBVMIwwi1JN-
+	free
+		+MLkwyDDqMPww4DBMieNlPjBVMIwwX1+M-
+
+
+

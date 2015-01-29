@@ -1,0 +1,1296 @@
+(function(){
+	var MediaType=new Class({
+		__new__:function(str){
+			var a=String(str).split(/[\,;][ \t]*/);
+			var t=a.shift();
+			var m;
+			if(m=t.match(/^(.*?)\/(.*)$/)){
+				this.type=m[1].toLowerCase();
+				this.subtype=m[2].toLowerCase();
+			}
+			var p={};
+			for(var i=0,l=a.length;i<l;i++){
+				if(a[i].match(/^\s*$/)){
+				}else if(m=a[i].match(/^(.*?)=(.*)$/)){
+					p[m[1].toLowerCase()]=(this[m[1].toLowerCase()]=m[2]);
+				}else{
+					p[a[i].toLowerCase()]=this[a[i].toLowerCase()]=void(0);
+				}
+			}
+			this.params=p;
+		},
+		setParam:function(name,value){
+			this.params[String(name).toLowerCase()]=this[String(name).toLowerCase()]=value;
+		},
+		toString:function(){
+			var res=this.type+'/'+this.subtype;
+			for each(let [n,v] in Iterator(this.params)){
+				res+='; '+n+'='+v;
+			}
+			return(res);
+		},
+	});
+	
+	var URL=new Class({
+		__new__:function(str,code){
+			str=String(str);
+			if(str.match(/[^\x00-\xff]/)){
+				str=MBString.encodeURI(str,code);
+			}
+			str=str.replace(/ /g,'%20');
+			this.encoding=code;
+			var m,host;
+			if(m=str.match(/^(.*?)#(.*)$/)){
+				this.__fragment__=m[2];
+				str=m[1];
+			}
+			if(m=str.match(/^([a-z]+)\:\/{0,2}(.*)$/i)){
+				this.scheme=m[1].toLowerCase();
+				str=m[2];
+			}else{
+				this.scheme="http";
+			}
+			if(m=str.match(/^(.*?)(\/.*)$/)){
+				host=m[1];
+				str=m[2];
+			}else{
+				host=str;
+				str='/';
+			}
+			if(m=host.match(/^(.*)\:(\d*)$/)){
+				host=m[1];
+				this.port=Number(m[2]||((this.scheme=='https')?443:80));
+			}else{
+				this.port=(this.scheme=='https')?443:80;
+			}
+			if(m=host.match(/^(.*?):(.*?)@(.*)$/)){
+				this.user=MBString.decodeURI(m[1],code);
+				this.password=MBString.decodeURI(m[2],code);
+				this.host=MBString.decodeURI(m[3],code);
+			}else if(m=host.match(/^(.*?)@(.*)$/)){
+				this.user=MBString.decodeURI(m[1],code);
+				this.host=MBString.decodeURI(m[2],code);
+			}else{
+				this.host=MBString.decodeURI(host,code);
+			}
+			if(m=str.match(/^(.*?)\?(.*)$/)){
+				this.__path__=m[1];
+				this.__query__=m[2];
+			}else{
+				this.__path__=str;
+			}
+		},
+		
+		
+		
+		get path()(MBString.decodeURI(this.__path__,this.encoding)),
+		set path(p)(this.__path__=MBString.encodeURI(p,this.encoding)),
+		get directory()(this.path.replace(/[^\/]*$/,'')),
+		set directory(p)(this.path=p+this.filename),
+		get filename()(this.path.replace(/^.*\//,'')),
+		set filename(p)(this.path=this.directory+p),
+		get query()(this.__query__ && MBString.decodeURI(this.__query__,this.encoding)),
+		set query(p)(this.__query__=MBString.encodeURI(p,this.encoding)),
+		get fragment()(this.__fragment__ && MBString.decodeURI(this.__fragment__,this.encoding)),
+		set fragment(p)(this.__fragment__=MBString.encodeURI(p,this.encoding)),
+		
+		
+		get url()(String(this)),
+		toString:function(noHost,noPath,noFragment,code){
+			var res="";
+			code=code||this.encoding;
+			if(!noHost){
+				res+=String(this.scheme||"http").toLowerCase()+'://';
+				if(typeof(this.user)!='undefined'){
+					res+=MBString.encodeURI(this.user,code);
+					if(typeof(this.password)!='undefined'){
+						res+=':'+MBString.encodeURI(this.password,code);
+					}
+					res+='@';
+				}
+				res+=MBString.encodeURI(this.host).toLowerCase();
+				if(this.port && (this.port!=((this.scheme=='https')?443:80))){
+					res+=':'+this.port;
+				}
+			}
+			if(!noPath){
+				res+=this.__path__||'/';
+				if(this.query){
+					res+='?'+this.query;
+				}
+			}
+			if(!noFragment){
+				if(typeof(this.fragment)!='undefined'){
+					res+='#'+this.__fragment__;
+				}
+			}
+			return(res);
+		},
+		get query(){
+			if(!this.__query__){
+				var q=[];
+				for each(let [n,v] in Iterator(this.__params__||{})){
+					if(typeof(v)=='undefined'){
+						q.push(MBString.encodeURIComponent(n,this.encoding));
+					}else{
+						q.push(MBString.encodeURIComponent(n,this.encoding)+'='+MBString.encodeURIComponent(v,this.encoding));
+					}
+				}
+				this.__query__=q.join('&');
+			}
+			return(this.__query__);
+		},
+		set query(q){
+			if(typeof(q)=='string'){
+				this.__query__=q;
+				this.__params__=null;
+			}else{
+				this.__query__=null;
+				this.__params__=q;
+			}
+		},
+		get params(){
+			if(!this.__params__){
+				var a=String(this.__query__||"").replace(/\+/g,' ').split('&');
+				var params=(this.__params__={});
+				for(var i=0,l=a.length;i<l;i++){
+					if(a[i]){
+						var m=a[i].match(/^(.*?)=(.*)$/);
+						if(m){
+							params[MBString.decodeURIComponent(m[1],this.encoding)]=MBString.decodeURIComponent(m[2],this.encoding);
+						}else{
+							params[MBString.decodeURIComponent(a[i],this.encoding)]=void(0);
+						}
+					}
+				}
+			}
+			return(this.__params__);
+		},
+		set params(q){
+			if(typeof(q)=='string'){
+				this.__query__=q;
+				this.__params__=null;
+			}else{
+				this.__query__=null;
+				this.__params__=q;
+			}
+		},
+		
+		build:function(p){
+			if(!p){
+				return(this);
+			}
+			p=String(p);
+			if(p.match(/^https?\:/)){
+				return(new this.constructor(p));
+			}else if(p.match(/^\//)){
+				return(new this.constructor(this.toString(0,1,1)+p));
+			}
+			var a=String(this.path).split('/');
+			a.pop();
+			a=a.concat(p.split('/'));
+			var r=[];
+			for(var i=0,l=a.length;i<l;i++){
+				switch(a[i]){
+					case('.'):{
+						break;
+					}case('..'):{
+						r.pop();
+						break;
+					}default:{
+						r.push(a[i]);
+						break;
+					}
+				}
+			}
+			return(new this.constructor(this.toString(0,1,1)+r.join('/')));
+		},
+	});
+	
+	var Headers=new Class({
+		__class__:{
+			parse:function(str){
+				var g;
+				if(str instanceof Array){
+					g=$G(str);
+				}else if(str.readLine){
+					g=(function(){
+						var l;
+						while(!str.eof && (l=str.readLine())){
+							yield(l);
+						}
+					})();
+				}else{
+					g=String(str).separate(/\r?\n/);
+				}
+				
+				var res=new this() ,n="",v="";
+				g.execute(function(line){
+					if(line.match(/^[ \t]/)){
+						v+=" "+line.replace(/^[ \t]+/);
+					}else{
+						if(n){
+							res.addValue(n,v);
+						}
+						[,n,v]=line.match(/^(.*?):[ \t]*(.*)$/)||['','',''];
+					}
+				});
+				if(n){
+					res.addValue(n,v);
+				}
+				return(res);
+			},
+		},
+		__new__:function(obj){
+			this.items={}
+			for each(let [n,v] in Iterator(obj||{})){
+				this.setValue(n,v);
+			}
+		},
+		getValue:function(name)(this[String.toLowerCase(name)]),
+		getArray:function(name){
+			var v=this[String.toLowerCase(name)];
+			return((v instanceof Array)?v:[v]);
+		},
+		getString:function(name){
+			var v=this[String.toLowerCase(name)];
+			return((v instanceof Array)?v.join("\n"):String(v));
+		},
+		setValue:function(name,value){
+			this[String.toLowerCase(name)]=this.items[name]=value;
+		},
+		removeValue:function(name){
+			delete(this[String.toLowerCase(name)]);
+			delete(this.items[name]);
+		},
+		addValue:function(n,v){
+			if(v instanceof Array){
+				for(var i=0,l=v.length;i<l;i++){
+					this.addValue(n,v[i]);
+				}
+			}else{
+				var items=this.items;
+				if(n in items){
+					if(!(items[n] instanceof Array)){
+						items[n]=[items[n]];
+					}
+					items[n].push(v);
+				}else{
+					items[n]=v;
+				}
+				this[String.toLowerCase(n)]=this[String(n).camelize()]=this.items[n];
+			}
+		},
+		toString:function(){
+			var res=[];
+			for each(let [n,v] in Iterator(this.items)){
+				v=(v instanceof Array)?v:[v];
+				for(var i=0,l=v.length;i<l;i++){
+					res.push(n+': '+v[i]);
+				}
+			}
+			return(res.join("\r\n")+"\r\n");
+		},
+		__iterator__:function(noValue)(Iterator(this.items,noValue)),
+	});
+	
+	var Cookies=new Class({
+		__class__:{
+			load:function(file)(new this((new File(file)).loadJSON())),
+			loadFromFile:function(file)(new this((new File(file)).loadJSON())),
+		},
+		__new__:function(o){
+			this.__items__=o||{};
+		},
+		add:function(url,obj){
+			if(obj instanceof Array){
+				for(var i=0,l=obj.length;i<l;i++){
+					this.add(url,obj[i]);
+				}
+			}else if(typeof(obj)=='string'){
+				var o={};
+				var a=obj.split(/;[ \t]*/);
+				for(var i=0,l=a.length;i<l;i++){
+					var p=a[i].match(/^(.*?)=(.*)$/);
+					if(p){
+						switch(p[1]){
+							case('expires'):{
+								o.expires=Date.from(p[2]).getTime();
+								break;
+							}case('path'):case('domain'):{
+								o[p[1]]=p[2];
+								break;
+							}default:{
+								o.name=p[1];
+								o.value=p[2];
+							}
+						}
+					}else if(a[i]=='secure'){
+						o.secure=true;
+					}
+				}
+				this.add(url,o);
+			}else{
+				url=new URL(url);
+				var o=Object.extend({expires:0,domain:url.host,path:url.path,secure:false},obj);
+				if(o.name && !o.domain.match(/^(?:(?:ac|co|go|or|ad|ne|gr|ed|lg)\.[^\.][^\.]|[^\.]*)$/)
+							&&((url.host==o.domain) || (url.host.endsWith(o.domain.replace(/^\.?/,'.'))))){
+					this.__items__[o.domain+';'+o.path+';'+o.name]=o;
+				}
+			}
+			return(this);
+		},
+		get:function(url,name){
+			url=new URL(url);
+			var t=now().getTime();
+			return($G(this.__items__).filter(function(o)((o.name==name)&&((o.expires==0)||(o.expires>t))
+					&&(url.path.indexOf(o.path)==0)&&(!o.secure||url.scheme=='https')
+					&&((url.host==o.domain)||(url.host.endsWith(o.domain.replace(/^\.?/,'.'))))))
+					.map(function(o)({l:o.path.length,v:o.value})).orderByDesc('l').map('v').first());
+		},
+		remove:function(url,name){
+			var x=[];
+			$E(this.__items__).filter(function(a)(let([n,o]=a)(
+				(o.name==name)&&(url.path.indexOf(o.path)==0)&&(!o.secure||url.scheme=='https')
+				&&((url.host==o.domain)||(url.host.endsWith(o.domain.replace(/^\.?/,'.'))))
+			))).execute(function(a)(x.push(a[0])));
+			for(var i=0,l=x.length;i<l;i++){
+				delete(obj[x[i]]);
+			}
+		},
+		toString:function(url){
+			url=new URL(url);
+			var t=now().getTime();
+			return($G(this.__items__)
+				.filter(function(o)(((o.expires==0)||(o.expires>t))
+					&&(!o.secure||url.scheme=='https')
+					&&(url.path.indexOf(o.path)==0)
+					&&((url.host==o.domain)||(url.host.endsWith(o.domain.replace(/^\.?/,'.'))))
+				)).map(function(o)({l:o.path.length,p:o.name+'='+(o.value||"")+'; '}))
+				.orderByDesc('l').map('p').toArray().join(''));
+		},
+		saveToFile:function(f,c)(this.saveTo(f,c)),
+		saveTo:function(file,closeSession){
+			var mux=new Mutex(file+':HTTPCookie');
+			try{
+				mux.lock();
+				var f=new File(file);
+				var obj=Object.extend(f.loadJSON()||{},this.__items__);
+				var x=[];
+				var t=now().getTime();
+				for each(let [n,v] in Iterator(obj)){
+					if(v.expires==0){
+						if(closeSession){
+							x.push(n);
+						}
+					}else if(v.expires<t){
+						x.push(n);
+					}
+				}
+				for(var i=0,l=x.length;i<l;i++){
+					delete(obj[x[i]]);
+				}
+				f.saveJSON(obj);
+			}finally{
+				mux.unlock();
+			}
+		},
+	});
+	
+	var ChunkedStream=new Class({},StreamMixin,{
+		__new__:function(stream){
+			this.stream=stream;
+			this.__remainChunk__=0;
+		},
+		
+		__read__:function(addr,size){
+			var size2=size, addr2=addr;
+			try{
+				while(!this.__eof__ && size2){
+					if(this.__remainChunk__==0){
+						var r=this.stream.readLine();
+						this.__remainChunk__=parseInt(r/*this.stream.readLine()*/.replace(/;.*$/,''),16);
+					}
+					if(this.__remainChunk__==0){
+						while(!this.stream.eof && this.stream.readLine()){
+						}
+						this.__eof__=true;
+					}else{
+						var read=this.stream.readTo(addr2,Math.min(size2,this.__remainChunk__),0,false);
+						size2-=read;
+						addr2+=read;
+						this.__remainChunk__-=read;
+						if(this.__remainChunk__<=0){
+							this.stream.readLine();
+						}
+					}
+				}
+			}finally{
+				return(size-size2);
+			}
+		},
+	});
+	var RawStreamWrapper=new Class({},StreamMixin,{
+		__new__:function(stream,size){
+			this.__stream__=stream;
+			this.__contentLength__=(typeof(size)=='undefined')?Number.POSITIVE_INFINITY:size;
+			this.__contentReceived__=0;
+		},
+		get __eof__()((this.__contentReceived__>=this.__contentLength__)||this.__stream__.eof),
+		__read__:function(addr,size){
+			var r=this.__stream__.readTo(addr,size,0,false);
+			this.__contentReceived__+=r;
+			return(r);
+		},
+		__write__:function(addr,size){
+			var ptr=new (Byte.pointer)(addr);
+			ptr.count=size;
+			return(this.__stream__.write(ptr));
+		},
+		__free__:function(){
+		},
+		__close__:function(){
+		},
+	});
+	
+	
+	
+	var HTTP=new Class({
+		__class__:{
+			get:function(url)(this.getText(url)),
+			post:function(url,body){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						body=body||url.body;
+						url=obj.url;
+						delete(obj.url);
+						delete(obj.body);
+					}
+					var http=new this(obj);
+					return(http.post(url,body));
+				}finally{
+					http.free();
+				}
+			},
+			head:function(url){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						url=obj.url;
+						delete(obj.url);
+					}
+					var http=new this(obj);
+					return(http.head(url));
+				}finally{
+					http.free();
+				}
+			},
+			getText:function(url){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						url=obj.url;
+						delete(obj.url);
+					}
+					var http=new this(obj);
+					return(http.getText(url));
+				}finally{
+					http.free();
+				}
+			},
+			getHTML:function(url){
+				var obj={};
+				if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+					obj=url;
+					url=obj.url;
+					delete(obj.url);
+				}
+				var http=new this(obj);
+				return(http.getHTML(url,true));
+			},
+			getXML:function(url){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						url=obj.url;
+						delete(obj.url);
+					}
+					var http=new this(obj);
+					return(http.getXML(url));
+				}finally{
+					http.free();
+				}
+			},
+			getData:function(url,type){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						url=obj.url;
+						delete(obj.url);
+					}
+					var http=new this(obj);
+					return(http.getData(url,type));
+				}finally{
+					http.free();
+				}
+			},
+			saveTo:function(url,dest,ifExists){
+				try{
+					var obj={};
+					if((typeof(url)=='object') && !(url instanceof URL) && !(url instanceof Array)){
+						obj=url;
+						url=obj.url;
+						delete(obj.url);
+					}
+					var http=new this(obj);
+					return(http.saveTo(url,dest,ifExists));
+				}finally{
+					http.free();
+				}
+			},
+			options:{
+			},
+		},
+		
+		__new__:function(opt){
+			opt=opt||{};
+			this.queue=[];
+			this.__children__=[];
+			this.__keepingConnections__={};
+			
+			this.options=Object.extend({},this.constructor.options||{});
+			
+			this.options.events={};
+			if((typeof(opt)=='object')&&!(opt instanceof URL)&&!(opt instanceof Array)){
+				Object.extend(this.options,opt);
+			}else{
+				this.options.url=opt;
+			}
+			if(this.options.url){
+				this.addRequests(this.options.url);
+			}
+			if(opt.cookies){
+				if(opt.cookies instanceof Cookies){
+					this.cookies=opt.cookies;
+				}else{
+					this.cookies=Cookies.load(opt.cookies)
+				}
+			}else{
+				this.cookies=new Cookies();
+			}
+		},
+		free:function(){
+			for(var i=0,a=this.__children__,l=a.length;i<l;i++){
+				a[i].free();
+			}
+			for each(let [n,v] in Iterator(this.__keepingConnections__)){
+				for(var i=0,l=v.length;i<l;i++){
+					v[i].free();
+				}
+			}
+			if(this.options.saveCookies){
+				if((this.options.saveCookies===true) && this.options.cookies && !(this.options.cookies instanceof Cookies)){
+					this.cookies.saveToFile(this.options.cookies,this.options.discardSessionCookies);
+				}else{
+					this.cookies.saveTo(this.options.saveCookies,this.options.discardSessionCookies);
+				}
+			}
+		},
+		
+		getData:function(url,type){
+			if((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array)){
+				url={url:url};
+			}
+			try{
+				var req=this.request(url);
+				var res=req.send();
+				if(res){
+					var buf=res.readAll();
+					if(!type){
+						return(buf);
+					}else if(type.pointer){
+						var obj=new type.pointer(buf.valueOf());
+						obj.count=Math.ceil(buf.length/type.size);
+						return(obj);
+					}else if(type.entity){
+						var obj=new type(buf.valueOf());
+						obj.count=Math.ceil(buf.length/type.entity.size);
+						return(obj);
+					}
+				}
+			}finally{
+				req&&req.free();
+				res&&res.free();
+			}
+		},
+		head:function(url){
+			if((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array)){
+				url={url:url};
+			}
+			url.method='HEAD';
+			try{
+				var req=this.request(url);
+				return(req.send());
+			}finally{
+				req&&req.free();
+			}
+		},
+		get:function(url)(this.getText(url)),
+		post:function(url,body){
+			if((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array)){
+				url={url:url,method:'POST',body:body};
+				
+			}else{
+				body=body||url.body||"";
+				url=Object.extend({},url);
+				url.method='POST';
+				url.body=body;
+			}
+			return(this.getText(url));
+		},
+		open:function(url){
+			if(url && ((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array))){
+				url={url:url};
+			}
+			try{
+				var req=this.request(url);
+				return(req.send());
+			}catch(e){
+				req&&req.free();
+				throw(e);
+			}
+		},
+		
+		getText:function(url){
+			if((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array)){
+				url={url:url};
+			}
+			try{
+				var req=this.request(url);
+				var res=req.send();
+				if(res){
+					if(!res.encoding){
+						res=new (require('Charset').Detector)(res, String(res.contentType||"").match(/xml|html/));
+					}
+					return(res.readText());
+					/*
+					var text="";
+					if(!res.encoding) && String(res.contentType||"").match(/xml|html/)){
+						res.encoding='utf8';
+						while(!res.eof){
+							text=text+res.readText(8);
+							var m=text.match(/<\?xml\s[^>]*encoding="([^"]*)"|<meta\s[^>]*content-type[^>]*;\s*charset=\s*([^\s">]*(?=[\s"]))|(<(?!html|head|title|isindex|base|script|style|meta|link|object|!doctype|\?xml)\w+[^>]*>)/i);
+							if(m){
+								if(!m[3]){
+									res.encoding=m[1]||m[2];
+								}
+								break;
+							}
+						}
+					}
+					
+					return(text+res.readText());
+					*/
+				}
+			}finally{
+				res&&res.free();
+				req&&req.free();
+			}
+		},
+		getHTML:function(url,freeHTTP){
+			try{
+				if((typeof(url)!='object') || (url instanceof URL) || (url instanceof Array)){
+					url={url:url};
+				}
+				var _this=this;
+				var req=this.request(url);
+				var res=req.send();
+				var e=res.encoding,text="";
+				if(res){
+					res=new (require('Charset').Detector)(res,true);
+					res.observe('free',function(){
+						req.free();
+						freeHTTP&&_this.free();
+					});
+					if(e){
+						res.encoding=e;
+						res.__encodingDetected__=true;
+					}
+					return(new (require('LooseXML').HTML)(res,{closeStream:true}));
+/*					
+					
+					return(new (require('LooseXML').HTML)({
+						get eof()(res.eof),
+						readText:function(size){
+							if(e){
+								return(res.readText(size));
+							}else{
+								var read="",rem=size;
+								while(!res.eof && (rem>0)){
+									var r=res.readText(Math.min(8,rem));
+									rem-=8;
+									read+=r;
+									text+=r;
+									var m=text.match(/<\?xml\s[^>]*encoding="([^"]*)"|<meta\s[^>]*content-type[^>]*;\s*charset=\s*([^\s">]*(?=[\s"]))|(<(?!html|head|title|isindex|base|script|style|meta|link|object|!doctype|\?xml)\w+[^>]*>)/i);
+									if(m){
+										if(m[3]){
+											e=true;
+										}else{
+											e=res.encoding=m[1]||m[2];
+										}
+										text=null;
+										return(read+((rem>0)?res.readText(rem):""));
+									}
+								}
+								return(read);
+							}
+						},
+						free:function(){
+							res.free();
+							req.free();
+							freeHTTP&&_this.free();
+						},
+					},{closeStream:true}));
+*/
+				}
+			}catch(e){
+				req&&req.free();
+				freeHTTP&&_this.free();
+				throw(e);
+			}
+		},
+		getXML:function(url){
+			var text=this.getText(url);
+			if(text){
+				return(new XML(text.replace(/<\?[^>]*\?>/g,"")));
+			}
+		},
+		
+		saveTo:function(url,dest,ifExists){
+			if((typeof(url)=='string') || (url instanceof URL) || (url instanceof Array)){
+				return(this.saveTo({url:url},dest,ifExists));
+			}else if(url.url instanceof Array){
+				var obj=Object.extend({},url);
+				var cnt=0;
+				for(var i=0,a=url.url,l=a.length;i<l;i++){
+					obj.url=a[i];
+					cnt+=this.saveTo(obj,(dest.length)?dest[i]:dest,ifExists)||0;
+				}
+				return(cnt);
+			}else{
+				if((typeof(dest.file)!='function') && !dest.openNew){
+					dest=cwd().buildPath(dest);
+				}
+				try{
+					var res=this.open(url);
+					url=new URL(url.url);
+					var name=url.filename||this.options.defaultName||'index.html';
+					if(res.headers['content-location']){
+						name=url.build(res.headers['content-location']).filename||name;
+					}else if(res.headers['content-disposition']){
+						name=(res.headers['content-disposition'].match(/;\s*filename="[^"]*?([^\|\<\>\*\:"\\\/]*)"/i)||["",name])[1];
+					}
+					if(typeof(dest.file)=='function'){
+						dest=dest.file(name);
+					}
+					if((typeof(ifExists)=='string')&&(typeof(dest.getNonexistent)=='function')){
+						dest=dest.getNonexistent(ifExists.match(/\[.*\]/)?ifExists:void(0));
+					}else if(!ifExists && !this.options.resume && dest.exists){
+						return(0);
+					}
+					var buf=res.readAll();
+					var stream=(this.options.resume&&dest.openAppend&&dest.exists)?dest.openAppend():dest.openNew();
+					stream.write(buf);
+					return(1);
+				}catch(e){
+					return(0);
+				}finally{
+					res&&res.free();
+					buf&&buf.free();
+					stream&&stream.free();
+				}
+			}
+		},
+		
+		
+		setOptions:function(opt){
+			Object.extend(this.options,opt||{});
+			return(this);
+		},
+		add:function(opt){
+			this.queue=this.queue.concat(this.createRequests(opt));
+			return(this);
+		},
+		request:function(opt)(this.createRequests(opt)[0]),
+		createRequests:function(opt){
+			var o=Object.extend({preferredHosts:{},headers:{}},this.options), a;
+			o.events={};
+			if(opt instanceof Array){
+				a=opt;
+			}else if((typeof(opt)=='object') && !(opt instanceof URL)){
+				Object.extend(o,opt);
+				if(o.url instanceof Array){
+					a=o.url;
+				}else{
+					a=[o.url];
+				}
+			}else{
+				a=[opt];
+			}
+			delete(o.url);
+			var res=new Array(a.length);
+			for(var i=0,l=a.length;i<l;i++){
+				this.__children__.push(res[i]=new Request(this,Object.extend({url:a[i]},o)));
+			}
+			return(res);
+		},
+		
+		execute:function(opt){
+			if(opt){
+				this.addRequests(opt);
+			}
+			var a=this.queue;
+			this.queue=[];
+			for(var i=0,l=a.length;i<l;i++){
+				a[i].send().discard();
+			}
+			return(this);
+		},
+	});
+	
+	var MD5=require('Hash').MD5;
+	var {TCP:TCP,SSL:SSL,IPAddress:IPAddress,ConnectError:ConnectError,ConnectionTimeout:ConnectionTimeout}=require('Socket');
+	var InflateStream=require('ZLib').InflateStream;
+	var Request=new Class({},EventMixin,{
+		__new__:function(http,opt){
+			this.parent=http;
+			this.options=opt;
+			this.version=opt.version||'1.1';
+			this.method=(opt.method||(('body' in opt)?'POST':'GET')).toUpperCase();
+			this.url=new URL(opt.url,this.options.encoding||'utf8');
+			this.headers=new Headers(opt.headers);
+			this.proxy=opt.proxy;
+			
+			for each(let [n,v] in Iterator(http.constructor.events||{})){
+				this.observe(n,v);
+			}
+			for each(let [n,v] in Iterator(http.events||{})){
+				this.observe(n,v);
+			}
+			for each(let [n,v] in Iterator(opt.events||{})){
+				this.observe(n,v);
+			}
+			this.maxRedirect=(typeof(opt.maxRedirect)=='undefined')?Number.POSITIVE_INFINITY:opt.maxRedirect;
+			this.maxRetry=opt.maxRetry||0;
+			this.retryInterval=opt.retryInterval|200;
+			this.retryCount=0;
+			this.redirectCount=0;
+			this.state='ready';
+		},
+		get secure()(this.url.scheme=='https'),
+		
+		send:function(noReceive){
+			while(true){
+				try{
+					if(this.state=='ready'){
+						var opt=this.options;
+						this.host=opt.preferredHosts[this.url.host]||this.url.host;
+						var a=this.parent.__keepingConnections__[this.url.scheme+'/'+this.proxy+'/'+this.host]||[];
+						while(this.__stream__=a.shift()){
+							if(this.__stream__.eof){
+								this.__stream__.free();
+							}else{
+								break;
+							}
+						}
+						this.headers.setValue('Host',this.url.host);
+						if('body' in opt){
+							let size=38;
+							if(typeof(opt.body)=='object'){
+								if(opt.body.openRead||opt.body.readTo||(opt.body instanceof Pointer)){
+								}else{
+									var a=[];
+									var code=opt.postEncoding||opt.encoding||'utf8';
+									for(let [n,v] in Iterator(opt.body)){
+										size+=34+39+8+MBString.calcSize(n,code);
+										if(v.openRead || v.readTo || (v instanceof Pointer)){
+											size+=13+40+MBString.calcSize(v.name||"0000.zip",code)+v.size;
+											if(!opt.boundary){
+												opt.boundary='ppppppppp'+String.random(12,true)+'rrrrrrrrrrr';
+											}
+										}else{
+											size+=String(v).length;
+										}
+										a.push(MBString.encodeURIComponent(n,code)+'='+MBString.encodeURIComponent(v,code));
+									}
+									if(!opt.boundary){
+										this.headers.setValue('Content-Type','application/x-www-form-urlencoded');
+										opt.body=a.join('&');
+									}
+								}
+							}
+							if(opt.boundary){
+								this.headers.setValue('Content-Type','multipart/form-data; boundary='+opt.boundary);
+								this.headers.setValue('Content-Length',size);
+							}else if(opt.body.openRead || opt.body.readTo || (opt.body instanceof Pointer)){
+								if('size' in opt.body){
+									this.headers.setValue('Content-Length',opt.bodySize||opt.body.size);
+								}
+							}else{
+								opt.body=String(opt.body);
+								this.headers.setValue('Content-Length',opt.bodySize||opt.body.length);
+							}
+						}
+						
+						if(opt.mtime){
+							this.headers.setValue('If-Modified-Since',Date.form(opt.mtime).toRFCFormat());
+						}
+						if(opt.offset){
+							if(opt.offset<0){
+								this.headers.setValue('Range','bytes='+opt.offset);
+							}else if(opt.length){
+								this.headers.setValue('Range','bytes='+opt.offset+'-'+(opt.offset*1+opt.length*1-1));
+							}else{
+								this.headers.setValue('Range','bytes='+opt.offset+'-');
+							}
+						}else if(opt.resume && opt.output && opt.output.openAppend){
+							var s=opt.output.size;
+							if(s){
+								this.headers.setValue('Range','bytes='+s+'-');
+							}
+						}
+						if(opt.referer){
+							this.headers.setValue('Referer',opt.referer);
+						}
+						if(opt.ua){
+							if(opt.ua==true){
+								this.headers.setValue('User-Agent','Mozilla/4.0 (compatible; MSIE 8.0; Windows NT 5.1)');
+							}else{
+								this.headers.setValue('User-Agent',opt.ua);
+							}
+						}
+						var cookie=this.parent.cookies.toString(this.url);
+						if(cookie){
+							this.headers.setValue('Cookie',cookie);
+						}
+						
+						if(opt.compress){
+							this.headers.setValue('Accept-Encoding','gzip,deflate');
+						}else{
+							this.headers.setValue('Accept-Encoding','identity');
+						}
+						if(opt.closeConnection){
+							this.headers.setValue('Connection','close');
+						}
+						
+						if(opt.user && opt.password && opt.basic){
+							this.headers.setValue('Authorization','Basic '+Base64.encode(opt.user+':'+opt.password,opt.encoding||"utf8"));
+						}
+						
+						this.fire('start');
+						if(this.__stream__){
+							this.state='connected';
+							this.fire('alive');
+						}else{
+							if(this.url.scheme=='https'){
+								this.__stream__=SSL.connect(this.host,this.url.port,this.proxy,opt.connectionTimeOut||opt.timeout);
+							}else if(this.proxy){
+								this.__stream__=TCP.connect(this.proxy,"",opt.connectionTimeOut||opt.timeout);
+							}else{
+								this.__stream__=TCP.connect(this.host,this.url.port,opt.connectionTimeOut||opt.timeout);
+							}
+							this.state='connected';
+							this.fire('connect');
+						}
+						this.__stream__.lineSeparator="\r\n";
+						this.__stream__.timeout=this.options.timeout;
+						this.__stream__.errorOnTimeout=this.options.errorOnTimeout;
+						this.__stream__.writeLine(String(this.method).toUpperCase()+' '+(this.proxy?this.url:this.url.toString(1,0,1))+' HTTP/'+this.version);
+						this.__stream__.writeLine(this.headers.toString());
+						
+						this.fire('request');
+						
+						if(opt.boundary){
+							this.__stream__.encoding=opt.postEncoding||opt.encoding||'utf8';
+							try{
+								var len=opt.bufferSize||8192;
+								var buf=Byte.alloc(len);
+								var ptr=new (Byte.pointer)(buf.valueOf());
+								for each(let [n,v] in Iterator(opt.body)){
+									this.__stream__.writeLine("--"+opt.boundary);
+									if(v.openRead){
+										this.__stream__.writeLine('Content-Disposition: form-data; name="'+n+'"; filename="'+(v.name||'0000.zip')+'"');
+										this.__stream__.writeLine('Content-Type: application/octet-stream');
+										this.__stream__.writeLine('');
+										try{
+											var written=0;
+											var f=v.openRead();
+											while(!f.eof){
+												written+=(ptr.count=f.readTo(buf.valueOf(), len));
+												this.__stream__.write(ptr);
+												this.fire('write',{"file":v, bytes:written});
+											}
+										}finally{
+											f&&f.free();
+										}
+										this.__stream__.writeLine('');
+									}else{
+										this.__stream__.writeLine('Content-Disposition: form-data; name="'+n+'"');
+										this.__stream__.writeLine('');
+										this.__stream__.writeLine(String(v));
+									}
+								}
+								this.__stream__.writeLine("--"+opt.boundary+"--");
+								this.__stream__.writeLine('');
+							}finally{
+								buf&&buf.free();
+							}
+						}else if(opt.body && (opt.body.readTo||opt.body.openRead)){
+							try{
+								var len=opt.bufferSize||8192;
+								var buf=Byte.alloc(len);
+								var ptr=new (Byte.pointer)(buf.valueOf());
+								var closeBody=!!opt.body.openRead;
+								var stream=opt.body.openRead?opt.body.openRead():opt.body;
+								var max=Number(opt.bodySize||Number.POSITIVE_INFINITY);
+								var sum=0;
+								while(!stream.eof && (sum<max)){
+									sum+=(ptr.count=stream.readTo(buf.valueOf(), Math.min(len,max-sum)));
+									this.__stream__.write(ptr);
+								}
+							}finally{
+								buf&&buf.free();
+								closeBody && stream && stream.free();
+							}
+						}else if(opt.body && (opt.body instanceof Pointer)){
+							this.__stream__.write(opt.body);
+						}else if('body' in opt){
+							this.__stream__.writeLine(String(opt.body));
+						}
+						this.state='sent';
+						this.fire('sent');
+					}
+					if(noReceive){
+						break;
+					}else{
+						
+						this.response=new Response(this);
+						if(!this.fire('response')){
+						}else{
+							var cookies=this.response.headers.getValue('Set-Cookie');
+							if(cookies && !opt.ignoreCookies){
+								this.parent.cookies.add(this.url,cookies);
+							}
+							if(this.response.headers.location &&!(this.response.status.match(this.options.failures||/^[45]..$/))&& (this.redirectCount<this.maxRedirect) &&  this.fire('redirect')){
+								this.url=new URL(this.response.headers.location,opt.encoding||'utf8');
+								this.response.__skippingBody__=true;
+								this.response.discard();
+								this.response.free();
+								this.response=null;
+								this.state='ready';
+								this.redirectCount++;
+							}else if((this.response.status=='401')&&!this.headers.getValue('Authorization')){
+								var m, f, inf=this.response.headers.getValue('WWW-Authenticate');
+								if(m=inf.match(/^Basic\s+realm="([^"]*)"/i)){
+									if(!this.options.password){
+										[this.options.user,this.options.password]=(this.options.auth||Function.doNothing)(this.url,m[1],this.options.user);
+										this.options.basic=true;
+									}
+								}else if(m=inf.match(/^Digest/)){
+									var realm,nonce,algo,qop;
+									inf.replace(/realm\s*=\s*"(?:"|(.*?[^"])")/,function($0,$1)((realm=$1.replace(/\\(.)/,'$1')),''))
+										.replace(/nonce\s*=\s*"(?:"|(.*?[^"])")/,function($0,$1)((nonce=$1.replace(/\\(.)/,'$1')),''))
+										.replace(/qop\s*=\s*"([^"]*)"/,function($0,$1)(qop=$1,''))
+										.replace(/algorithm\s*=\s*(\w+)/,function($0,$1)((algo=$1),""));
+									if((algo=='MD5')&&qop.match(/(^|,)auth(,|$)/)){
+										if(!this.options.password){
+											[this.options.user,this.options.password]=(this.options.auth||Function.doNothing)(this.url,realm,this.options.user);
+										}
+										var A1=MD5.calc([this.options.user+':'+realm+':'+this.options.password, this.options.encoding||"utf8"]);
+										var A2=MD5.calc([this.method+':'+this.url.path, this.options.encoding||"utf8"]);
+										var cnonce=String.random(32,16).toLowerCase();
+										var res=MD5.calc([A1+':'+nonce+':00000001:'+cnonce+':auth:'+A2,'utf8']);
+										this.headers.setValue('Authorization','Digest username="'+this.options.user
+																+'",realm="'+realm+'",nonce="'+nonce+'",uri="'+this.url.path
+																+'",cnonce="'+cnonce+'",nc=00000001,algorithm=MD5,response="'+res+'",qop=auth');
+									}
+								}
+								if(opt.password){
+									this.response.__skippingBody__=true;
+									this.response.discard();
+									this.response.free();
+									this.response=null;
+									this.state='ready';
+								}else if(this.response.status.match(this.options.failures||/^[45]..$/)){
+									this.response.__skippingBody__=true;
+									this.response.discard();
+									this.response.free();
+									var res=this.response;
+									this.response=null;
+									throw(res);
+								}else{
+									break;
+								}
+							}else if(this.response.status.match(this.options.failures||/^[45]..$/)){
+								this.response.__skippingBody__=true;
+								this.response.discard();
+								this.response.free();
+								var res=this.response;
+								this.response=null;
+								throw(res);
+							}else if(this.method=='HEAD'||(this.response.status=='204')){
+								this.state='complete';
+								this.fire('complete');
+								this.response.free();
+								break;
+							}else{
+								this.state='loading';
+								break;
+							}
+						}
+					}
+				}catch(e if e===this.abort){
+					break;
+				}catch(e if ((e===ConnectionTimeout)||(e===WriteTimeout)||(e===ReadTimeout))&&(this.options.errorOnTimeout)){
+					throw(e);
+				}catch(e){
+					if((this.retryCount<this.maxRetry)&&this.fire('retry')){
+						if(this.response){
+							this.response.free();
+							this.response=null;
+						}
+						sleep(this.retryInterval||0);
+						this.state='ready';
+						this.retryCount++;
+					}else if((e instanceof Response)&&(this.options.errorOnFailure)){
+						throw(e);
+					}else{
+						this.error=this.parent.error=e;
+						this.state='fail';
+						this.fire('fail');
+						break;
+					}
+				}
+			}
+			return(this.response);
+		},
+		free:function(){
+			if(this.response){
+				this.response.free();
+			}else if(this.__stream__){
+				this.__stream__.free();
+			}
+		},
+		abort:function(){
+			this.state='aborted';
+			this.free();
+		},
+	});
+	
+	var Response=new Class({},StreamMixin,{
+		__new__:function(request){
+			this.request=request;
+			this.parent=request.parent;
+			this.options=request.options;
+			request.__stream__.encoding='utf8';
+			var line=request.__stream__.readLine();
+			var m=line.match(/^http\/([\d\.]+)\s+(\d+)\s+(.*)$/i);
+			if(!m){
+				throw(new Error('HTTP error: invalid status line('+line+')'));
+			}
+			this.version=m[1];
+			this.status=m[2];
+			this.statusText=m[3];
+			this.headers=Headers.parse(request.__stream__);
+			if('last-modified' in this.headers){
+				this.mtime=this.timeModified=Date.from(this.headers['last-modified']);
+			}
+			if('content-type' in this.headers){
+				this.contentType=new MediaType(this.headers['content-type']);
+			}
+			
+			this.encoding=this.options.responseEncoding||this.options.encoding||(this.contentType||{}).charset;
+		},
+		
+		__read__:function(addr,size){
+			var size2=size,addr2=addr;
+			if(!this.__eof__){
+				if(!this.__stream__){
+					if(this.headers.getValue('Transfer-Encoding')=='chunked'){
+						this.__stream__=new ChunkedStream(this.request.__stream__);
+					}else{
+						this.__stream__=new RawStreamWrapper(this.request.__stream__,this.headers['content-length']||Number.POSITIVE_INFINITY);
+					}
+					var z=(this.headers.getValue('Content-Encoding')||"").toLowerCase();
+					if(['gzip','deflate'].indexOf(z)!=-1){
+						this.__stream__=new InflateStream(this.__stream__,((z=='deflate')?'raw':''));
+					}
+					if(this.options.output){
+						if(this.options.resume){
+							this.__outputStream__=this.options.output.openAppend();
+						}else if(this.options.output.openNew){
+							this.__outputStream__=this.options.output.openNew();
+						}else{
+							this.__outputStream__=this.options.output;
+							this.__outputStreamKeepOpened__=!this.options.closeOutput;
+						}
+					}
+				}
+				while(!this.__stream__.eof && (size2>0)){
+					var s=this.__stream__.readTo(addr2,size2,0);
+					size2-=s;
+					addr2+=s;
+					if(!this.request.fire('read')){
+						this.free();
+						return(size-size2);
+					}
+				}
+				if(this.__outputStream__){
+					var ptr=new (Byte.pointer)(addr);
+					ptr.count=size-size2;
+					this.__outputStream__.write(ptr);
+				}
+				if(this.__stream__.eof){
+					if(!this.__skippingBody__){
+						this.request.fire('complete');
+						this.request.state='complete';
+					}
+					this.free();
+				}
+			}
+			return(size-size2);
+		},
+		__free__:function(){
+			if(!this.__eof__){
+				this.__eof__=true;
+				if(this.__stream__){
+					if(this.__stream__.eof && (this.version=='1.1') && !this.options.closeConnection && (String(this.headers.getValue('Connection')).toLowerCase()!='close')){
+						var req=this.request, hash=req.url.scheme+'/'+req.proxy+'/'+req.host;
+						(this.parent.__keepingConnections__[hash]||(this.parent.__keepingConnections__[hash]=[])).push(req.__stream__);
+					}else{
+						this.request.__stream__.free();
+					}
+					this.__stream__.free();
+					if(this.__outputStream__ && !this.__outputStreamKeepOpened__){
+						this.__outputStream__.free();
+					}
+				}else{
+					this.request.__stream__.free();
+				}
+			}
+		},
+	});
+	this.MediaType=MediaType;
+	this.URL=URL;
+	this.Headers=Headers;
+	this.Request=Request;
+	this.Response=Response;
+	this.Cookies=Cookies;
+	this.HTTP=HTTP;
+})

@@ -1,0 +1,1325 @@
+(function(){
+	var eay32=Library.load('libeay32.dll'),
+	
+	ERR_get_error=				eay32.proc('ERR_get_error',[],UInt),
+	ERR_error_string_n=			eay32.proc('ERR_error_string_n',[UInt,MBString,UInt],UInt),
+	ERR_load_EVP_strings=		eay32.proc('ERR_load_EVP_strings',[],Int),
+	ERR_load_RSA_strings=		eay32.proc('ERR_load_RSA_strings',[],Int),
+	ERR_load_BIO_strings=		eay32.proc('ERR_load_BIO_strings',[],Int),
+	RAND_pseudo_bytes=				eay32.proc('RAND_pseudo_bytes',[Pointer,Int],Int),
+	RSA_print=						eay32.proc('RSA_print',[UInt,UInt,Int],Int),
+	RSA_size=						eay32.proc('RSA_size',[UInt],Int),
+	RSA_free=						eay32.proc('RSA_free',[UInt],Int),
+	RSA_generate_key=				eay32.proc('RSA_generate_key',[Int,UInt,UInt,UInt],UInt),
+	RSA_private_decrypt=			eay32.proc('RSA_private_decrypt',[Int,UInt,UInt,UInt,Int],Int),
+	RSA_private_encrypt=			eay32.proc('RSA_private_encrypt',[Int,UInt,UInt,UInt,Int],Int),
+	RSA_public_decrypt=				eay32.proc('RSA_public_decrypt',[Int,UInt,UInt,UInt,Int],Int),
+	RSA_public_encrypt=				eay32.proc('RSA_public_encrypt',[Int,UInt,UInt,UInt,Int],Int),
+	RSA_sign=						eay32.proc('RSA_sign',[Int,Pointer,Int,Pointer,Pointer,UInt],Int),
+	RSA_verify=						eay32.proc('RSA_verify',[Int,Pointer,Int,Pointer,Int,UInt],Int),
+	PEM_write_bio_RSAPrivateKey=	eay32.proc('PEM_write_bio_RSAPrivateKey',[UInt,UInt,UInt,UInt,UInt,UInt,UInt],Int),
+	PEM_read_bio_RSAPrivateKey=		eay32.proc('PEM_read_bio_RSAPrivateKey',[UInt,UInt,UInt,UInt],Int),
+	PEM_write_bio_RSAPublicKey=		eay32.proc('PEM_write_bio_RSAPublicKey',[UInt,UInt],Int),
+	PEM_read_bio_RSAPublicKey=		eay32.proc('PEM_read_bio_RSAPublicKey',[UInt,UInt,UInt,UInt],Int),
+	PEM_write_bio_RSA_PUBKEY=		eay32.proc('PEM_write_bio_RSA_PUBKEY',[UInt,UInt],Int),
+	PEM_read_bio_RSA_PUBKEY=		eay32.proc('PEM_read_bio_RSA_PUBKEY',[UInt,UInt,UInt,UInt],Int),
+	EVP_enc_null=					eay32.proc('EVP_enc_null',[],UInt),
+	EVP_aes_128_ecb=				eay32.proc('EVP_aes_128_ecb',[],UInt),
+	
+	HMac=							eay32.proc('HMAC',[UInt,Pointer,Int,Pointer,Int,Pointer,Pointer],UInt),
+	
+	AES_set_encrypt_key=			eay32.proc('AES_set_encrypt_key',[Pointer,Int,Pointer],Int),
+	AES_ctr128_encrypt=				eay32.proc('AES_ctr128_encrypt',[Pointer,Pointer,UInt,Pointer,Pointer,Pointer,Pointer],Int),
+	
+	EVP_add_digest=					eay32.proc('EVP_add_digest',[UInt],Int),
+	
+	EVP_BytesToKey=					eay32.proc('EVP_BytesToKey',[UInt,UInt,Pointer,Pointer,Int,Int,Pointer,Pointer],Int),
+	
+	BIO_new=			eay32.proc('BIO_new',[UInt],UInt),
+	BIO_push=			eay32.proc('BIO_push',[UInt,UInt],UInt),
+	BIO_set_flags=		eay32.proc('BIO_set_flags',[UInt,UInt],Int),
+	BIO_ctrl=			eay32.proc('BIO_ctrl',[UInt,Int,Int,UInt],Int),
+	
+	BIO_s_null=			eay32.proc('BIO_s_null',[],UInt),
+	BIO_new_bio_pair=	eay32.proc('BIO_new_bio_pair',[Pointer,Int,Pointer,Int]),
+	BIO_new_mem_buf=	eay32.proc('BIO_new_mem_buf',[UInt,Int],UInt),
+	BIO_f_base64=		eay32.proc('BIO_f_base64',[],UInt),
+	BIO_f_md=			eay32.proc('BIO_f_md',[],UInt),
+	BIO_f_cipher=		eay32.proc('BIO_f_cipher',[],UInt),
+	BIO_set_cipher=		eay32.proc('BIO_set_cipher',[UInt,UInt,Pointer,Pointer,Int],Int),
+
+	BIO_gets=			eay32.proc('BIO_gets',[UInt,UInt,Int],Int),
+	BIO_puts=			eay32.proc('BIO_puts',[UInt,UInt,Int],Int),
+	BIO_write=			eay32.proc('BIO_write',[UInt,UInt,UInt],Int),
+	BIO_read=			eay32.proc('BIO_read',[UInt,UInt,UInt],Int),
+	
+	BIO_free_all=		eay32.proc('BIO_free_all',[UInt],Int);
+	ERR_load_EVP_strings();
+	ERR_load_RSA_strings();
+	ERR_load_BIO_strings();
+	var error=function(){
+		try{
+			var buf=Byte.alloc(320);
+			ERR_error_string_n(ERR_get_error(),buf,319);
+			return(buf.toString());
+		}finally{
+			buf&&buf.free();
+		}
+	};
+	
+	var enc_b64=function(obj,free){
+		try{
+			var pw=UInt.alloc(),pr=UInt.alloc();
+			BIO_new_bio_pair(pw,0,pr,0);
+			var write=BIO_push(BIO_new(BIO_f_base64()),pw.item()),read=pr.item();
+
+			BIO_set_flags(write,0x100);
+			BIO_write(write,obj,obj.size);
+			BIO_ctrl(write,11,0,0);
+			var size=Math.ceil(obj.size/3)*4+4;
+			var buf=Byte.alloc(size);
+			buf.count=BIO_read(read,buf.valueOf(),size);
+			return(buf.toString());
+		}finally{
+			write&&	BIO_free_all(write);
+			read&&	BIO_free_all(read);
+			pw&&	pw.free();
+			pr&&	pr.free();
+			buf&&	buf.free();
+			obj&&free&&obj.free();
+		}
+	};
+	var dec_b64=function(str){
+		try{
+			var pw=UInt.alloc(),pr=UInt.alloc();
+			BIO_new_bio_pair(pw,0,pr,0);
+			var read=BIO_push(BIO_new(BIO_f_base64()),pr.item()),write=pw.item();
+			
+			BIO_set_flags(read,0x100);
+			var mbs=MBString.from(str=String(str).replace(/[^0-9a-zA-Z\=\+\/]/g,''));
+			BIO_write(write,mbs,str.length);
+			BIO_ctrl(write,11,0,0);
+			var size=Math.ceil(str.length/4)*3;
+			var buf=Byte.alloc(size);
+			buf.count=BIO_read(read,buf.valueOf(),size);
+			return(buf);
+		}finally{
+			write&&	BIO_free_all(write);
+			read&&	BIO_free_all(read);
+			pw&&	pw.free();
+			pr&&	pr.free();
+			mbs&&	mbs.free();
+		}
+	};
+	
+	
+	var calc_md=function(md,buf){
+		try{
+			var n=BIO_new(BIO_s_null());
+			var m=BIO_push(BIO_new(BIO_f_md()),n);
+			var res=Byte.alloc(md.size);
+			BIO_ctrl(m,111,1,md.handle);
+			BIO_write(m,buf,buf.size);
+			BIO_ctrl(m,11,0,0);
+			BIO_gets(m,res.valueOf(),md.size);
+			return(res);
+		}finally{
+			m&&BIO_free_all(m);
+		}
+	};
+	var RSA=new Class({
+		__class__:{
+			paddingTypes:{
+				'PKCS1':1,
+				'PKCS':1,
+				'SSLV23':2,
+				'SSL':2,
+				'NONE':3,
+				'OAEP':4,
+				'X931':5,
+			},
+			create:function(bits,exp){
+				bits=bits||2048;
+				exp=exp||65537;
+				return(new this(RSA_generate_key(bits,exp,0,0),true));
+			},
+			createKeys:function(b,e){
+				try{
+					var rsa=this.create(b,e);
+					return([rsa.privateKey,rsa.publicKey]);
+				}finally{
+					rsa&&rsa.free();
+				}
+			},
+			searchKey:function(pattern,bits,exp,hash){
+				if(pattern instanceof RegExp){
+					while(true){
+						try{
+							var rsa=this.create(bits,exp);
+							if(rsa.getFingerprint(hash).match(pattern)){
+								yield(rsa);
+							}
+						}finally{
+							rsa && rsa.free();
+						}
+					}
+				}else{
+					while(true){
+						try{
+							var rsa=this.create(bits,exp);
+							if(rsa.getFingerprint(hash).indexOf(pattern)!=-1){
+								yield(rsa);
+							}
+						}finally{
+							rsa && rsa.free();
+						}
+					}
+				}
+			},
+			
+			encode:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.encode(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			encodeToHex:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.encodeToHex(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			encodeToBytes:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.encodeToBytes(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			decode:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.decode(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			decodeHex:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.decodeHex(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			sign:function(key,a,b){
+				try{
+					var rsa=new this(key);
+					return(rsa.sign(a,b));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			signHex:function(key,a,b){
+				try{
+					var rsa=new this(key);
+					return(rsa.signHex(a,b));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			signBytes:function(key,a,b){
+				try{
+					var rsa=new this(key);
+					return(rsa.signBytes(a,b));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			verify:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.verify(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			
+			verifyHex:function(key,a,b,c){
+				try{
+					var rsa=new this(key);
+					return(rsa.verifyHex(a,b,c));
+				}finally{
+					rsa && rsa.free();
+				}
+			},
+			
+			
+		},
+		
+		__new__:function(key,priv){
+			if(typeof(key)=='number'){
+				this.handle=key;
+				this.private=!!priv;
+			}else{
+				try{
+					key=String(key);
+					this.private=false;
+					var reader;
+					if(key.indexOf('-----BEGIN RSA PUBLIC KEY-----')!=-1){
+						reader=PEM_read_bio_RSAPublicKey;
+					}else if(key.indexOf('-----BEGIN PUBLIC KEY-----')!=-1){
+						reader=PEM_read_bio_RSA_PUBKEY;
+					}else if(key.indexOf('-----BEGIN RSA PRIVATE KEY-----')!=-1){
+						this.private=true;
+						reader=PEM_read_bio_RSAPrivateKey;
+					}
+					this[this.private?'__privateKey__':'__publicKey__']=key;
+					var buf=MBString.from(key);
+					var bio=BIO_new_mem_buf(buf.valueOf(),-1);
+					this.handle=reader(bio,0,0,0);
+				}finally{
+					bio && BIO_free_all(bio);
+					buf && buf.free();
+				}
+			}
+			if(!this.handle){
+				throw('RSA: invalid handle');
+			}
+			this.size=RSA_size(this.handle);
+		},
+		
+		free:function(){
+			if(this.handle){
+				RSA_free(this.handle);
+				this.handle=null;
+			}
+		},
+		toString:function(){
+			try{
+				var buf=Byte.alloc(8192);
+				var pw=UInt.alloc(),pr=UInt.alloc();
+				BIO_new_bio_pair(pw,0,pr,0);
+				var write=pw.item(),read=pr.item();
+				RSA_print(write,this.handle,0);
+				BIO_read(read,buf.valueOf(),8192);
+				return(buf.toString());
+			}finally{
+				write&&	BIO_free_all(write);
+				read&&	BIO_free_all(read);
+				pw&&	pw.free();
+				pr&&	pr.free();
+				buf&&	buf.free();
+			}
+			
+		},
+		toPublic:function()(this.private?(new this.constructor(this.publicKey)):this),
+		
+		get privateKey(){
+			if(this.private && !this.__privateKey__){
+				try{
+					var buf=Byte.alloc(4096);
+					var pw=UInt.alloc(),pr=UInt.alloc();
+					BIO_new_bio_pair(pw,0,pr,0);
+					var write=pw.item(),read=pr.item();
+					PEM_write_bio_RSAPrivateKey(write,this.handle,0,0,0,0,0);
+					BIO_read(read,buf.valueOf(),4096);
+					this.__privateKey__=buf.toString();
+				}finally{
+					write&&	BIO_free_all(write);
+					read&&	BIO_free_all(read);
+					pw&&	pw.free();
+					pr&&	pr.free();
+					buf&&	buf.free();
+				}
+			}
+			return(this.__privateKey__);
+		},
+		get publicKey(){
+			if(!this.__publicKey__){
+				try{
+					var buf=Byte.alloc(4096);
+					var pw=UInt.alloc(),pr=UInt.alloc();
+					BIO_new_bio_pair(pw,0,pr,0);
+					var write=pw.item(),read=pr.item();
+					PEM_write_bio_RSA_PUBKEY(write,this.handle,0,0,0,0,0);
+					BIO_read(read,buf.valueOf(),4096);
+					this.__publicKey__=buf.toString();
+				}finally{
+					write&&	BIO_free_all(write);
+					read&&	BIO_free_all(read);
+					pw&&	pw.free();
+					pr&&	pr.free();
+					buf&&	buf.free();
+				}
+			}
+			return(this.__publicKey__);
+		},
+		
+		
+		getFingerprint:function(hash){
+			if(!this.__fingerprint__){
+				try{
+					var buf=dec_b64(this.publicKey);
+					var hash=calc_md(Cipher.__getDigest__(hash||"SHA1"),buf);
+					this.__fingerprint__=enc_b64(hash);
+				}finally{
+					buf&&buf.free();
+					hash&&hash.free();
+				}
+			}
+			return(this.__fingerprint__);
+		},
+		
+		
+		encode:function(obj,padding){
+			try{
+				var res=this.encodeToBytes(obj,padding);
+				return(res && enc_b64(res));
+			}finally{
+				res&&res.free();
+			}
+		},
+		encodeToHex:function(obj,padding){
+			try{
+				var res=this.encodeToBytes(obj,padding);
+				return(res && Hex.encode(res).replace(/\s/g,''));
+			}finally{
+				res&&res.free();
+			}
+		},
+		encodeToBytes:function(obj,padding){
+			if(!(obj instanceof Pointer)){
+				try{
+					obj=String(obj);
+					var ws=WideString.from(obj);
+					var pb=new (Byte.pointer)(ws.valueOf());
+					pb.count=obj.length*2;
+					return(this.encodeToBytes(pb,padding));
+				}finally{
+					ws&&ws.free();
+				}
+			}else{
+				var result=Byte.alloc(this.size);
+				result.count=(this.private?RSA_private_encrypt:RSA_public_encrypt)(
+								obj.size,obj.valueOf(),result.valueOf(),this.handle,this.constructor.paddingTypes[String(padding).toUpperCase()]||1);
+				return(result);
+			}
+		},
+		decode:function(obj,encoding,padding){
+			if(!(obj instanceof Pointer)){
+				try{
+					var buf=dec_b64(obj);
+					return(this.decode(buf,encoding,padding));
+				}finally{
+					buf && buf.free();
+				}
+			}else{
+				var result=Byte.alloc(this.size);
+				result.count=(this.private?RSA_private_decrypt:RSA_public_decrypt)(
+								this.size,obj.valueOf(),result.valueOf(),this.handle,this.constructor.paddingTypes[String(padding).toUpperCase()]||1);
+				if(encoding){
+					try{
+						if(typeof(encoding)=='string'){
+							result.encoding=encoding;
+							return(result.toString());
+						}else{
+							var ws=new WideString(result.valueOf());
+							return(ws.toString());
+						}
+					}finally{
+						result&&result.free();
+					}
+				}else{
+					return(result);
+				}
+			}
+		},
+		decodeHex:function(obj,encoding,padding){
+			try{
+				var buf=Hex.decode(obj);
+				return(this.decode(buf,encoding,padding));
+			}finally{
+				buf&&buf.free();
+			}
+		},
+		
+		
+		
+		sign:function(obj,hash){
+			try{
+				var r=this.signBytes(obj,hash);
+				return(r && enc_b64(r));
+			}finally{
+				r&&r.free();
+			}
+		},
+		signHex:function(obj,hash){
+			try{
+				var r=this.signBytes(obj,hash);
+				return(r && Hex.encode(r).replace(/\s/g,""));
+			}finally{
+				r&&r.free();
+			}
+		},
+		signBytes:function(obj,hash){
+			if(this.private){
+				if(!(obj instanceof Pointer)){
+					try{
+						obj=String(obj);
+						var ws=WideString.from(obj);
+						var pb=new (Byte.pointer)(ws.valueOf());
+						pb.count=obj.length*2;
+						return(this.signBytes(pb,hash));
+					}finally{
+						ws&&ws.free();
+					}
+				}else{
+					var md=Cipher.__getDigest__(hash||"SHA1");
+					var result=Byte.alloc(this.size);
+					try{
+						var len=UInt.alloc().update(this.size);
+						var digest=calc_md(md,obj);
+						if(RSA_sign(md.type, digest,md.size, result,len, this.handle)){
+							result.count=len.item();
+						}else{
+							result.free();
+							result=null;
+						}
+					}finally{
+						len && len.free();
+						digest && digest.free();
+					}
+					return(result);
+				}
+			}
+		},
+		verify:function(obj,sign,hash){
+			if(!(obj instanceof Pointer)){
+				try{
+					obj=String(obj);
+					var ws=WideString.from(obj);
+					var pb=new (Byte.pointer)(ws.valueOf());
+					pb.count=obj.length*2;
+					return(this.verify(pb,sign,hash));
+				}finally{
+					ws&&ws.free();
+				}
+			}else if(!(sign instanceof Pointer)){
+				try{
+					var buf=dec_b64(sign);
+					return(this.verify(obj,buf,hash));
+				}finally{
+					buf&&	buf.free();
+				}
+			}else{
+				try{
+					var md=Cipher.__getDigest__(hash||"SHA1");
+					var digest=calc_md(md,obj);
+					return(0!=RSA_verify(md.type, digest,md.size, sign,sign.size, this.handle));
+				}finally{
+					digest && digest.free();
+				}
+			}
+		},
+		verifyHex:function(obj,sign,hash){
+			try{
+				var buf=Hex.decode(sign);
+				return(this.verify(obj,buf,hash));
+			}finally{
+				buf&&buf.free();
+			}
+		},
+	});
+	
+	
+	
+	
+	var __null_iv__=Hex.decode('00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00');
+	var Cipher=new Class({},StreamMixin,{
+		__class__:{
+			__ciphers__:{},
+			__digests__:{},
+			__getCipher__:function(name){
+				var name2=String(name).toLowerCase().replace(/[^\w]+/g,"_");
+				if(name2.match(/^aes_\d+_cfb$/)){
+					name2=name2+"128";
+				}
+				if(!this.__ciphers__[name2]){
+					try{
+						var f=eay32.proc('EVP_'+name2,[],UInt);
+						var c=f();
+						var p=new (UInt.pointer)(c);
+						
+						this.__ciphers__[name2]={
+							handle:c,
+							name:name2,
+							nid:p.item(),
+							block:p.inc(1).item(),
+							key:p.inc(2).item(),
+							iv:p.inc(3).item(),
+						};
+					}catch(e){
+						throw('Cipher: unknown cipher name "'+name+'"');
+					}
+				}
+				return(this.__ciphers__[name2]);
+			},
+			__getDigest__:function(name){
+				var name2=String(name).toLowerCase().replace(/[^\w]+/g,"_");
+				if(!this.__digests__[name2]){
+					try{
+						var f=eay32.proc('EVP_'+name2,[],UInt);
+						var c=f();
+						EVP_add_digest(c);
+						var p=new (UInt.pointer)(c);
+						this.__digests__[name2]={
+							handle:c,
+							name:name2,
+							type:p.item(),
+							pkeyType:p.inc(1).item(),
+							size:p.inc(2).item(),
+						};
+					}catch(e){
+						throw('Cipher: unknown digest name "'+name+'"');
+					}
+				}
+				return(this.__digests__[name2]);
+			},
+			createKey:function(name){
+				name=name||this.cipher;
+				var len=this.__getCipher__(name).key;
+				var buf=Byte.alloc(len);
+				RAND_pseudo_bytes(buf,len);
+				return(buf);
+			},
+			
+			__createInstanceWithInput__:function(obj,opt){
+				if(typeof(opt)=='string'){
+					opt={cipher:opt};
+				}
+				if(obj.readTo||obj.openRead){
+					return(new this(Object.extend({input:obj},opt||{})));
+				}else{
+					var res=new this(opt);
+					if(obj instanceof Pointer){
+						res.write(obj);
+					}else{
+						try{
+							var buf;
+							if(obj instanceof Array){
+								buf=MBString.from(obj[0],obj[1]||"utf8");
+							}else{
+								buf=WideString.from(obj);
+							}
+							res.write(obj);
+						}finally{
+							buf&&buf.free();
+						}
+					}
+					res.close(0,1);
+					return(res);
+				}
+			},
+			
+			__writeToDest__:function(src,dest,c,bs){
+				if(dest.openNew){
+					return(this.__writeToDest__(src,dest.openNew(),true));
+				}else if(!dest.writeLine){
+					return(this.__writeToDest__(src,(new File(dest)).openNew(),true));
+				}else{
+					try{
+						var size=this.bufferSize||1024;
+						var buf=Byte.alloc(size);
+						while(!src.eof){
+							buf.count=src.readTo(buf.valueOf(),size);
+							dest.write(buf);
+						}
+					}finally{
+						dest && c && dest.free();
+					}
+				}
+			},
+			encode:function(obj,pass,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,Object.extend({pass:pass,base64:true},opt||{}));
+					if(opt.dest){
+						return(this.__writeToDest__(s,opt.dest,false,Math.floor((opt.bufferSize||this.bufferSize||1024)/4)*3));
+					}else{
+						return(s.readText());
+					}
+				}finally{
+					s && s.free();
+				}
+			},
+			encodeToHex:function(obj,pass,opt){
+				try{
+					var res=this.encodeToBytes(obj,pass,opt);
+					if(opt.dest){
+						return(this.__writeToDest__(s,opt.dest,false,Math.floor((opt.bufferSize||this.bufferSize||1024)/4)*3));
+					}else{
+						return(Hex.encode(res).replace(/\s/g,''));
+					}
+				}finally{
+					res&&res.free();
+				}
+			},
+			encodeToBytes:function(obj,pass,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,Object.extend({pass:pass,base64:false},opt||{}));
+					if(opt.dest){
+						return(this.__writeToDest__(s,opt.dest,false,Math.floor((opt.bufferSize||this.bufferSize||1024)/4)*3));
+					}else{
+						return(s.readAll());
+					}
+				}finally{
+					s && s.free();
+				}
+			},
+			
+			decode:function(obj,pass,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,Object.extend({pass:pass,decode:true,base64:(typeof(obj)=='string')},opt||{}));
+					if(opt.dest){
+						return(this.__writeToDest__(s,opt.dest,false,Math.floor((opt.bufferSize||this.bufferSize||1024)/4)*3));
+					}else{
+						var res=s.readAll();
+						if(opt&&opt.encoding){
+							try{
+								if((typeof(opt.encoding)!='string')||opt.encoding.match(/utf[^\w]*16/i)){
+									return((new WideString(res.valueOf())).toString());
+								}else{
+									res.encoding=opt.encoding;
+									return(res.toString());
+								}
+							}finally{
+								res.free();
+							}
+						}else{
+							return(res);
+						}
+					}
+				}finally{
+					s && s.free();
+				}
+			},
+			
+			decodeHex:function(obj,key,opt){
+				try{
+					var buf=Hex.decode(obj);
+					return(this.decode(buf,key,opt));
+				}finally{
+					buf&&buf.free();
+				}
+			},
+			
+			calc:function(obj,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.hash);
+				}finally{
+					s&&s.free();
+				}
+			},
+			calcHex:function(obj,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.hashHex);
+				}finally{
+					s&&s.free();
+				}
+			},
+			calcBytes:function(obj,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.hashBytes);
+				}finally{
+					s&&s.free();
+				}
+			},
+			sign:function(obj,rsa,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.sign(rsa));
+				}finally{
+					s&&s.free();
+				}
+			},
+			signHex:function(obj,rsa,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.signHex(rsa));
+				}finally{
+					s&&s.free();
+				}
+			},
+			signBytes:function(obj,rsa,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.signBytes(rsa));
+				}finally{
+					s&&s.free();
+				}
+			},
+			
+			
+			verify:function(obj,rsa,sign,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.verify(rsa,sign));
+				}finally{
+					s&&s.free();
+				}
+			},
+			verifyHex:function(obj,rsa,sign,opt){
+				try{
+					var s=this.__createInstanceWithInput__(obj,opt||{});
+					s.discard();
+					return(s.verifyHex(rsa,sign));
+				}finally{
+					s&&s.free();
+				}
+			},
+		},
+		__new__:function(opt){
+			var plain,encoded;
+			if(opt.input){
+				if(opt.input.openRead){
+					this.__input__=opt.input.openRead();
+					this.__closeInput__=true;
+				}else{
+					this.__input__=opt.input;
+				}
+			}
+			if(opt.output){
+				if(opt.output.openNew){
+					this.__output__=opt.output.openNew();
+					this.__closeOutput__=true;
+				}else{
+					this.__output__=opt.output;
+				}
+			}
+			try{
+				var p1=UInt.alloc(),p2=UInt.alloc(),cf,bf;
+				BIO_new_bio_pair(p1,opt.bufferSize||this.constructor.bufferSize||0,p2,opt.bufferSize||this.constructor.bufferSize||0);
+				plain=p1.item();
+				encoded=p2.item();
+			}finally{
+				p1&&p1.free();
+				p2&&p2.free();
+			}
+			this.decode=opt.decode||false;
+			if(this.base64=!!((typeof(opt.base64)!='undefined')?opt.base64:this.constructor.base64)){
+				plain=BIO_push(BIO_new(BIO_f_base64()),plain);
+				BIO_set_flags(plain,0x100);
+			}
+			if(this.cipher=opt.cipher||this.constructor.cipher){
+				this.cipher=this.constructor.__getCipher__(this.cipher);
+				if(opt.rsa && this.decode){
+					try{
+						var rsa=(opt.rsa instanceof RSA)?rsa:(new RSA(opt.rsa));
+						if(!rsa.private){
+							throw("Cipher: rsa key is not private");
+						}
+						if(typeof(opt.key)=='string'){
+							this.__key__=rsa.decode(opt.key);
+						}else{
+							var fp=rsa.getFingerprint(opt.key.hash||"SHA1");
+							if(!opt.key[fp]){
+								throw('Cipher: encrypted key for "'+fp+'" not found');
+							}
+							this.__key__=rsa.decode(opt.key[fp]);
+						}
+					}finally{
+						if(!(opt.rsa instanceof RSA)){
+							rsa && rsa.free();
+						}
+					}
+				}else if(opt.pass){
+					this.__pass__=opt.pass, this.__salt__=opt.salt||this.constructor.salt;
+					if(!(this.__pass__ instanceof Pointer)){
+						var pe=opt.passEncoding||this.constructor.passEncoding;
+						if(!pe || (typeof(pe)=='string')){
+							this.__pass__=MBString.from(this.__pass__,pe||"utf8");
+							this.__pass__.count=this.__pass__.length;
+						}else{
+							this.__pass__=new (Byte.pointer)(WideString.from(this.__pass__));
+							this.__pass__.count=String(opt.this.__pass__).length*2;
+						}
+					}else{
+						this.__noPassFree__=true;
+					}
+					if(typeof(this.__salt__)!='undefined'){
+						if(typeof(this.__salt__)=='boolean'){
+							this.__salt__=Byte.alloc(8);
+							if(this.decode){
+								if(!this.__input__){
+									this.__deferedInit__=true;
+								}else if(this.base64){
+									try{
+										var tmp=Byte.alloc(24);
+										this.__input__.readTo(tmp.valueOf(),24);
+										BIO_write(encoded,tmp.valueOf(),24);
+										BIO_read(plain,this.__salt__.valueOf(),8);
+										BIO_read(plain,this.__salt__.valueOf(),8);
+									}finally{
+										tmp&&tmp.free();
+									}
+								}else{
+									this.__input__.readTo(this.__salt__.valueOf(),8);
+									this.__input__.readTo(this.__salt__.valueOf(),8);
+								}
+							}else{
+								RAND_pseudo_bytes(this.__salt__,8);
+								if(opt.salt){
+									try{
+										var s=MBString.from('Salted__');
+										BIO_write(plain,s.valueOf(),8);
+										BIO_write(plain,this.__salt__.valueOf(),8);
+									}finally{
+										s&&s.free();
+									}
+								}
+							}
+						}else if(!(this.__salt__ instanceof Pointer)){
+							this.__salt__=Hex.decode(salt);
+						}else{
+							this.__noSaltFree__=true;
+						}
+						this.salt=Hex.encode(this.__salt__).replace(/\s/g,'');
+					}
+					this.passHashCount=opt.passHashCount||this.constructor.passHashCount||1;
+					this.__passHash__=this.constructor.__getDigest__(opt.passHash||this.constructor.passHash||"SHA1");
+					this.__key__=Byte.alloc(this.cipher.key);
+					this.__iv__=Byte.alloc(this.cipher.iv||1);
+					if(!this.__deferedInit__){
+						EVP_BytesToKey(this.cipher.handle, this.__passHash__.handle, this.__salt__||null, this.__pass__, this.__pass__.size, this.passHashCount,this.__key__,this.__iv__);
+						if(opt.iv||this.constructor.iv){
+							this.__iv__.free();
+							this.__iv__=opt.iv||this.constructor.iv;
+							if(this.__iv__ instanceof Pointer){
+								this.__noFreeIV__=true;
+							}else{
+								this.__iv__=Hex.decode(this.__iv__);
+							}
+						}
+						plain=BIO_push(BIO_new(BIO_f_cipher()),plain);
+						BIO_set_cipher(plain, this.cipher.handle,this.__key__,this.__iv__,1);
+					}
+				}else if(opt.key){
+					this.__key__=opt.key;
+					if(this.__key__ instanceof Pointer){
+						this.__noFreeKey__=true;
+					}else{
+						this.__key__=Hex.decode(this.__key__);
+					}
+					this.__iv__=opt.iv||this.constructor.iv||__null_iv__;
+					if(!(this.__iv__ instanceof Pointer)){
+						this.__iv__=Hex.decode(this.__iv__);
+					}
+					plain=BIO_push(BIO_new(BIO_f_cipher()),plain);
+					BIO_set_cipher(plain, this.cipher.handle,this.__key__,this.__iv__,1);
+				}else{
+					this.__key__=this.constructor.createKey(this.cipher.name);
+					this.__iv__=opt.iv||this.constructor.iv||__null_iv__;
+					if(!(this.__iv__ instanceof Pointer)){
+						this.__iv__=Hex.decode(this.__iv__);
+					}
+					plain=BIO_push(BIO_new(BIO_f_cipher()),plain);
+					BIO_set_cipher(plain, this.cipher.handle,this.__key__,this.__iv__,1);
+				}
+			}
+			if(opt.hash||this.constructor.hash){
+				this.__md__=this.constructor.__getDigest__(opt.hash||this.constructor.hash);
+				if(!this.__deferedInit__){
+					this.__hashBIO__=plain=BIO_push(BIO_new(BIO_f_md()),plain);
+					BIO_ctrl(plain,111,1,this.__md__.handle);
+				}
+			}
+			if(this.decode){
+				this.__inputBIO__=encoded;
+				this.__outputBIO__=plain;
+			}else{
+				this.__inputBIO__=plain;
+				this.__outputBIO__=encoded;
+			}
+			this.__inputWritten__=0;
+			this.encoding=opt.encoding;
+			this.__options__=opt;
+		},
+		
+		
+		
+		__free__:function(){
+			this.close(true,true);
+			this.__inputBIO__ && BIO_free_all(this.__inputBIO__);
+			this.__outputBIO__ && BIO_free_all(this.__outputBIO__);
+			this.__inputBIO__=null;
+			this.__outputBIO__=null;
+			this.__closeInput__&&this.__input__.free();
+			this.__closeOutput__&&this.__output__.free();
+			this.__closeInput__=null;
+			this.__closeOutput__=null;
+			this.__pass__&&!this.__noPassFree__&&this.__pass__.free();
+			this.__salt__&&!this.__noSaltFree__&&this.__salt__.free();
+			this.__iv__&&!this.__noFreeIV__&&this.__iv__.free();
+			this.__key__&&!this.__noFreeKey__&&this.__key__.free();
+			this.__pass__=null;
+			this.__salt__=null;
+			this.__iv__=null;
+			this.__key__=null;
+		},
+		__close__:function(r,w){
+			if(w){
+				this.__inputClosed__=true;
+				BIO_ctrl(this.__inputBIO__,11,0,0);
+				if(this.__md__&&!this.decode ){
+					try{
+						var buf=Byte.alloc(this.__md__.size);
+						BIO_gets(this.__hashBIO__,buf.valueOf(),this.__md__.size);
+						this.hashHex=Hex.encode(buf).replace(/\s/g,'');
+						this.hash=enc_b64(buf);
+					}finally{
+						buf&&buf.free();
+					}
+				}
+				if(this.__output__){
+					try{
+						var s=64;
+						var buf=Bytes.alloc(s);
+						while(true){
+							buf.count=BIO_read(this.__outputBIO__,buf.valueOf(),s);
+							if(buf.count>0){
+								this.__output__.write(buf);
+							}else{
+								break;
+							}
+						}
+					}finally{
+						buf && buf.free();
+					}
+				}
+			}
+			
+			if(r){
+				if(this.__md__ && this.decode){
+					try{
+						var buf=Byte.alloc(this.__md__.size);
+						BIO_gets(this.__hashBIO__,buf.valueOf(),this.__md__.size);
+						this.hash=enc_b64(buf);
+						this.hashHex=Hex.encode(buf).replace(/\s/g,'');
+					}finally{
+						buf&&buf.free();
+					}
+				}
+			}
+		},
+		__read__:function(addr,size){
+			if(!size){
+				return(0);
+			}else if(this.__output__){
+				return(size);
+			}else{
+				if(this.__input__ && !this.__input__.eof){
+					try{
+						var s=this.base64?(this.decode?(Math.ceil(size/3)*4):(Math.ceil(size/4)*3)):size;
+						var buf=Byte.alloc(s);
+						var red=this.__input__.readTo(buf.valueOf(),s);
+						var written=BIO_write(this.__inputBIO__,buf.valueOf(),red);
+						if(written>=0){
+							this.__inputWritten__+=written;
+						}
+						if(this.__input__.eof){
+							this.close(false,true);
+						}
+					}finally{
+						buf && buf.free();
+					}
+				}
+				var res=BIO_read(this.__outputBIO__,addr,size);
+				if(res>=0){
+					return(res);
+				}else if(this.__inputClosed__){
+					this.__eof__=true;
+					return(0);
+				}else{
+					throw('Cipher: '+error());
+				}
+			}
+		},
+		__write__:function(addr,size){
+			if(!size){
+				return(0);
+			}else if(this.__input__){
+				return(size);
+			}else{
+				var res=BIO_write(this.__inputBIO__,addr,size);
+				if(res>=0){
+					this.__inputWritten__+=res;
+					
+					if(this.__deferedInit__ && (this.__inputWritten__>=(this.base64?24:16))){
+						BIO_read(this.__outputBIO__,this.__salt__.valueOf(),8);
+						BIO_read(this.__outputBIO__,this.__salt__.valueOf(),8);
+						EVP_BytesToKey(this.cipher.handle, this.__passHash__.handle, this.__salt__, this.__pass__, this.__pass__.size, this.passCount,this.__key__,this.__iv__);
+						if(this.__options__.iv||this.constructor.iv){
+							this.__iv__.free();
+							this.__iv__=this.__options__.iv||this.constructor.iv;
+							if(this.__iv__ instanceof Pointer){
+								this.__noFreeIV__=true;
+							}else{
+								this.__iv__=Hex.decode(this.__iv__);
+							}
+						}
+						this.__outputBIO__=BIO_push(BIO_new(BIO_f_cipher()),this.__outputBIO__);
+						BIO_set_cipher(this.__outputBIO__, this.cipher.handle,this.__key__,this.__iv__,1);
+						if(this.__md__){
+							this.__hashBIO__=this.__outputBIO__=BIO_push(BIO_new(BIO_f_md()),this.__outputBIO__);
+							BIO_ctrl(this.__hashBIO__,111,1,this.__md__.handle);
+						}
+					}
+					
+					if((res>0)&&this.__output__){
+						try{
+							var s=this.base64?(this.decode?(Math.ceil(size/4)*3):(Math.ceil(size/3)*4)):size;
+							var buf=Byte.alloc(s);
+							buf.count=BIO_read(this.__outputBIO__,buf.valueOf(),s);
+							this.__output__.write(buf);
+						}finally{
+							buf && buf.free();
+						}
+					}
+					return(res);
+				}else{
+					throw('Cipher: '+error());
+				}
+			}
+		},
+		
+		
+		get hashBytes()(dec_b64(this.hash)),
+		
+		
+		sign:function(rsa){
+			try{
+				var r=this.signBytes(rsa);
+				return(r && enc_b64(r));
+			}finally{
+				r&&r.free();
+			}
+		},
+		signHex:function(rsa){
+			try{
+				var r=this.signBytes(rsa);
+				return(r && Hex.encode(r).replace(/\s/g,""));
+			}finally{
+				r&&r.free();
+			}
+		},
+		signBytes:function(rsa){
+			if(!(rsa instanceof RSA)){
+				try{
+					var r=new RSA(rsa);
+					return(this.sign(r,base64));
+				}finally{
+					r&&r.free();
+				}
+			}else if(this.hash){
+				var result=Byte.alloc(rsa.size);
+				try{
+					var len=UInt.alloc().update(rsa.size);
+					var digest=this.hashBytes;
+					if(RSA_sign(this.__md__.type, digest,this.__md__.size, result,len, rsa.handle)){
+						result.count=len.item();
+					}else{
+						result.free();
+						result=null;
+					}
+				}finally{
+					len && len.free();
+					digest && digest.free();
+				}
+				return(result);
+			}
+		},
+		verify:function(rsa,sign){
+			if(!(sign instanceof Pointer)){
+				try{
+					var buf=dec_b64(sign);
+					return(this.verify(rsa,buf));
+				}finally{
+					buf&&	buf.free();
+				}
+			}else if(this.hash){
+				try{
+					var md=Cipher.__getDigest__(hash||"SHA1");
+					var digest=this.hashBytes;
+					return(0!=RSA_verify(this.__md__.type, digest,this.__md__.size, sign,sign.size, rsa.handle));
+				}finally{
+					digest && digest.free();
+				}
+			}
+		},
+		verifyHex:function(rsa,sign){
+			try{
+				var buf=Hex.decode(sign);
+				return(this.verify(rsa,buf));
+			}finally{
+				buf&&buf.free();
+			}
+		},
+		
+		wrapKey:function(rsa,hash){
+			if(!(rsa instanceof Array)){
+				rsa=[rsa];
+			}
+			var res={hash:hash||"SHA1"};
+			for(var i=0,l=rsa.length;i<l;i++){
+				try{
+					var r=(rsa[i] instanceof RSA)?rsa[i]:(new RSA(rsa[i]));
+					res[r.getFingerprint(hash)]=r.encode(this.__key__,true);
+				}finally{
+					if(!(rsa[i] instanceof RSA)){
+						r&&r.free();
+					}
+				}
+			}
+			return(res);
+		},
+	});
+	
+	var HMAC=new Class({
+		__class__:{
+			calc:function(data,key,hash){
+				try{
+					var buf=this.calcBytes(data,key,hash);
+					return(enc_b64(buf));
+				}finally{
+					free(buf);
+				}
+			},
+			calcHex:function(data,key,hash){
+				try{
+					var buf=this.calcBytes(data,key,hash);
+					return(Hex.encode(buf).replace(/\s/g,''));
+				}finally{
+					free(buf);
+				}
+			},
+			calcBytes:function(data,key,hash){
+				var md=Cipher.__getDigest__(hash||this.hash||"md5");
+				var fk,fd;
+				try{
+					if(!(data instanceof Pointer)){
+						fd=true;
+						if(!(data instanceof Array)){
+							data=[data,'utf8'];
+						}
+						key=MBString.from(data[0],data[1]);
+					}
+					if(!(key instanceof Pointer)){
+						fk=true;
+						if(!(key instanceof Array)){
+							key=[key,'utf8'];
+						}
+						key=MBString.from(key[0],key[1]);
+					}
+					var buf=Byte.alloc(md.size);
+					var sz=Int.alloc();
+					if(HMac(md.handle, key,key.size, data,data.size, buf,sz)){
+						return(buf);
+					}
+				}finally{
+					fk&&key.free();
+					fd&&data.free();
+				}
+			},
+		},
+	});
+	
+	var Random=new Class({
+		__class__:{
+			hash:"SHA1",
+			hashCount:1,
+		},
+		__new__:function(seed,s){
+			try{
+				if(!arguments.length){
+					seed=String.random(16);
+				}
+				this.seed=String(seed);
+				
+				var salt=s||this.constructor.salt;
+				if(salt){
+					if(salt instanceof Pointer){
+						salt=salt.clone();
+					}else{
+						salt=Hex.decode(salt);
+					}
+				}
+				
+				var pass=MBString.from(this.seed);
+				pass.count=pass.length;
+				
+				var key=Byte.alloc(16);
+				this.__in__=Byte.alloc(16);
+				this.__out__=Byte.alloc(16);
+				this.__key__=Byte.alloc(320);
+				this.__iv__=Byte.alloc(16);
+				this.__ecounter__=UInt.alloc(4);
+				this.__number__=UInt.alloc().update(0);
+				var c=Cipher.__getCipher__("AES-128-OFB");
+				var d=Cipher.__getDigest__(this.constructor.hash);
+				EVP_BytesToKey(c.handle, d.handle, salt||null,pass,pass.size, this.constructor.hashCount,this.__key__,this.__iv__);
+				AES_set_encrypt_key(key,128,this.__key__);
+			}catch(e){
+				free(salt,pass,key);
+			}
+		},
+		free:function(){
+			free(this.__in__,this.__out__,this.__key__,this.__iv__,this.__ecounter__,this.__number__);
+		},
+		next:function(r1,r2,inc){
+			this.__number__.update(0);
+			AES_ctr128_encrypt(this.__in__,this.__out__,16,this.__key__,this.__iv__,this.__ecounter__,this.__number__);
+			
+			var p=this.__ecounter__,a=p.item(),b=p.inc(1).item(),r=(a&0xFFFFF)*0x100000000+b;
+			switch(arguments.length){
+				case(0):{
+					return(r/0x10000000000000);
+				}case(1):{
+					r2=0;
+				}default:{
+					[r1,r2]=(r1>r2)?[r2,r1]:[r1,r2];
+					if(r1==r2){
+						return(r1);
+					}else if(inc){
+						r2++;
+					}
+					return(r1+r%(r2-r1));
+				}
+			}
+			
+		},
+		
+	});
+	
+	
+	
+	this.RSA=RSA;
+	this.Cipher=Cipher;
+	this.HMAC=HMAC;
+	this.Random=Random;
+	
+})

@@ -1,0 +1,190 @@
+(function(){
+	var ZStream=new Struct({
+		nextIn:		UInt,
+		availIn:	UInt,
+		totalIn:	UInt,
+		nextOut:	UInt,
+		availOut:	UInt,
+		totalOut:	UInt,
+		message:	MBString,
+		state:		UInt,
+		allocFunc:	UInt,
+		freeFunc:	UInt,
+		obj:		UInt,
+		dataType:	Int,
+		adler:		UInt,
+		res:		UInt
+	});
+	var zlib=WinLibrary.load("zlib32.dll");
+	
+	var
+		deflateInit=	zlib.proc('deflateInit_',[ZStream,Int,MBString,Int],UInt),
+		deflateInit2=	zlib.proc('deflateInit2_',[ZStream,Int,Int,Int,Int,Int,MBString,Int],UInt),
+		deflate=		zlib.proc('deflate',[ZStream,Int],Int),
+		deflateEnd=		zlib.proc('deflateEnd',[ZStream],Int),
+		inflateInit=	zlib.proc('inflateInit_',[ZStream,MBString,Int],UInt),
+		inflateInit2=	zlib.proc('inflateInit2_',[ZStream,Int,MBString,Int],UInt),
+		inflate=		zlib.proc('inflate',[ZStream,Int],Int),
+		inflateEnd=		zlib.proc('inflateEnd',[ZStream],Int),
+		zlibVersion=	MBString.from("1.2.4");
+	var DeflateStream=new Class({},StreamMixin,{
+		__new__:function(stream,level,mode,bufsize){
+			this.__stream__=stream;
+			this.__gzBufferSize__=bufsize||4096;
+			this.__buffer__=Byte.alloc(this.__gzBufferSize__);
+			this.__context__=ZStream.alloc();
+			this.__context__.nextOut=this.__buffer__.valueOf();
+			this.__context__.availOut=this.__gzBufferSize__;
+			if(mode=='raw'){
+				mode=-15;
+			}else if(mode=='gzip'){
+				mode=31;
+			}else{
+				mode=15;
+			}
+			if(deflateInit2(this.__context__, level||9, 8, mode, 9, 0, zlibVersion,56)!=0){
+				throw(new Error("zlib init failure"));
+			}
+		},
+		
+		__write__:function(addr,size){
+			var written=size;
+			this.__context__.nextIn=addr;
+			this.__context__.availIn=size;
+			while(this.__context__.availIn>0){
+				deflate(this.__context__,2);
+				if(this.__context__.availOut==0){
+					this.__stream__.write(this.__buffer__);
+					if(this.__context__.eof){
+						written=size-this.__context__.availIn;
+						this.finish();
+						break;
+					}
+					this.__context__.nextOut=this.__buffer__.valueOf();
+					this.__context__.availOut=this.__gzBufferSize__;
+				}
+			}
+			return(written);
+		},
+		__flush__:function(){
+		},
+		__finish__:function(){
+			if(!this.__eof__){
+				while(deflate(this.__context__,4)==0){
+					if(this.__context__.availOut==0){
+						if(!this.__context__.eof){
+							this.__stream__.write(this.__buffer__);
+						}
+						this.__context__.nextOut=this.__buffer__.valueOf();
+						this.__context__.availOut=this.__gzBufferSize__;
+					}
+				}
+				if(!this.__context__.eof && (this.__context__.availOut<this.__gzBufferSize__)){
+					var b=new (Byte.pointer)(this.__buffer__.valueOf());
+					b.count=this.__gzBufferSize__-this.__context__.availOut;
+					this.__stream__.write(b);
+				}
+				deflateEnd(this.__context__);
+				this.__context__.free();
+				this.__buffer__.free();
+				this.__context__=null;
+				this.__buffer__=null;
+				this.__eof__=true;
+			}
+		},
+		__close__:function(r,w){
+			if(w){
+				this.finish();
+				if(this.__stream__){
+					this.__stream__.free();
+					this.__stream__=null;
+				}
+			}
+		},
+		__free__:function(){
+			this.__close__(1,1);
+		},
+	});
+	var InflateStream=new Class({},StreamMixin,{
+		__new__:function(stream,mode,bufsize){
+			this.__stream__=stream;
+			this.__gzBufferSize__=bufsize||4096;
+			this.__context__=ZStream.alloc();
+			if(mode=='raw'){
+				mode=-15;
+			}else if(mode=='gzip'){
+				mode=31;
+			}else{
+				mode=47;
+			}
+			if(inflateInit2(this.__context__,mode,zlibVersion,56)!=0){
+				throw(new Error("zlib init failure"));
+			}
+		},
+		__read__:function(addr,size){
+			this.__context__.nextOut=addr;
+			this.__context__.availOut=size;
+			while(this.__context__.availOut>0){
+				if(this.__context__.availIn==0){
+					if(this.__stream__.eof){
+						var remain=this.__context__.availOut;
+						this.finish();
+						return(size-remain);
+					}
+					if(this.__buffer__){
+						this.__buffer__.free();
+					}
+					this.__buffer__=Byte.alloc(this.__gzBufferSize__);
+					
+//					this.__stream__.readBytes(this.__gzBufferSize__);
+					this.__context__.nextIn=this.__buffer__.valueOf();
+					this.__context__.availIn=this.__stream__.readTo(this.__buffer__.valueOf(),this.__gzBufferSize__);
+				}
+				if(-3==inflate(this.__context__,2)){
+					throw(new Error("zlib data error"));
+				}
+			}
+			return(size-this.__context__.availOut);
+		},
+		__finish__:function(){
+			if(!this.__eof__){
+				if(this.__buffer__){
+					try{
+						var buf=Byte.alloc(this.__gzBufferSize__);
+						this.__context__.nextOut=buf.valueOf();
+						this.__context__.availOut=this.__gzBufferSize__;
+						while(inflate(this.__context__,4)==0){
+							if(this.__context__.availOut==0){
+								this.__context__.nextOut=buf.valueOf();
+								this.__context__.availOut=this.__gzBufferSize__;
+							}
+						}
+					}finally{
+						buf && buf.free();
+						this.__buffer__.free();
+						this.__buffer__=null;
+					}
+				}
+				inflateEnd(this.__context__);
+				this.__eof__=true;
+				this.__context__.free();
+				this.__context__=null;
+			}
+		},
+		__close__:function(r,w){
+			if(r){
+				this.finish();
+				if(this.__stream__){
+					this.__stream__.free();
+					this.__stream__=null;
+				}
+			}
+		},
+		__free__:function(){
+			this.__close__(1,1);
+		},
+	});
+	
+	this.DeflateStream=DeflateStream;
+	this.InflateStream=InflateStream;
+})

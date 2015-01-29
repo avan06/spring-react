@@ -1,0 +1,248 @@
+(function(){
+	
+	var eay32=WinLibrary.load('libeay32.dll');
+	var zlib=WinLibrary.load("zlib32.dll");
+	var CalcCRC32=zlib.proc('crc32',[UInt,UInt,UInt],UInt);
+	var CalcAdler32=zlib.proc('adler32',[UInt,UInt,UInt],UInt);
+	
+	var AbstractHash=new Class({},StreamMixin,{
+		__class__:{
+			calc:function(obj,returnBuffer){
+				if(returnBuffer){
+					return(Hex.decode(this.calc(obj).replace(/\w\w/g,'$& ')));
+				}else if(obj instanceof Pointer){
+					return(this.__calculate__(obj.valueOf(),obj.size));
+				}else if((typeof(obj)=='object') && ('openRead' in obj)){
+					var o=new this(obj.openRead());
+					o.discard();
+					o.free();
+					return(returnBuffer?o.hashBytes:o.hash);
+				}else if(obj instanceof Array){
+					try{
+						var buf=MBString.from(obj[0],obj[1]);
+						return(this.__calculate__(buf.valueOf(),buf.length));
+					}finally{
+						buf&&buf.free();
+					}
+				}else{
+					try{
+						var buf=WideString.from(obj);
+						return(this.__calculate__(buf.valueOf(),obj.length*2));
+					}finally{
+						buf&&buf.free();
+					}
+				}
+			},
+			__calculate__:function(addr,size,dest){
+				var o=new this(null,true);
+				o.__update__(addr,size);
+				o.free();
+				return(o.result);
+			},
+		},
+		__new__:function(stream,dontFreeStream){
+			this.__initialize__();
+			this.__stream__=stream;
+			this.__dontFreeStream__=dontFreeStream;
+		},
+		get __eof__()(this.__stream__&&this.__stream__.eof),
+		__read__:function(addr,size){
+			var r=this.__stream__.readTo(addr,size,0);
+			if(r){
+				this.hash=this.__update__(addr,r);
+			}
+			return(r);
+		},
+		__write__:function(addr,size){
+			if(this.__stream__){
+				var ptr=new (Byte.pointer)(addr);
+				ptr.count=size;
+				var r=this.__stream__.write(ptr,0);
+				if(r){
+					this.hash=this.__update__(addr,r);
+				}
+				return(r);
+			}else{
+				this.hash=this.__update__(addr,size);
+				return(size);
+			}
+		},
+		get hashBytes()(Hex.decode(this.calc().replace(/\w\w/g,'$& '))),
+		calc:function(){
+			if(!this.hash){
+				this.hash=this.__calculate__();
+			}
+			return(this.hash);
+		},
+		__free__:function(){
+			this.calc();
+			if(this.__stream__ && !this.__dontFreeStream__){
+				this.__stream__.free();
+			}
+		},
+	});
+	
+	
+	
+	var LibEayHash=new Class(AbstractHash,{
+		__class__:{
+			__calculate__:function(addr,size){
+				try{
+					var dest=Byte.alloc(this.size);
+					this.__calculateHash__(addr,size,dest.valueOf());
+					return(Hex.encode(dest).replace(/ /g,''));
+				}finally{
+					dest&&dest.free();
+				}
+			},
+		},
+		__initialize__:function()(this.__initializeContext__(this.__context__=Byte.alloc(this.__contextSize__||512))),
+		__update__:function(addr,size){this.__updateContext__(this.__context__,addr,size)},
+		__calculate__:function(){
+			try{
+				var dest=Byte.alloc(this.constructor.size);
+				this.__finalizeContext__(dest,this.__context__);
+				return(Hex.encode(dest).replace(/ /g,''));
+			}finally{
+				dest&&dest.free();
+				this.__finalize__();
+			}
+		},
+		__finalize__:function(){
+			this.__context__.free();
+			this.__context__=null;
+		},
+	});
+	
+	this.AbstractHash=AbstractHash;
+	
+	
+	
+	
+	
+	this.CRC32=new Class(AbstractHash,{
+		__class__:{
+			size:4,
+			__calculate__:function(addr,size)(('00000000'+Number(CalcCRC32(0,addr,size)).toString(16)).slice(-8)),
+		},
+		__initialize__:function()(this.__crc32__=0),
+		__update__:function(addr,size)(('00000000'+Number(this.__crc32__=CalcCRC32(this.__crc32__,addr,size)).toString(16)).slice(-8)),
+		__calculate__:function()(('00000000'+Number(this.__crc32__).toString(16)).slice(-8)),
+		__finalize__:Function.doNothing,
+	});
+	
+	this.Adler32=new Class(AbstractHash,{
+		__class__:{
+			size:4,
+			__calculate__:function(addr,size)(('00000000'+Number(CalcAdler32(0,addr,size)).toString(16)).slice(-8)),
+		},
+		__initialize__:function()(this.__adler32__=0),
+		__update__:function(addr,size)(('00000000'+Number(this.__adler32__=CalcAdler32(this.__adler32__,addr,size)).toString(16)).slice(-8)),
+		__calculate__:function()(('00000000'+Number(this.__adler32__).toString(16)).slice(-8)),
+		__finalize__:Function.doNothing,
+	});
+	
+	
+	this.MD2=new Class(LibEayHash,{
+		__class__:{
+			size:16,
+			__calculateHash__:	eay32.proc('MD2',[UInt,UInt,UInt],UInt),
+		},
+		__contextSize__:96,
+		__initializeContext__:	eay32.proc('MD2_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('MD2_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('MD2_Final',[Pointer,Pointer],Int),
+	});
+	this.MD4=new Class(LibEayHash,{
+		__class__:{
+			size:16,
+			__calculateHash__:		eay32.proc('MD4',[UInt,UInt,UInt],UInt),
+		},
+		__contextSize__:96,
+		__initializeContext__:	eay32.proc('MD4_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('MD4_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('MD4_Final',[Pointer,Pointer],Int),
+	});
+	this.MD5=new Class(LibEayHash,{
+		__class__:{
+			size:16,
+			__calculateHash__:		eay32.proc('MD5',[UInt,UInt,UInt],UInt),
+		},
+		__contextSize__:96,
+		__initializeContext__:	eay32.proc('MD5_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('MD5_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('MD5_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA0=new Class(LibEayHash,{
+		__class__:{
+			size:20,
+			__calculateHash__:		eay32.proc('SHA',[UInt,UInt,UInt],UInt),
+		},
+		__initializeContext__:	eay32.proc('SHA_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA1=new Class(LibEayHash,{
+		__class__:{
+			size:20,
+			__calculateHash__:		eay32.proc('SHA1',[UInt,UInt,UInt],UInt),
+		},
+		__initializeContext__:	eay32.proc('SHA1_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA1_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA1_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA224=new Class(LibEayHash,{
+		__class__:{
+			size:28,
+			__calculateHash__:		eay32.proc('SHA224',[UInt,UInt,UInt],UInt),
+		},
+		__initializeContext__:	eay32.proc('SHA224_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA224_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA224_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA256=new Class(LibEayHash,{
+		__class__:{
+			size:32,
+			__calculateHash__:		eay32.proc('SHA256',[UInt,UInt,UInt],UInt),
+		},
+		__initializeContext__:	eay32.proc('SHA256_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA256_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA256_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA384=new Class(LibEayHash,{
+		__class__:{
+			size:48,
+			__calculateHash__:		eay32.proc('SHA384',[UInt,UInt,UInt],UInt),
+		},
+		__initializeContext__:	eay32.proc('SHA384_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA384_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA384_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.SHA512=new Class(LibEayHash,{
+		__class__:{
+			size:64,
+			__calculateHash__:		eay32.proc('SHA512',[UInt,UInt,UInt],UInt),
+		},
+		__contextSize__:96,
+		__initializeContext__:	eay32.proc('SHA512_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('SHA512_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('SHA512_Final',[Pointer,Pointer],Int),
+	});
+	
+	this.RIPEMD160=new Class(LibEayHash,{
+		__class__:{
+			size:20,
+			__calculateHash__:		eay32.proc('RIPEMD160',[UInt,UInt,UInt],UInt),
+		},
+		__contextSize__:96,
+		__initializeContext__:	eay32.proc('RIPEMD160_Init',[Pointer],Int),
+		__updateContext__:		eay32.proc('RIPEMD160_Update',[Pointer,UInt,UInt],Int),
+		__finalizeContext__:	eay32.proc('RIPEMD160_Final',[Pointer,Pointer],Int),
+	});
+})

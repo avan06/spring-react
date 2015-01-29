@@ -1,0 +1,342 @@
+(function(){
+	
+	var Point=new Struct({x:Int,y:Int});
+	var MSG=new Struct({
+		hwnd:		UInt,
+		message:	UInt,
+		wParam:		UInt,
+		lParam:		UInt,
+		time:		UInt,
+		x:			Int,
+		y:			Int,
+	});
+	
+	var MSLLHOOKSTRUCT=new Struct({
+		x:			Int,
+		y:			Int,
+		data:		Int,
+		flags:		UInt,
+		time:		UInt,
+		extraInfo:	Pointer,
+	});
+	
+	var LowLevelMouseProc=StdCallFunction.define([Int,UInt,UInt],Int);
+	
+	var
+		GetSystemMetrics=		user32.proc('GetSystemMetrics',[Int],Int),
+		GetDoubleClickTime=		user32.proc('GetDoubleClickTime',[],UInt),
+		SetDoubleClickTime=		user32.proc('SetDoubleClickTime',[UInt],Int),
+		
+		GetKeyState=			user32.proc("GetKeyState",[Int],UInt),
+//		mouse_event=			user32.proc('mouse_event',[UInt,Int,Int,UInt,UInt],Int),
+		BlockInput=				user32.proc('BlockInput',[Int],Int),
+		
+		
+		GetCursorPos=			user32.proc("GetCursorPos",[Point],Int),
+		SetCursorPos=			user32.proc("SetCursorPos",[Int,Int],Int),
+		
+		GetMessage=				user32.proc("GetMessageW",[MSG,UInt,UInt,UInt],Int,true),
+		TranslateMessage=		user32.proc('TranslateMessage',[MSG],Int),
+		DispatchMessage=		user32.proc('DispatchMessageW',[MSG],Int),
+		PostThreadMessage=		user32.proc('PostThreadMessageW',[UInt,UInt,UInt,UInt],Int),
+		
+		SetWindowsHookEx=		user32.proc("SetWindowsHookExW",[UInt,LowLevelMouseProc,UInt,UInt],UInt,true),
+		CallNextHookEx=			user32.proc("CallNextHookEx",[UInt,Int,UInt,UInt],Int),
+		UnhookWindowsHookEx=	user32.proc("UnhookWindowsHookEx",[UInt],Int);
+
+	var MouseInput=new Struct({
+		type:	UInt,
+		x:		Int,
+		y:		Int,
+		data:	UInt,
+		flags:	UInt,
+		time:	UInt,
+		extra:	UInt,
+	});
+	var SendInput=user32.proc('SendInput',[UInt,Pointer,UInt],Int,true);
+//	var ox=GetSystemMetrics(76),oy=GetSystemMetrics(77),sx=65536/GetSystemMetrics(78),sy=65536/GetSystemMetrics(79);
+	var sx=GetSystemMetrics(0),sy=GetSystemMetrics(1);
+	var mouse_event=function(flags,x,y,data,extra){
+		try{
+			var data=MouseInput.alloc();
+			data.x=Math.round(((x*65536)/sx)+1);
+			data.y=Math.round(((y*65536)/sy)+1);
+			data.data=data||0;
+			data.flags=0x8000|(flags||0);
+			data.extra=extra||0;
+			SendInput(1,data,28);
+		}finally{
+			data && data.free();
+		}
+	};
+	
+	
+	var Mouse=(new Class({},EventMixin,{__class__:{
+		reportError:Function.doNoting,
+		
+		__observeFirst__:function(){
+			this.__observed__=true;
+			this.__observerThread__=Thread.create(function(mouse){
+				try{
+					var func=LowLevelMouseProc.from(function(code,wp,LP){
+						try{
+							if(LP && (code>=0) && mouse.__observed__){
+								var lp=new (MSLLHOOKSTRUCT.pointer)(LP);
+								var d,ev,obj={x:lp.x, y:lp.y, injected:((lp.flags&1)==1)};
+								switch(wp){
+									case(0x20A):{
+										obj.count=Math.abs(d=(lp.data>>16))/120;
+										ev=(d>0)?'wheelUp':'wheelDown';
+										break;
+									}case(0x20E):{
+										obj.count=Math.abs(d=(lp.data>>16))/120;
+										ev=(d>0)?'tiltRigiht':'tiltLeft';
+										break;
+									}case(0x20B):{
+										ev=(lp.data>>16==1)?'x1buttonDown':'x2buttonDown';
+										break;
+									}case(0x20C):{
+										ev=(lp.data>>16==1)?'x1buttonUp':'x2buttonUp';
+										break;
+									}default:{
+										ev=({0x200:'move',0x201:'lbuttonDown',0x202:'lbuttonUp',0x204:'rbuttonDown',0x205:'rbuttonUp',0x207:'mbuttonDown',0x208:'mbuttonUp'})[wp];
+										break;
+									}
+								}
+								if(!mouse.fire(ev,obj)){
+									return(1);
+								}
+							}
+						}catch(e){
+							if(e!==Main.exit){
+								println(e);
+								mouse.reportError('event',e,obj);
+							}
+						}
+						return(CallNextHookEx(hHook,code,wp,LP));
+					});
+					var hHook=SetWindowsHookEx(14,func,Main.handle,0);
+					var msg=MSG.alloc();
+					while(GetMessage(msg,0,0,0)){
+					}
+				}catch(e){
+					if((e!==Main.exit) && (msg.message!=0x12)){
+						println(e);
+						mouse.reportError('messageLoop',e);
+					}
+				}finally{
+					hHook&&	UnhookWindowsHookEx(hHook);
+					func&&	func.free();
+					msg&&	msg.free();
+				}
+			},[this]);
+			Main.reside();
+			Main.observe('exit',function(){Mouse.unobserveAll()});
+		},
+		__unobserveLast__:function(){
+			this.__observed__=false;
+			PostThreadMessage(this.__observerThread__.id,0x12,0,0);
+			this.__observerThread__.waitExit(200);
+			this.__observerThread__.free();
+			this.__observerThread__=null;
+			Main.unreside();
+		},
+		get exists()(GetSystemMetrics(19)!=0),
+		get buttonCount()(GetSystemMetrics(43)),
+		get hasWheel()(GetSystemMetrics(75)),
+		get hasTiltWheel()(GetSystemMetrics(91)),
+		get isButtonSwapped()(GetSystemMetrics(23)!=0),
+		get cursorWidth()(GetSystemMetrics(13)),
+		get cursorHeight()(GetSystemMetrics(14)),
+		get doubleClickTime()(GetDoubleClickTime()),
+		set doubleClickTime(ms)(SetDoubleClickTime(ms)),
+		
+		
+		block:function(){
+			BlockInput(1);
+			return(this);
+		},
+		unblock:function(){
+			BlockInput(0);
+			return(this);
+		},
+		sleep:function(ms){
+			sleep(ms||0);
+			return(this);
+		},
+		get position(){
+			try{
+				var pos=Point.alloc();
+				GetCursorPos(pos);
+				return({x:pos.x,y:pos.y});
+			}finally{
+				pos.free();
+			}
+		},
+		set position(p)(SetCursorPos(p.x||0,p.y||0)),
+		get x()(this.position.x),
+		get y()(this.position.y),
+		set x(p)(SetCursorPos(p||0,this.y)),
+		set y(p)(SetCursorPos(this.x,p||0)),
+		move:function(x,y,useEvent){
+			if(useEvent){
+				mouse_event(1,(this.x+(x||0)),(this.y+(y||0)),0,0);
+			}else{
+				SetCursorPos(this.x+(x||0),this.y+(y||0));
+			}
+			return(this);
+		},
+		moveTo:function(x,y,useEvent){
+			if(useEvent){
+				mouse_event(1,((typeof(x)=='undefined')?this.x:x),((typeof(y)=='undefined')?this.y:y),0,0);
+			}else{
+				SetCursorPos((typeof(x)=='undefined')?this.x:x, (typeof(y)=='undefined')?this.y:y);
+			}
+			return(this);
+		},
+		
+		
+		
+		get leftButton()	(GetKeyState(1)>0),
+		get lButton()	(GetKeyState(1)>0),
+		get rightButton()	(GetKeyState(2)>0),
+		get rButton()	(GetKeyState(2)>0),
+		get middleButton()	(GetKeyState(4)>0),
+		get mButton()	(GetKeyState(4)>0),
+		get x1Button()		(GetKeyState(5)>0),
+		get x2Button()		(GetKeyState(6)>0),
+		
+		set leftButton(b)(b?this.leftDown():this.leftUp()),
+		set rightButton(b)(b?this.rightDown():this.rightUp()),
+		set middleButton(b)(b?this.middleDown():this.middleUp()),
+		set x1Button(b)(b?this.x1Down():this.x1Up()),
+		set x2Button(b)(b?this.x2Down():this.x2Up()),
+		
+		leftDown:function(){
+			mouse_event(0x0002,0,0,0,0);
+			return(this);
+		},
+		lDown:function(){
+			mouse_event(0x0002,0,0,0,0);
+			return(this);
+		},
+		leftUp:function(){
+			mouse_event(0x0004,0,0,0,0);
+			return(this);
+		},
+		lUp:function(){
+			mouse_event(0x0004,0,0,0,0);
+			return(this);
+		},
+		rightDown:function(){
+			mouse_event(0x0008,0,0,0,0);
+			return(this);
+		},
+		rDown:function(){
+			mouse_event(0x0008,0,0,0,0);
+			return(this);
+		},
+		rightUp:function(){
+			mouse_event(0x0010,0,0,0,0);
+			return(this);
+		},
+		rUp:function(){
+			mouse_event(0x0010,0,0,0,0);
+			return(this);
+		},
+		middleDown:function(){
+			mouse_event(0x0020,0,0,0,0);
+			return(this);
+		},
+		mDown:function(){
+			mouse_event(0x0020,0,0,0,0);
+			return(this);
+		},
+		middleUp:function(){
+			mouse_event(0x0040,0,0,0,0);
+			return(this);
+		},
+		mUp:function(){
+			mouse_event(0x0040,0,0,0,0);
+			return(this);
+		},
+		x1Down:function(){
+			mouse_event(0x0080,0,0,1,0);
+			return(this);
+		},
+		x1Up:function(){
+			mouse_event(0x0100,0,0,1,0);
+			return(this);
+		},
+		x2Down:function(){
+			mouse_event(0x0080,0,0,2,0);
+			return(this);
+		},
+		x2Up:function(){
+			mouse_event(0x0100,0,0,2,0);
+			return(this);
+		},
+		
+		leftClick:function(dur){
+			this.leftDown();
+			if(dur){
+				sleep(dur);
+			}
+			this.leftUp();
+			return(this);
+		},
+		rightClick:function(dur){
+			this.rightDown();
+			if(dur){
+				sleep(dur);
+			}
+			this.rightUp();
+			return(this);
+		},
+		middleClick:function(dur){
+			this.middleDown();
+			if(dur){
+				sleep(dur);
+			}
+			this.middleUp();
+			return(this);
+		},
+		x1Click:function(dur){
+			this.x1Down();
+			if(dur){
+				sleep(dur);
+			}
+			this.x1Up();
+			return(this);
+		},
+		x2Click:function(dur){
+			this.x2Down();
+			if(dur){
+				sleep(dur);
+			}
+			this.x2Up();
+			return(this);
+		},
+		
+		
+		wheelUp:function(count){
+			mouse_event(0x0800,0,0,120*(count||1),0);
+			return(this);
+		},
+		wheelDown:function(count){
+			mouse_event(0x0800,0,0,120*(count||1),0);
+			return(this);
+		},
+		
+		tiltLeft:function(count){
+			mouse_event(0x01000,0,0,120*(count||1),0);
+			return(this);
+		},
+		tiltRight:function(count){
+			mouse_event(0x01000,0,0,120*(count||1),0);
+			return(this);
+		},
+		
+	}}));
+	this.Mouse=Mouse;
+})

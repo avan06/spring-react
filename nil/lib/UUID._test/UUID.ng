@@ -1,0 +1,35 @@
+(function(){
+	var uHash=require('Hash');
+	var UUID=new Class({
+		__class__:{
+			create:function(version,src){
+				switch(Number(version)){
+					case(5):{
+						return(new this(uHash.SHA1.calc(src).replace(/^(.{8})(.{4}).(.{3})(.{4})(.{12}).*$/,'$1-$2-5$3-$4-$5')));
+						break;
+					}default:case(4):{
+						return(new this(String.random(12,16)+'4'+String.random(3,16)+["8","9","A","B"].random()+String.random(15,16)));
+						break;
+					}case(3):{
+						return(new this(uHash.MD5.calc(src).replace(/^(.{8})(.{4}).(.{3})(.{4})(.{12}).*$/,'$1-$2-5$3-$4-$5')));
+						break;
+					}
+				}
+			},
+		},
+		__new__:function(str){
+			if(str instanceof this.constructor){
+				this.uuid=str.uuid;
+			}else{
+				this.uuid=String(str).replace(/^urn:uuid:|[^0-9a-f]/ig,'').toUpperCase();
+				if(!this.uuid.match(/^[0-9a-f]{32}$/i)){
+					throw(Error('uuid is invalid: '+str));
+				}
+			}
+		},
+		toBytes:function()(Hex.decode(this.uuid)),
+		toString:function()(this.uuid.replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/,'{$1-$2-$3-$4-$5}')),
+		get version()(this.uuid.slice(12,13)),
+	});
+	this.UUID=UUID;
+})

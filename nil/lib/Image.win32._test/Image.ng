@@ -1,0 +1,2855 @@
+(function(){
+
+	var gdi=WinLibrary.load('gdi32.dll');
+	var ole32=WinLibrary.load('ole32.dll');
+	var gdip=WinLibrary.load('gdiplus.dll');
+	var comctl=WinLibrary.load('Comctl32.dll');
+	var shell32=WinLibrary.load('shell32.dll');
+	var ExtractAssociatedIcon=shell32.proc('ExtractAssociatedIconW',[UInt,WideString,Pointer],UInt);
+	var ExtractIcon=shell32.proc('ExtractIconW',[UInt,WideString,UInt],UInt);
+
+	var ImageList_LoadImage=		comctl.proc('ImageList_LoadImageW',[UInt,WideString,Int,Int,UInt,UInt,UInt],UInt);
+	var ImageList_GetImageCount=	comctl.proc('ImageList_GetImageCount',[UInt],UInt);
+	var ImageList_GetIconSize=		comctl.proc('ImageList_GetIconSize',[UInt,Pointer,Pointer],UInt);
+	var ImageList_GetIcon=			comctl.proc('ImageList_GetIcon',[UInt,Int,UInt],UInt);
+
+	var LoadImage=					user32.proc('LoadImageW',[UInt,WideString,UInt,Int,Int,UInt],UInt);
+	var DestroyIcon=				user32.proc('DestroyIcon',[UInt],Int);
+	var DestroyCursor=				user32.proc('DestroyCursor',[UInt],Int);
+	var DeleteObject=				gdi.proc('DeleteObject',[UInt],Int);
+	
+	var GetDIBits=					gdi.proc('GetDIBits',[UInt,UInt,UInt,UInt,Pointer,Pointer,UInt],UInt);
+	var GetIconInfo=				user32.proc('GetIconInfo',[UInt,Pointer],Int);
+	
+	var GetDC=						user32.proc('GetDC',[UInt],UInt);
+	var GetWindowDC=				user32.proc('GetWindowDC',[UInt],UInt);
+	var CreateCompatibleDC=			gdi.proc('CreateCompatibleDC',[UInt],UInt);
+	var ReleaseDC=					user32.proc('ReleaseDC',[UInt,UInt],Int);
+	var DeleteDC=					gdi.proc('DeleteDC',[UInt],Int);
+	var SelectObject=				gdi.proc('SelectObject',[UInt,UInt],UInt);
+	
+	var BitmapData=new Struct({
+		width:UInt,
+		height:UInt,
+		stride:UInt,
+		format:UInt,
+		scan:UInt.pointer,
+		res:Pointer,
+	});
+	
+	var gdipStatus={
+		0:"Ok",
+		1:"GenericError",
+		2:"InvalidParameter",
+		3:"OutOfMemory",
+		4:"ObjectBusy",
+		5:"InsufficientBuffer",
+		6:"NotImplemented",
+		7:"Win32Error",
+		8:"WrongState",
+		9:"Aborted",
+		10:"FileNotFound",
+		11:"ValueOverflow",
+		12:"AccessDenied",
+		13:"UnknownImageFormat",
+		14:"FontFamilyNotFound",
+		15:"FontStyleNotFound",
+		16:"NotTrueTypeFont",
+		17:"UnsupportedGdiplusVersion",
+		18:"GdiplusNotInitialized",
+		19:"PropertyNotFound",
+		20:"PropertyNotSupported",
+		21:"ProfileNotFound",
+	};
+	var gdipCheckResult=function(r){
+		if(r==0){
+			return(true);
+		}else{
+			throw(new Error('GDI+: '+gdipStatus[r]));
+		}
+	}
+	
+	
+	var EncodeParameter=new Struct({
+		guid:	[Byte,16],
+		count:	UInt,
+		type:	UInt,
+		value:	Pointer,
+		
+	});
+	var ImageCodecInfo=new Struct({
+		clsid:		[Byte,16],
+		guid:		[Byte,16],
+		name:		WideString,
+		dll:		WideString,
+		description:WideString,
+		extension:	WideString,
+		mimeType:	WideString,
+		flags:		UInt,
+		version:	UInt,
+		sigCount:	UInt,
+		sigSize:	UInt,
+		sigPattern:	Pointer,
+		sigMask:	Pointer,
+	});
+	
+	var
+		GetDC=				user32.proc('GetDC',[UInt],UInt),
+		GetWindowDC=		user32.proc('GetWindowDC',[UInt],UInt),
+		ReleaseDC=			user32.proc('ReleaseDC',[UInt,UInt],Int),
+		GetDesktopWindow=	user32.proc('GetDesktopWindow',[],UInt),
+		GdipGetDC=			gdip.proc('GdipGetDC',[UInt,Pointer],UInt),
+		GdipReleaseDC=		gdip.proc('GdipReleaseDC',[UInt,UInt],UInt),
+		BitBlt=				gdi.proc('BitBlt',[UInt,Int,Int,Int,Int,UInt,Int,Int,UInt],Int),
+		StretchBlt=			gdi.proc('StretchBlt',[UInt,Int,Int,Int,Int,UInt,Int,Int,Int,Int,UInt],Int),
+		
+		CreateBitmap=		gdi.proc('CreateBitmap',[Int,Int,UInt,UInt,Pointer],UInt),
+		CreateCompatibleBitmap=gdi.proc('CreateCompatibleBitmap',[UInt,Int,Int],UInt),
+		
+		
+		GdipCreateFromHDC=	gdip.proc('GdipCreateFromHDC',[UInt,Pointer],UInt),
+//		GdipCreateBitmapFromGraphics=	gdip.proc('GdipCreateBitmapFromGraphics',[Int,Int,UInt,Pointer],UInt),
+		
+		
+	
+		CLSIDFromString=	ole32.proc('CLSIDFromString',[WideString,Pointer],Int),
+		GdiplusStartup=					gdip.proc('GdiplusStartup',[Pointer,Pointer,Pointer],UInt),
+		GdipCreateBitmapFromHICON=		gdip.proc('GdipCreateBitmapFromHICON',[UInt,Pointer],UInt),
+		GdipCreateBitmapFromFileICM=	gdip.proc('GdipCreateBitmapFromFileICM',[WideString,Pointer],UInt),
+		GdipCreateBitmapFromStreamICM=	gdip.proc('GdipCreateBitmapFromStreamICM',[Pointer,Pointer],UInt),
+		GdipCreateBitmapFromScan0=		gdip.proc('GdipCreateBitmapFromScan0',[UInt,UInt,UInt,Int,UInt,Pointer],UInt),
+		GdipDisposeImage=				gdip.proc('GdipDisposeImage',[UInt]),
+		
+		GdipCreateHBITMAPFromBitmap=	gdip.proc('GdipCreateHBITMAPFromBitmap',[UInt,Pointer,UInt],UInt),
+		GdipCreateBitmapFromHBITMAP=	gdip.proc('GdipCreateBitmapFromHBITMAP',[UInt,UInt,Pointer],UInt),
+		GdipCreateHICONFromBitmap=		gdip.proc('GdipCreateHICONFromBitmap',[UInt,Pointer],UInt),
+		GdipCreateBitmapFromGdiDib=		gdip.proc('GdipCreateBitmapFromGdiDib',[Pointer,Pointer,Pointer],UInt),
+		
+		GdipBitmapLockBits=				gdip.proc('GdipBitmapLockBits',[UInt,Pointer,UInt,UInt,Pointer],UInt),
+		GdipBitmapUnlockBits=			gdip.proc('GdipBitmapUnlockBits',[UInt,Pointer],UInt),
+		GdipBitmapGetPixel=				gdip.proc('GdipBitmapGetPixel',[UInt,Int,Int,Pointer],UInt),
+		GdipBitmapSetPixel=				gdip.proc('GdipBitmapSetPixel',[UInt,Int,Int,UInt],UInt),
+		
+		
+		GdipGetImageEncodersSize=		gdip.proc('GdipGetImageEncodersSize',[Pointer,Pointer]),
+		GdipGetImageEncoders=			gdip.proc('GdipGetImageEncoders',[UInt,UInt,Pointer]),
+		GdipSaveImageToFile=			gdip.proc('GdipSaveImageToFile',[UInt,WideString,Pointer,Pointer],UInt),
+		GdipSaveImageToStream=			gdip.proc('GdipSaveImageToStream',[UInt,Pointer,Pointer,Pointer],UInt),
+		
+		GdipGetImageWidth=				gdip.proc('GdipGetImageWidth',[UInt,Pointer],UInt),
+		GdipGetImageHeight=				gdip.proc('GdipGetImageHeight',[UInt,Pointer],UInt),
+		GdipCloneBitmapAreaI=			gdip.proc('GdipCloneBitmapAreaI',[Int,Int,UInt,UInt,UInt,UInt,Pointer],UInt),
+		GdipGetImageGraphicsContext=	gdip.proc('GdipGetImageGraphicsContext',[UInt,Pointer],UInt),
+		
+		GdipDeleteGraphics=				gdip.proc('GdipDeleteGraphics',[UInt],UInt),
+		GdipDrawImageRectI=				gdip.proc('GdipDrawImageRectI',[UInt,UInt,Int,Int,UInt,UInt],UInt),
+		GdipSetInterpolationMode=		gdip.proc('GdipSetInterpolationMode',[UInt,UInt],UInt),
+		GdipImageRotateFlip=			gdip.proc('GdipImageRotateFlip',[UInt,UInt],UInt),
+		
+		GdipDrawImagePointsI=			gdip.proc('GdipDrawImagePointsI',[UInt,UInt,Pointer,UInt],UInt),
+		GdipDrawImageRectRectI=			gdip.proc('GdipDrawImageRectRectI',[UInt,UInt, Int,Int,Int,Int, Int,Int,Int,Int, UInt,UInt,UInt,UInt],UInt),
+		GdipDrawImageRectI=				gdip.proc('GdipDrawImageRectI',[UInt,UInt, Int,Int,Int,Int],UInt),
+		GdipDrawImageI=					gdip.proc('GdipDrawImageI',[UInt,UInt, Int,Int],UInt),
+		
+		GdipSetSmoothingMode=			gdip.proc('GdipSetSmoothingMode',[UInt,UInt],UInt),
+		GdipGetSmoothingMode=			gdip.proc('GdipGetSmoothingMode',[UInt,Pointer],UInt),
+		
+		
+		
+		GdipCreateLineBrushI=			gdip.proc('GdipCreateLineBrushI',[Pointer,Pointer,UInt,UInt,UInt,Pointer],UInt),
+		GdipSetLineGammaCorrection=		gdip.proc('GdipSetLineGammaCorrection',[UInt,Int],UInt),
+		GdipSetLineBlend=				gdip.proc('GdipSetLineBlend',[UInt,Pointer,Pointer,UInt],UInt),
+		GdipSetLinePresetBlend=			gdip.proc('GdipSetLinePresetBlend',[UInt,Pointer,Pointer,UInt],UInt),
+		GdipSetLineSigmaBlend=			gdip.proc('GdipSetLineSigmaBlend',[UInt,Float,Float],UInt),
+		GdipSetLineLinearBlend=			gdip.proc('GdipSetLineLinearBlend',[UInt,Float,Float],UInt),
+		
+		GdipCreateSolidFill=			gdip.proc('GdipCreateSolidFill',[UInt,Pointer],UInt),
+		GdipCreateTexture=				gdip.proc('GdipCreateTexture',[UInt,UInt,Pointer],UInt),
+		GdipCreateHatchBrush=			gdip.proc('GdipCreateHatchBrush',[UInt,UInt,UInt,Pointer],UInt),
+		GdipDeleteBrush=				gdip.proc('GdipDeleteBrush',[UInt],UInt),
+		GdipGetSolidFillColor=			gdip.proc('GdipGetSolidFillColor',[UInt,Pointer],UInt),
+		GdipSetCompositingMode=			gdip.proc('GdipSetCompositingMode',[UInt,UInt],UInt),
+		GdipDrawLinesI=					gdip.proc('GdipDrawLinesI',[UInt,UInt, Pointer, UInt],UInt),
+		GdipDrawCurve3I=				gdip.proc('GdipDrawCurve3I',[UInt,UInt, Pointer, UInt, Int,Int, Float],UInt),
+		GdipDrawRectangleI=				gdip.proc('GdipDrawRectangleI',[UInt,UInt,Int,Int,Int,Int],UInt),
+		GdipFillRectangleI=				gdip.proc('GdipFillRectangleI',[UInt,UInt,Int,Int,Int,Int],UInt),
+		GdipDrawEllipseI=				gdip.proc('GdipDrawEllipseI',[UInt,UInt,Int,Int,Int,Int],UInt),
+		GdipFillEllipseI=				gdip.proc('GdipFillEllipseI',[UInt,UInt,Int,Int,Int,Int],UInt),
+		GdipDrawArcI=					gdip.proc('GdipDrawArcI',[UInt,UInt,Int,Int,Int,Int,Float,Float],UInt),
+		GdipDrawPieI=					gdip.proc('GdipDrawPieI',[UInt,UInt,Int,Int,Int,Int,Float,Float],UInt),
+		GdipFillPieI=					gdip.proc('GdipFillPieI',[UInt,UInt,Int,Int,Int,Int,Float,Float],UInt),
+		
+		
+		
+		GdipDrawPolygonI=				gdip.proc('GdipDrawPolygonI',[UInt,UInt,Pointer, UInt],UInt),
+		GdipFillPolygonI=				gdip.proc('GdipFillPolygonI',[UInt,UInt,Pointer,UInt,UInt],UInt),
+		GdipDrawClosedCurve2I=			gdip.proc('GdipDrawClosedCurve2I',[UInt,UInt, Pointer, UInt, Float],UInt),
+		GdipFillClosedCurve2I=			gdip.proc('GdipFillClosedCurve2I',[UInt,UInt, Pointer, UInt, Float, UInt],UInt),
+		
+		GdipCreatePen1=					gdip.proc('GdipCreatePen1',[UInt,Float,UInt,Pointer],UInt),
+		GdipDeletePen=					gdip.proc('GdipDeletePen',[UInt],UInt),
+		GdipCreatePen2=					gdip.proc('GdipCreatePen2',[UInt,Float,UInt,Pointer],UInt),
+		GdipSetPenLineCap197819=		gdip.proc('GdipSetPenLineCap197819',[UInt,UInt,UInt,UInt],UInt),
+		GdipSetPenLineJoin=				gdip.proc('GdipSetPenLineJoin',[UInt,UInt],UInt),
+		GdipSetPenMiterLimit=			gdip.proc('GdipSetPenMiterLimit',[UInt,Float],UInt),
+		GdipSetPenMode=					gdip.proc('GdipSetPenMode',[UInt,UInt],UInt),
+		GdipSetPenDashStyle=			gdip.proc('GdipSetPenDashStyle',[UInt,UInt],UInt),
+		
+		GdipNewInstalledFontCollection=	gdip.proc('GdipNewInstalledFontCollection',[Pointer],UInt),
+		GdipNewPrivateFontCollection=	gdip.proc('GdipNewPrivateFontCollection',[Pointer],UInt),
+		GdipDeletePrivateFontCollection=gdip.proc('GdipDeletePrivateFontCollection',[UInt],UInt),
+		GdipPrivateAddFontFile=			gdip.proc('GdipPrivateAddFontFile',[UInt,WideString],UInt),
+		
+		GdipGetGenericFontFamilySansSerif=gdip.proc('GdipGetGenericFontFamilySansSerif',[Pointer],UInt),
+		GdipCreateFontFamilyFromName=	gdip.proc('GdipCreateFontFamilyFromName',[WideString,UInt,Pointer],UInt),
+		GdipDeleteFontFamily=			gdip.proc('GdipDeleteFontFamily',[UInt],UInt),
+		GdipGetFontCollectionFamilyList=gdip.proc('GdipGetFontCollectionFamilyList',[UInt,Int,Pointer,Pointer],UInt),
+		GdipCloneFontFamily=			gdip.proc('GdipCloneFontFamily',[UInt,Pointer],UInt),
+		GdipCreateFont=					gdip.proc('GdipCreateFont',[UInt,Float,UInt,UInt,Pointer],UInt),
+		GdipDeleteFont=					gdip.proc('GdipDeleteFont',[UInt],UInt),
+		GdipDrawString=					gdip.proc('GdipDrawString',[UInt,WideString,UInt, UInt,Pointer, UInt, UInt],UInt),
+		GdipMeasureString=				gdip.proc('GdipMeasureString',[UInt,WideString,UInt, UInt,Pointer, UInt, Pointer,Pointer,Pointer],UInt),
+		GdipSetTextRenderingHint=		gdip.proc('GdipSetTextRenderingHint',[UInt,UInt],UInt),
+		GdipSetTextContrast=			gdip.proc('GdipSetTextContrast',[UInt,UInt],UInt),
+		
+		GdipCreateStringFormat=			gdip.proc('GdipCreateStringFormat',[UInt,UInt],UInt),
+		GdipDeleteStringFormat=			gdip.proc('GdipDeleteStringFormat',[UInt],UInt),
+		
+	var_end;
+	
+	
+	
+
+	var replaceColorThreshold=(new CFunction(Hex.decode(
+		"55 8b ec 51 53 56 57 8b 75 18 8b 7d 20 8b 45 0c c1 e0 02 8b 4d 14 8b d1 2b c8 89 4d 14 89 45 0c 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 55 0c 8b 55 fc 8b 18 8b ce 33 d2 8a fe 8a ea 81 e3 ff 00 ff 00 81 e1 ff 00 ff 00 66 2b d9 66 83 fb 00 7d 03 66 f7 db 8a ce 81 e2 ff 00 00 00 66 2b d1 66 83 fa 00 7d 03 66 f7 da 66 03 d3 2b d9 83 fb 00 7d 02 f7 db c1 eb 10 03 d3 3b d7 7f 05 8b 5d 1c 89 18 83 c0 04 3b 45 fc 7c a8 03 45 14 3b 45 10 7c 98 5f 5e 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt,UInt],UInt);
+	var replaceColor=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 0c c1 e3 02 8b 4d 14 8b d1 2b cb 89 4d 14 8b 45 08 8b 75 18 8b 7d 1c 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 d3 8b 08 3b ce 75 04 8b cf 89 08 83 c0 04 3b c2 7c ef 03 45 14 3b 45 10 7c e3 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt,UInt,UInt],UInt);
+
+
+	var threshold_avg=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 6b db 03 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e2 ff 00 00 ff 8a cd 81 e1 ff 00 ff 00 66 03 d1 c1 e9 10 66 03 ca 81 e2 00 00 00 ff 3b cb 7c 06 81 ca ff ff ff 00 89 10 83 c0 04 3b c7 7c cc 03 45 14 3b 45 0c 7c c0 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+
+	var threshold_brightness=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e2 00 00 00 ff 3a cd 72 02 8a e9 c1 e9 08 3a cd 77 02 8a cd 81 e1 ff 00 00 00 3b cb 7c 06 81 ca ff ff ff 00 89 10 83 c0 04 3b c7 7c ce 03 45 14 3b 45 0c 7c c2 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+
+
+	var negate=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 75 0c c1 e6 02 8b 5d 14 8b d3 2b de 8b 45 08 8b 7d 10 0f af fa 03 f8 8b d0 03 d6 81 30 ff ff ff 00 83 c0 04 3b c2 7c f3 03 c3 3b c7 7c e9 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+
+	var mono_brightness=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 5d 10 0f af da 03 d8 8b f8 03 fe 8b 10 8b ca 81 e2 00 00 00 ff 3a cd 72 02 8a e9 c1 e9 08 3a cd 77 02 8a cd 81 e1 ff 00 00 00 69 c9 01 01 01 00 0b d1 89 10 83 c0 04 3b c7 7c d0 03 45 14 3b c3 7c c5 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+
+	var mono_avg=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 10 53 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f8 d9 6d f8 b8 03 00 00 00 89 45 f8 db 45 f8 8b 45 0c c1 e0 02 8b 4d 14 8b d1 2b c8 89 4d 14 89 45 0c 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d f4 8b d0 03 55 0c 89 55 f0 8b 10 8b ca 81 e1 ff 00 00 00 8b da c1 eb 08 81 e3 ff 00 00 00 03 cb 8b da c1 eb 10 81 e3 ff 00 00 00 03 cb 89 08 df 00 d8 f1 df 18 8b 08 69 c9 01 01 01 00 81 e2 00 00 00 ff 0b ca 89 08 83 c0 04 3b 45 f0 7c ba 03 45 14 3b 45 f4 7c aa dd d8 d9 6d fc 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+
+	var mono_weight=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 10 53 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f8 d9 6d f8 b8 00 01 00 00 89 45 f8 db 45 f8 8b 45 0c c1 e0 02 8b 4d 14 8b d1 2b c8 89 4d 14 89 45 0c 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d f4 8b d0 03 55 0c 89 55 f0 8b 10 8b ca 81 e1 ff 00 00 00 6b c9 1c 8b da c1 eb 08 81 e3 ff 00 00 00 69 db 97 00 00 00 03 cb 8b da c1 eb 10 81 e3 ff 00 00 00 6b db 4d 03 cb 89 08 df 00 d8 f1 df 18 8b 08 69 c9 01 01 01 00 81 e2 00 00 00 ff 0b ca 89 08 83 c0 04 3b 45 f0 7c ae 03 45 14 3b 45 f4 7c 9e dd d8 d9 6d fc 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+	
+	var mono_alpha=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 8b 45 08 8b 5d 10 0f af da 03 d8 8b f8 03 fe 8b 10 c1 ea 18 69 d2 01 01 01 00 81 ca 00 00 00 ff 89 10 83 c0 04 3b c7 7c e6 03 c1 3b c3 7c dc 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+	
+	
+	var prepareMatrixFilter=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 34 8b 45 0c 99 83 e2 03 03 c2 c1 f8 02 89 45 d0 8b 45 14 99 83 e2 03 03 c2 c1 f8 02 89 45 dc 8b 45 20 03 45 18 89 45 d4 8b 4d 20 03 4d 1c 89 4d d8 8b 55 d8 03 55 20 89 55 f8 8b 45 dc 2b 45 20 89 45 e0 8b 4d 08 8b 11 89 55 f4 8b 45 10 89 45 e8 8b 4d dc 0f af 4d 20 8b 55 10 8d 04 8a 89 45 e4 eb 0c 8b 4d e0 8b 55 e8 8d 04 8a 89 45 e8 8b 4d e8 3b 4d e4 73 2b 8b 55 20 8b 45 e8 8d 0c 90 89 4d fc eb 09 8b 55 e8 83 c2 04 89 55 e8 8b 45 e8 3b 45 fc 73 0a 8b 4d e8 8b 55 f4 89 11 eb e5 eb c1 8b 45 20 8b 4d 10 8d 14 81 89 55 e8 8b 45 08 89 45 f0 8b 4d d4 8b 55 10 8d 04 8a 89 45 e4 eb 12 8b 4d f0 83 c1 04 89 4d f0 8b 55 e8 83 c2 04 89 55 e8 8b 45 e8 3b 45 e4 73 40 8b 4d f0 8b 11 89 55 f4 8b 45 e8 89 45 cc 8b 4d dc 0f af 4d 20 8b 55 e8 8d 04 8a 89 45 fc eb 0c 8b 4d dc 8b 55 cc 8d 04 8a 89 45 cc 8b 4d cc 3b 4d fc 73 0a 8b 55 cc 8b 45 f4 89 02 eb e2 eb a6 8b 4d d4 8b 55 10 8d 04 8a 89 45 e8 8b 4d dc 0f af 4d 20 8b 55 e8 8d 04 8a 89 45 e4 eb 0c 8b 4d e0 8b 55 e8 8d 04 8a 89 45 e8 8b 4d e8 3b 4d e4 73 2b 8b 55 20 8b 45 e8 8d 0c 90 89 4d fc eb 09 8b 55 e8 83 c2 04 89 55 e8 8b 45 e8 3b 45 fc 73 0a 8b 4d e8 8b 55 f4 89 11 eb e5 eb c1 8b 45 dc 2b 45 d4 2b 45 20 89 45 e0 8b 4d d0 2b 4d 18 89 4d ec 8b 55 20 0f af 55 dc 8b 45 10 8d 0c 90 89 4d e8 8b 55 08 89 55 f0 8b 45 d8 0f af 45 dc 8b 4d 10 8d 14 81 89 55 e4 eb 18 8b 45 e0 8b 4d e8 8d 14 81 89 55 e8 8b 45 ec 8b 4d f0 8d 14 81 89 55 f0 8b 45 e8 3b 45 e4 0f 83 9c 00 00 00 8b 4d f0 8b 11 89 55 f4 8b 45 20 8b 4d e8 8d 14 81 89 55 fc eb 09 8b 45 e8 83 c0 04 89 45 e8 8b 4d e8 3b 4d fc 73 0a 8b 55 e8 8b 45 f4 89 02 eb e5 8b 4d 18 8b 55 e8 8d 04 8a 89 45 fc eb 12 8b 4d e8 83 c1 04 89 4d e8 8b 55 f0 83 c2 04 89 55 f0 8b 45 e8 3b 45 fc 73 0c 8b 4d e8 8b 55 f0 8b 02 89 01 eb da 8b 4d f0 8b 51 fc 89 55 f4 8b 45 20 8b 4d e8 8d 14 81 89 55 fc eb 09 8b 45 e8 83 c0 04 89 45 e8 8b 4d e8 3b 4d fc 73 0a 8b 55 e8 8b 45 f4 89 02 eb e5 e9 40 ff ff ff 8b 4d dc 2b 4d 20 89 4d e0 8b 55 d0 c1 e2 02 8b 45 f0 2b c2 89 45 f0 8b 4d f0 8b 11 89 55 f4 8b 45 dc 0f af 45 d8 8b 4d 10 8d 14 81 89 55 e8 8b 45 dc 0f af 45 f8 8b 4d 10 8d 14 81 89 55 e4 eb 0c 8b 45 e0 8b 4d e8 8d 14 81 89 55 e8 8b 45 e8 3b 45 e4 73 2b 8b 4d 20 8b 55 e8 8d 04 8a 89 45 fc eb 09 8b 4d e8 83 c1 04 89 4d e8 8b 55 e8 3b 55 fc 73 0a 8b 45 e8 8b 4d f4 89 08 eb e5 eb c1 8b 55 dc 0f af 55 d8 8b 45 10 8d 0c 90 8b 55 20 8d 04 91 89 45 e8 8b 4d dc 0f af 4d d8 8b 55 10 8d 04 8a 8b 4d d4 8d 14 88 89 55 e4 eb 12 8b 45 f0 83 c0 04 89 45 f0 8b 4d e8 83 c1 04 89 4d e8 8b 55 e8 3b 55 e4 73 40 8b 45 f0 8b 08 89 4d f4 8b 55 e8 89 55 cc 8b 45 dc 0f af 45 20 8b 4d e8 8d 14 81 89 55 fc eb 0c 8b 45 dc 8b 4d cc 8d 14 81 89 55 cc 8b 45 cc 3b 45 fc 73 0a 8b 4d cc 8b 55 f4 89 11 eb e2 eb a6 8b 45 d4 8b 4d 10 8d 14 81 8b 45 dc 0f af 45 d8 8d 0c 82 89 4d e8 8b 55 dc 0f af 55 f8 8b 45 10 8d 0c 90 89 4d e4 eb 0c 8b 55 e0 8b 45 e8 8d 0c 90 89 4d e8 8b 55 e8 3b 55 e4 73 2b 8b 45 20 8b 4d e8 8d 14 81 89 55 fc eb 09 8b 45 e8 83 c0 04 89 45 e8 8b 4d e8 3b 4d fc 73 0a 8b 55 e8 8b 45 f4 89 02 eb e5 eb c1 8b e5 5d c3"
+	))).toFunction([UInt,Int,UInt,Int, Int,Int,Int],UInt);
+	var matrixFilter=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 20 8b 45 18 c1 e0 02 8b 4d 0c 2b c8 89 4d f8 8b 4d 14 2b c8 89 4d e4 89 45 18 8b 55 24 d1 e2 83 c2 01 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f4 d9 6d f4 8b 45 08 8b 4d 1c 0f af 4d 0c 03 c8 89 4d ec 8b c8 03 4d 18 89 4d e8 d9 ee d9 ee d9 ee d9 ee 33 c0 89 45 f0 33 c0 89 45 e0 8b c8 0f af ca 03 4d f0 c1 e1 02 03 4d 20 d9 01 0f af 45 0c 03 45 08 8b 4d f0 8b 04 88 8b c8 81 e1 ff 00 00 00 89 4d f4 db 45 f4 d8 c9 de c5 c1 e8 08 8b c8 81 e1 ff 00 00 00 89 4d f4 db 45 f4 d8 c9 de c4 c1 e8 08 8b c8 81 e1 ff 00 00 00 89 4d f4 db 45 f4 d8 c9 de c3 c1 e8 08 89 45 f4 db 45 f4 d8 c9 de c2 dd d8 8b 45 e0 83 c0 01 3b c2 7c 8b 8b 45 f0 83 c0 01 3b c2 0f 8c 78 ff ff ff 33 c9 db 5d f4 8b 45 f4 83 f8 00 7e 0e 3d 00 01 00 00 7c 05 b8 ff 00 00 00 0b c8 c1 e1 08 db 5d f4 8b 45 f4 83 f8 00 7e 0e 3d 00 01 00 00 7c 05 b8 ff 00 00 00 0b c8 c1 e1 08 db 5d f4 8b 45 f4 83 f8 00 7e 0e 3d 00 01 00 00 7c 05 b8 ff 00 00 00 0b c8 c1 e1 08 db 5d f4 8b 45 f4 83 f8 00 7e 0e 3d 00 01 00 00 7c 05 b8 ff 00 00 00 0b c8 8b 45 10 89 08 83 c0 04 89 45 10 8b 45 08 83 c0 04 89 45 08 3b 45 e8 0f 8c e2 fe ff ff 8b 45 10 03 45 e4 89 45 10 8b 45 08 03 45 f8 89 45 08 3b 45 ec 0f 8c bf fe ff ff d9 6d fc 8b e5 5d c3"
+	))).toFunction([UInt,Int,UInt,Int,Int,Int,Pointer,Int],UInt);
+	
+	var pixelDiff=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 08 53 56 57 8b 45 18 8b 5d 0c 8b 4d 14 c1 e0 02 8b d3 2b d8 2b c8 89 45 18 89 5d 0c 89 4d 14 8b 75 08 8b 7d 10 8b 4d 1c 0f af ca 03 ce 89 4d fc 8b ce 03 4d 18 89 4d f8 8b 06 8b 1f 8b c8 8b d3 81 e1 ff 00 00 00 81 e2 ff 00 00 00 2b ca 83 f9 00 7d 02 f7 d9 81 e3 00 ff ff ff 0b d9 8b c8 8b d3 81 e1 00 ff 00 00 81 e2 00 ff 00 00 2b ca 83 f9 00 7d 02 f7 d9 81 e3 ff 00 ff ff 0b d9 8b d3 25 00 00 ff 00 81 e2 00 00 ff 00 2b c2 83 f8 00 7d 02 f7 d8 81 e3 ff ff 00 ff 0b d8 89 1e 83 c6 04 83 c7 04 3b 75 f8 7c 8f 03 75 0c 03 7d 14 3b 75 fc 0f 8c 78 ff ff ff 5f 5e 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int, UInt,Int, Int,Int],UInt);
+	
+	
+	
+	
+	
+	
+	var pixelXor=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 7d 14 8b d7 2b fe 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 d6 8b 08 33 cb 89 08 83 c0 04 3b c2 7c f3 03 c7 3b 45 10 7c e8 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+
+	var pixelOr=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 7d 14 8b d7 2b fe 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 d6 8b 08 0b cb 89 08 83 c0 04 3b c2 7c f3 03 c7 3b 45 10 7c e8 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+
+	var pixelAnd=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 7d 14 8b d7 2b fe 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 d6 8b 08 23 cb 89 08 83 c0 04 3b c2 7c f3 03 c7 3b 45 10 7c e8 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+	
+	
+	
+	var threshold_alpha=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b f8 03 fe 8b 08 8b d1 81 e1 ff ff ff 00 c1 ea 18 3b d3 7c 06 81 c9 00 00 00 ff 89 08 83 c0 04 3b c7 7c e0 03 45 14 3b 45 10 7c d4 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+	
+	var brightness2alpha=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 3a cd 77 02 8a cd 8a d9 c1 e9 10 3a cb 77 02 8a cb c1 e1 18 81 e2 ff ff ff 00 0b d1 89 10 83 c0 04 3b c7 7c d7 03 45 14 3b 45 0c 7c cb 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int],UInt);
+	var update_alpha=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 18 c1 e3 18 8b 75 0c c1 e6 02 8b 7d 14 8b d7 2b fe 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 d6 8b 08 81 e1 ff ff ff 00 0b cb 89 08 83 c0 04 3b c2 7c ed 03 c7 3b 45 10 7c e2 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,UInt],UInt);
+	var copy_alpha=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 75 18 c1 e6 02 8b 5d 0c 8b 4d 14 8b d3 2b de 2b ce 89 5d 0c 89 4d 14 8b 45 08 8b 5d 10 8b 4d 1c 0f af ca 03 c8 89 4d 18 8b f8 03 fe 8b 08 8b 13 81 e1 ff ff ff 00 81 e2 00 00 00 ff 0b ca 89 08 83 c0 04 83 c3 04 3b c7 7c e2 03 45 0c 03 5d 14 3b 45 18 7c d3 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,UInt,Int, Int,Int],UInt);
+	var copy_alpha_from_brightness=(new CFunction(Hex.decode(
+		"55 8b ec 83 ec 08 53 8b 45 18 8b 5d 0c 8b 4d 14 c1 e0 02 8b d3 2b d8 2b c8 89 45 18 89 5d 0c 89 4d 14 8b 45 08 8b 5d 10 8b 4d 1c 0f af ca 03 c8 89 4d fc 8b c8 03 4d 18 89 4d f8 8b 0b 3a cd 77 02 8a cd 8a d1 c1 e9 10 3a ca 77 02 8a ca c1 e1 18 8b 10 81 e2 ff ff ff 00 0b d1 89 10 83 c0 04 83 c3 04 3b 45 f8 7c d3 03 45 0c 03 5d 14 3b 45 fc 7c c0 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int,UInt,Int, Int,Int],UInt);
+	var multiply_alpha=(new CFunction(Hex.decode(
+		"55 8b ec 83 ec 08 53 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f8 d9 6d f8 d9 45 18 8b 45 0c c1 e0 02 8b 4d 14 8b d1 2b c8 89 4d 14 89 45 0c 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 10 8b d0 03 55 0c 8b 08 8b d9 81 e1 ff ff ff 00 c1 eb 18 89 18 df 00 d8 c9 df 18 8b 18 81 fb 00 01 00 00 7c 05 bb ff 00 00 00 c1 e3 18 0b cb 89 08 83 c0 04 3b c2 7c ce 03 45 14 3b 45 10 7c c1 dd d8 d9 6d fc 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Float],UInt);
+	var mix_alpha=(new CFunction(Hex.decode(
+	"55 8b ec 83 ec 10 53 56 57 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f8 d9 6d f8 c7 45 f8 ff 00 00 00 db 45 f8 8b 45 18 c1 e0 02 89 45 18 8b 5d 0c 8b d3 2b d8 89 5d 0c 8b 4d 14 2b c8 89 4d 14 8b 75 08 8b 7d 10 8b 4d 1c 0f af ca 03 ce 89 4d f4 8b ce 03 4d 18 89 4d f0 8b 06 8b 1f 8b c8 c1 e9 18 c1 eb 18 0f af d9 89 1e df 06 d8 f1 df 1e 8b 1e c1 e3 18 25 ff ff ff 00 0b c3 89 06 83 c6 04 83 c7 04 3b 75 f0 7c d0 03 75 0c 03 7d 14 3b 75 f4 7c bd dd d8 d9 6d fc 5f 5e 5b 8b e5 5d c3"
+	))).toFunction([UInt,Int, UInt,Int, Int,Int],UInt);
+	var combine=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 45 20 c1 e0 02 89 45 20 8b 5d 0c 8b d3 2b d8 89 5d 0c 8b 4d 14 2b c8 89 4d 14 8b 4d 1c 2b c8 89 4d 1c 8b 75 08 8b 7d 10 8b 45 18 8b 4d 24 0f af ca 03 ce 89 4d 24 8b de 03 5d 20 8b 0e 81 e1 ff 00 00 ff 8b 17 81 e2 00 ff 00 00 0b ca 8b 10 81 e2 00 00 ff 00 0b ca 89 0e 83 c6 04 83 c7 04 83 c0 04 3b f3 7c d5 03 75 0c 03 7d 14 03 45 1c 3b 75 24 7c c2 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int, UInt,Int, UInt,Int, Int,Int],UInt);
+	var separate=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 45 20 c1 e0 02 89 45 20 8b 5d 0c 8b d3 2b d8 89 5d 0c 8b 4d 14 2b c8 89 4d 14 8b 4d 1c 2b c8 89 4d 1c 8b 75 08 8b 7d 10 8b 45 18 8b 4d 24 0f af ca 03 ce 89 4d 24 8b de 03 5d 20 8b 0e 8b d1 81 e2 00 ff 00 ff 89 17 8b d1 81 e2 00 00 ff ff 89 10 81 e1 ff 00 00 ff 89 0e 83 c6 04 83 c7 04 83 c0 04 3b f3 7c d5 03 75 0c 03 7d 14 03 45 1c 3b 75 24 7c c2 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int, UInt,Int, UInt,Int, Int,Int],UInt);
+	
+	
+	var adjust_brightness=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e1 ff 00 00 00 81 c1 00 02 00 00 03 cb 8a 11 8b ca c1 e9 08 81 e1 ff 00 00 00 03 cb 81 c1 00 01 00 00 8a 31 8b ca c1 e9 10 81 e1 ff 00 00 00 03 cb 8a 09 81 e1 ff 00 00 00 c1 e1 10 81 e2 ff ff 00 ff 0b d1 89 10 83 c0 04 3b c7 7c ae 03 45 14 3b 45 0c 7c a2 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Pointer],UInt);
+	
+	
+	
+	var mono_weight_custom=(new CFunction(Hex.decode(
+		"55 8b ec 83 ec 10 d9 7d fc 8b 45 fc 25 ff f3 ff ff 89 45 f8 d9 6d f8 33 c0 03 45 18 03 45 1c 03 45 20 89 45 f8 db 45 f8 db 45 18 db 45 1c db 45 20 8b 45 0c c1 e0 02 8b 4d 14 8b d1 2b c8 89 4d 14 89 45 0c 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d f4 8b d0 03 55 0c 89 55 f0 8b 10 8b ca 81 e1 ff 00 00 00 89 08 df 00 d8 c9 8b ca c1 e9 08 81 e1 ff 00 00 00 89 08 df 00 d8 cb 8b ca c1 e9 10 81 e1 ff 00 00 00 89 08 df 00 d8 cd de c1 de c1 d8 f4 df 18 8b 08 69 c9 01 01 01 00 81 e2 00 00 00 ff 0b ca 89 08 83 c0 04 3b 45 f0 7c ac 03 45 14 3b 45 f4 7c 9c dd d8 dd d8 dd d8 dd d8 d9 6d fc 8b e5 5d c3"
+	))).toFunction([],UInt);
+	var histogram_brightness=(new CFunction(Hex.decode(
+		"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 3a cd 72 02 8a e9 c1 e9 08 3a cd 77 02 8a cd 81 e1 ff 00 00 00 c1 e1 02 03 cb fe 01 83 c0 04 3b c7 7c d9 03 45 14 3b 45 0c 7c cd 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Pointer],UInt);
+	var histogram_rgb=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e1 ff 00 00 00 c1 e1 02 81 c1 00 08 00 00 03 cb ff 01 8b ca c1 e9 08 81 e1 ff 00 00 00 c1 e1 02 81 c1 00 04 00 00 03 cb ff 01 8b ca c1 e9 10 81 e1 ff 00 00 00 c1 e1 02 03 cb ff 01 83 c0 04 3b c7 7c b8 03 45 14 3b 45 0c 7c ac 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Pointer],UInt);
+	var histogram_total=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 4d 14 8b d1 8b 75 0c c1 e6 02 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e1 ff 00 00 00 c1 e1 02 03 cb ff 01 8b ca c1 e9 06 81 e1 fc 03 00 00 03 cb ff 01 c1 ea 0e 81 e2 fc 03 00 00 03 d3 ff 02 83 c0 04 3b c7 7c cc 03 45 14 3b 45 0c 7c c0 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Pointer],UInt);
+	var histogram_sum=(new CFunction(Hex.decode(
+	"55 8b ec 53 56 57 8b 5d 18 8b 75 0c c1 e6 02 8b 4d 14 8b d1 2b ce 89 4d 14 8b 45 08 8b 4d 10 0f af ca 03 c8 89 4d 0c 8b f8 03 fe 8b 10 8b ca 81 e1 ff 00 00 00 8a d6 81 e2 ff 00 ff 00 66 03 ca c1 ea 10 66 03 ca c1 e1 02 03 cb ff 01 83 c0 04 3b c7 7c d7 03 45 14 3b 45 0c 7c cb 5f 5e 5b 5d c3"
+	))).toFunction([UInt,Int,Int,Int,Pointer],UInt);
+	
+	
+	
+	var interpolationModes={
+		low:1,
+		high:2,
+		bilinear:3,
+		bicubic:4,
+		nearestNeighbor:5,
+		bilinearHQ:6,
+		bicubicHQ:7,
+		
+		1:1,2:2,3:3,4:4,5:5,6:6,7:7,
+	};
+	
+	
+	
+	var startupInfo=UInt.alloc(16).update(0x00001), token, pEncoders, encoders={};
+	let(pToken=UInt.alloc(), pCount=UInt.alloc(), pSize=UInt.alloc()){
+		try{
+			GdiplusStartup(pToken,startupInfo,null);
+			token=pToken.item();
+			
+			GdipGetImageEncodersSize(pCount,pSize);
+			let size=pSize.item(),count=pCount.item();
+			pEncoders=new ImageCodecInfo.pointer(Byte.alloc(size).valueOf());
+			GdipGetImageEncoders(count,size,pEncoders);
+			for(var i=0;i<count;i++){
+				let e=pEncoders.inc(i);
+				let o=e.clsid;
+				encoders[e.mimeType.toString()]=encoders[e.mimeType.toString().replace(/^image\//,'')]=o;
+				
+				let exts=e.extension.toString().replace(/\*/g,'').toLowerCase().split(/;/g);
+				for(let i=0,l=exts.length;i<l;i++){
+					encoders[exts[i]]=o;
+				}
+			}
+		}finally{
+			free(pToken,pCount,pSize);
+		}
+	}
+	
+	
+	
+	
+	
+	
+	var BitmapInfo=new Struct({
+		size:			UInt,
+		width:			Int,
+		height:			Int,
+		planes:			UShort,
+		bpp:			UShort,
+		compression:	UInt,
+		sizeImage:		UInt,
+		xPPM:			Int,
+		yPPM:			Int,
+		colorUsed:		UInt,
+		colorImportant:	UInt,
+	});
+	var IconInfo=new Struct({
+		isIcon:			Int,
+		hotSpotX:		UInt,
+		hotSpotY:		UInt,
+		hMaskBitmap:	UInt,
+		hBitmap:		UInt,
+	});
+	
+	var Color=new Class({
+		__class__:{
+			names:{
+				white:0xFFFFFF,
+				whitesmoke:0xF5F5F5,
+				gainsboro:0xDCDCDC,
+				lightgrey:0xD3D3D3,
+				silver:0xC0C0C0,
+				darkgray:0xA9A9A9,
+				gray:0x808080,
+				dimgray:0x696969,
+				black:0x000000,
+				red:0xFF0000,
+				orangered:0xFF4500,
+				tomato:0xFF6347,
+				coral:0xFF7F50,
+				salmon:0xFA8072,
+				lightsalmon:0xFFA07A,
+				darksalmon:0xE9967A,
+				peru:0xCD853F,
+				saddlebrown:0x8B4513,
+				sienna:0xA0522D,
+				chocolate:0xD2691E,
+				sandybrown:0xF4A460,
+				darkred:0x8B0000,
+				maroon:0x800000,
+				brown:0xA52A2A,
+				firebrick:0xB22222,
+				crimson:0xDC143C,
+				indianred:0xCD5C5C,
+				lightcoral:0xF08080,
+				rosybrown:0xBC8F8F,
+				palevioletred:0xDB7093,
+				deeppink:0xFF1493,
+				hotpink:0xFF69B4,
+				lightpink:0xFFB6C1,
+				pink:0xFFC0CB,
+				mistyrose:0xFFE4E1,
+				linen:0xFAF0E6,
+				seashell:0xFFF5EE,
+				lavenderblush:0xFFF0F5,
+				snow:0xFFFAFA,
+				yellow:0xFFFF00,
+				gold:0xFFD700,
+				orange:0xFFA500,
+				darkorange:0xFF8C00,
+				goldenrod:0xDAA520,
+				darkgoldenrod:0xB8860B,
+				darkkhaki:0xBDB76B,
+				burlywood:0xDEB887,
+				tan:0xD2B48C,
+				khaki:0xF0E68C,
+				peachpuff:0xFFDAB9,
+				navajowhite:0xFFDEAD,
+				palegoldenrod:0xEEE8AA,
+				moccasin:0xFFE4B5,
+				wheat:0xF5DEB3,
+				bisque:0xFFE4C4,
+				blanchedalmond:0xFFEBCD,
+				papayawhip:0xFFEFD5,
+				cornsilk:0xFFF8DC,
+				lightyellow:0xFFFFE0,
+				lightgoldenrodyellow:0xFAFAD2,
+				lemonchiffon:0xFFFACD,
+				antiquewhite:0xFAEBD7,
+				beige:0xF5F5DC,
+				oldlace:0xFDF5E6,
+				ivory:0xFFFFF0,
+				floralwhite:0xFFFAF0,
+				greenyellow:0xADFF2F,
+				yellowgreen:0x9ACD32,
+				olive:0x808000,
+				darkolivegreen:0x556B2F,
+				olivedrab:0x6B8E23,
+				chartreuse:0x7FFF00,
+				lawngreen:0x7CFC00,
+				lime:0x00FF00,
+				limegreen:0x32CD32,
+				forestgreen:0x228B22,
+				green:0x00FF00,
+				darkgreen:0x006400,
+				seagreen:0x2E8B57,
+				mediumseagreen:0x3CB371,
+				darkseagreen:0x8FBC8F,
+				lightgreen:0x90EE90,
+				palegreen:0x98FB98,
+				springgreen:0x00FF7F,
+				mediumspringgreen:0x00FA9A,
+				honeydew:0xF0FFF0,
+				mintcream:0xF5FFFA,
+				azure:0xF0FFFF,
+				lightcyan:0xE0FFFF,
+				aliceblue:0xF0F8FF,
+				darkslategray:0x2F4F4F,
+				steelblue:0x4682B4,
+				mediumaquamarine:0x66CDAA,
+				aquamarine:0x7FFFD4,
+				mediumturquoise:0x48D1CC,
+				turquoise:0x40E0D0,
+				lightseagreen:0x20B2AA,
+				darkcyan:0x008B8B,
+				teal:0x008080,
+				cadetblue:0x5F9EA0,
+				darkturquoise:0x00CED1,
+				aqua:0x00FFFF,
+				cyan:0x00FFFF,
+				lightblue:0xADD8E6,
+				powderblue:0xB0E0E6,
+				paleturquoise:0xAFEEEE,
+				skyblue:0x87CEEB,
+				lightskyblue:0x87CEFA,
+				deepskyblue:0x00BFFF,
+				dodgerblue:0x1E90FF,
+				ghostwhite:0xF8F8FF,
+				lavender:0xE6E6FA,
+				lightsteelblue:0xB0C4DE,
+				slategray:0x708090,
+				lightslategray:0x778899,
+				indigo:0x4B0082,
+				darkslateblue:0x483D8B,
+				midnightblue:0x191970,
+				navy:0x000080,
+				darkblue:0x00008B,
+				slateblue:0x6A5ACD,
+				mediumslateblue:0x7B68EE,
+				cornflowerblue:0x6495ED,
+				royalblue:0x4169E1,
+				mediumblue:0x0000CD,
+				blue:0x0000FF,
+				thistle:0xD8BFD8,
+				plum:0xDDA0DD,
+				orchid:0xDA70D6,
+				violet:0xEE82EE,
+				fuchsia:0xFF00FF,
+				magenta:0xFF00FF,
+				mediumpurple:0x9370DB,
+				mediumorchid:0xBA55D3,
+				darkorchid:0x9932CC,
+				blueviolet:0x8A2BE2,
+				darkviolet:0x9400D3,
+				purple:0x800080,
+				darkmagenta:0x8B008B,
+			},
+			
+			
+			rgb:function(r,g,b)(new this(r,g,b)),
+			
+			
+/*
+			hsv:function(h,s,v){
+				if(!s){
+					return(new this(v,v,v));
+				}else if(h*2<1){
+					if(h*6<1){
+					}else(h*3<1){
+					}else{
+					}
+				}else{
+					
+				}
+			},
+*/
+		},
+		__new__:function(r,g,b,a){
+			if(arguments.length==1){
+				if(typeof(r)=='string'){
+					if(r in this.constructor.names){
+						r=this.constructor.names[r];
+						a=255;
+						b=r&0xFF;
+						g=(r>>8)&0xFF;
+						r=(r>>16)&0xFF;
+					}else{
+						var m=r.match(/([0-9a-f][0-9a-f])([0-9a-f][0-9a-f])([0-9a-f][0-9a-f])/i);
+						if(m){
+							r=parseInt(m[1],16);
+							g=parseInt(m[2],16);
+							b=parseInt(m[3],16);
+							a=255;
+						}
+					}
+				}else if(typeof(r)=='number'){
+					a=255-(r>>>24);
+					b=r&0xFF;
+					g=(r>>>8)&0xFF;
+					r=(r>>>16)&0xFF;
+				}else if(r instanceof Array){
+					if(r.length<4){
+						[r,g,b]=r;
+						a=255;
+					}else{
+						[r,g,b,a]=r;
+					}
+				}else{
+					if('a' in r){
+						var {r,g,b,a}=r;
+					}else{
+						var {r,g,b}=r;
+						a=255;
+					}
+				}
+				
+			}else if(arguments.length<4){
+				a=255;
+			}
+			this.red=r||0;
+			this.green=g||0;
+			this.blue=b||0;
+			this.alpha=a||0;
+		},
+		
+		toString:function()(('#'+('0'+Math.floor(this.red).toString(16)).slice(-2)+('0'+Math.floor(this.green).toString(16)).slice(-2)+('0'+Math.floor(this.blue).toString(16)).slice(-2)).toUpperCase()),
+		valueOf:function()((Math.floor(this.alpha)*0x1000000)+(Math.floor(this.red)*0x10000)+(Math.floor(this.green)*0x100)+(Math.floor(this.blue))),
+		
+		
+		/*
+		get hsv(){
+			if(!('__hsv__' in this)){
+				var r=this.red/256 ,g=this.green/256 ,b=this.blue/256 ;
+				var max=Math.max(r,g,b),min=Math.min(r,g,b);
+				var diff=max-min;
+				this.__hsv__={
+					h:(max==r)?(((g<b)?6:0)+g-b)/(diff*6)):((max==g)?((2+b-r)/(diff*6)):((4+r-g)/(diff*6))),
+					s:diff/max,
+					v:max,
+				});
+			}
+			return(this.__hsv__);
+		},
+		*/
+		
+	});
+	
+	var Point=new Class({
+		__class__:{
+			createArray:function(a){
+				if(a instanceof Array){
+					var r=[];
+					if(typeof(a[0])=='number'){
+						for(var i=0,l=a.length;i<l;i+=2){
+							r[r.length]=new this(a[i],a[i+1]);
+						}
+					}else{
+						for(var i=0,l=a.length;i<l;i++){
+							if(a[i] instanceof Array){
+								r[i]=new this(a[i][0]||0, a[i][1]||0);
+							}else if('x' in a[i]){
+								r[i]=new this(a[i].x||0, a[i].y||0);
+							}else{
+								r[i]=new this(a[i].left||0, a[i].top||0);
+							}
+						}
+					}
+					return(r);
+				}else if('x' in a){
+					return([new this(a.x,a.y)]);
+				}else{
+					return([new this(a.left,a.top)]);
+				}
+			},
+			
+		},
+		__new__:function(x,y){
+			this.x=Number(x);
+			this.y=Number(y);
+		},
+		
+	});
+	
+	var capStyles={
+		flat:0,
+		butt:0,
+		square:1,
+		round:2,
+		triangle:3,
+		anchor:0x10,
+		squareAnchor:0x11,
+		circle:0x12,
+		disc:0x12,
+		diamond:0x13,
+		arrow:0x14,
+	};
+	var dashCapStyles={
+		flat:0,
+		butt:0,
+		round:2,
+		triangle:3,
+	};
+	var joinStyles={
+		miter:0,
+		bevel:1,
+		round:2,
+		clip:3,
+	};
+	var dashStyles={
+		solid:0,
+		dash:1,
+		dot:2,
+		dashDot:3,
+		dashDotDot:4,
+		dashed:1,
+		dotted:2,
+	};
+	var Pen=new Class({
+		__class__:{
+			create:function(opt){
+				try{
+					var ph=UInt.alloc();
+					var b;
+					var s=opt.brush;
+					if((s instanceof Color)||(typeof(s)=='number')||((typeof(s)=='string')&&((s in Color.names)||s.match(/[0-9a-f]{6}/i)))){
+						GdipCreatePen1(((s instanceof Color)?s:new Color(s)).valueOf(), opt.width||1, 0, ph);
+					}else{
+						b=Brush.create(s);
+						GdipCreatePen2(b.__handle__, opt.width||1, 0, ph);
+					}
+					var h=ph.item();
+					GdipSetPenLineCap197819(h,capStyles[opt.startCap||opt.cap]||0,capStyles[opt.endCap||opt.cap]||0,dashCapStyles[opt.dashCap||opt.cap]||0);
+					GdipSetPenLineJoin(h,joinStyles[opt.join]||0);
+					GdipSetPenMiterLimit(h,opt.miterLimit||0);
+					GdipSetPenMode(h,opt.inset?1:0);
+					if(opt.dash){
+						GdipSetPenDashStyle(h,dashStyles[opt.dash]||1);
+					}
+					return(new this(h,b));
+				}finally{
+					free(ph);
+				}
+			},
+			
+		},
+		__new__:function(handle,brush){
+			this.__handle__=handle;
+			this.__brush__=brush;
+		},
+		free:function(){
+			GdipDeletePen(this.__handle__);
+			free(this.__brush__);
+		},
+		
+	});
+	
+	var hatchStyles={
+		horizontal               : 0,
+		vertical                 : 1,
+		forwardDiagonal          : 2,
+		backwardDiagonal         : 3,
+		cross                    : 4,
+		diagonalCross            : 5,
+		dotted05                : 6,
+		dotted10                : 7,
+		dotted20                : 8,
+		dotted25                : 9,
+		dotted30                : 10,
+		dotted40                : 11,
+		dotted50                : 12,
+		dotted60                : 13,
+		dotted70                : 14,
+		dotted75                : 15,
+		dotted80                : 16,
+		dotted90                : 17,
+		lightDownwardDiagonal    : 18,
+		lightUpwardDiagonal      : 19,
+		darkDownwardDiagonal     : 20,
+		darkUpwardDiagonal       : 21,
+		wideDownwardDiagonal     : 22,
+		wideUpwardDiagonal       : 23,
+		lightVertical            : 24,
+		lightHorizontal          : 25,
+		narrowVertical           : 26,
+		narrowHorizontal         : 27,
+		darkVertical             : 28,
+		darkHorizontal           : 29,
+		dashedDownwardDiagonal   : 30,
+		dashedUpwardDiagonal     : 31,
+		dashedHorizontal         : 32,
+		dashedVertical           : 33,
+		smallConfetti            : 34,
+		largeConfetti            : 35,
+		zigZag                   : 36,
+		wave                     : 37,
+		diagonalBrick            : 38,
+		horizontalBrick          : 39,
+		weave                    : 40,
+		plaid                    : 41,
+		divot                    : 42,
+		dottedGrid               : 43,
+		dottedDiamond            : 44,
+		shingle                  : 45,
+		trellis                  : 46,
+		sphere                   : 47,
+		smallGrid                : 48,
+		smallCheckerBoard        : 49,
+		largeCheckerBoard        : 50,
+		outlinedDiamond          : 51,
+		solidDiamond             : 52,
+	};
+	var Brush=new Class({
+		__class__:{
+			create:function(opt){
+				if(opt instanceof this){
+					return(opt);
+				}else{
+					var r=[];
+					if(opt instanceof Color){
+						opt={color:opt};
+					}else if(opt instanceof Image){
+						opt={image:opt};
+					}else if(typeof(opt)=='string'){
+						if((opt in Color.names)||opt.match(/[0-9a-f]{6}/i)){
+							opt={color:opt};
+						}else{
+							opt={image:opt};
+						}
+					}else if(typeof(opt)=='number'){
+						opt={color:opt};
+					}
+					try{
+						var ph=UInt.alloc();
+						if('image' in opt){
+							if(!(opt.image instanceof Image)){
+								r.push(opt.image=Image.load(opt.image));
+							}
+							gdipCheckResult(GdipCreateTexture(opt.image.__hImage__, (opt.flipX?1:0)+(opt.flipY?2:0)+(opt.flip?3:0),ph));
+						}else if('pattern' in opt){
+							if(opt.color instanceof Array){
+								opt.background=opt.color[1];
+								opt.color=opt.color[0];
+							}
+							if(!(opt.color instanceof Color)){
+								opt.color=new Color(opt.color);
+							}
+							if(!('background' in opt)){
+								opt.background=new Color(0,0,0,0);
+							}else if(!(opt.background instanceof Color)){
+								opt.background=new Color(opt.background);
+							}
+							gdipCheckResult(GdipCreateHatchBrush(hatchStyles[opt.pattern]||0,opt.color.valueOf(),opt.background.valueOf(), ph));
+						}else if('gradient' in opt){
+							var sc,ec;
+							if((opt.color||{}) instanceof Array){
+								sc=opt.color[0];
+								ec=opt.color[opt.color.length-1];
+							}else{
+								sc=new Color(0,0,0,0);
+								ec=opt.color||0;
+								opt.color=[];
+							}
+							if(!(sc instanceof Color)){
+								sc=new Color(sc);
+							}
+							if(!(ec instanceof Color)){
+								ec=new Color(ec);
+							}
+							var p1=UInt.alloc(2);
+							var p2=UInt.alloc(2);
+							if(opt.gradient instanceof Array){
+								p1.update(opt.gradient[0]);
+								p1.inc(1).update(opt.gradient[1]);
+								p2.update(opt.gradient[2]);
+								p2.inc(1).update(opt.gradient[3]);
+							}else{
+								let x=opt.gradient.x||0, y=opt.gradient.y||0, angle=opt.gradient.angle||0, width=opt.gradient.width||64;
+								p1.update(x+width);
+								p1.inc(1).update(y+width);
+								p2.update(x+Math.cos(angle)*width+width);
+								p2.inc(1).update(y+Math.sin(angle)*width+width);
+								
+							}
+							gdipCheckResult(GdipCreateLineBrushI(p1,p2,sc.valueOf(), ec.valueOf(), opt.flip?3:0, ph));
+							var lgb=ph.item();
+							
+							if(opt.gammaCorrect){
+								gdipCheckResult(GdipSetLineGammaCorrection(lgb,1));
+							}
+							if(('focus' in opt)||('scale' in opt)||opt.curve){
+								if(opt.curve){
+									gdipCheckResult(GdipSetLineSigmaBlend(lgb,opt.focus||0.5,opt.scale||1));
+								}else{
+									gdipCheckResult(GdipSetLineLinearBlend(lgb,opt.focus||0.5,opt.scale||1));
+								}
+							}
+							if(opt.color.length>2){
+								var colors=opt.color;
+								var count=colors.length;
+								var pPos=Float.alloc(count);
+								var pColors=UInt.alloc(count);
+								if(opt.positions){
+									var poss=opt.positions;
+									poss[count-2]=1;
+									for(var i=0;i<count;i++){
+										pPos.inc(i).update(Math.min(1,Math.max(poss[i-1]||0,0)));
+										pColors.inc(i).update(((colors[i] instanceof Color)?colors[i]:new Color(colors[i])).valueOf());
+									}
+								}else{
+									var diff=1/(count-1);
+									for(var i=0;i<count;i++){
+										pPos.inc(i).update(diff*i);
+										pColors.inc(i).update(((colors[i] instanceof Color)?colors[i]:new Color(colors[i])).valueOf());
+									}
+								}
+								gdipCheckResult(GdipSetLinePresetBlend(lgb,pColors,pPos,count));
+							}
+						}else{
+							if(!(opt.color instanceof Color)){
+								opt.color=new Color(opt.color);
+							}
+							GdipCreateSolidFill(opt.color.valueOf(),ph);
+						}
+						return(new this(ph.item(),r));
+					}finally{
+						free(ph,p1,p2,pPos,pColors);
+					}
+				}
+			},
+		},
+		__new__:function(h,r){
+			this.__handle__=h;
+			this.__resources__=r;
+		},
+		__free__:function(){
+			GdipDeleteBrush(this.__handle__);
+			free.apply(null,this.__resources__||[]);
+		},
+		
+		
+	});
+	
+	var Font=new Class({
+		__class__:{
+			create:function(opt){
+				try{
+					var pFami=UInt.alloc();
+					if(!opt.name){
+						if(opt.file){
+							var pCol=UInt.alloc();
+							GdipNewPrivateFontCollection(pCol);
+							var coll=pCol.item();
+							GdipPrivateAddFontFile(coll,opt.file);
+							try{
+								var pNum=UInt.alloc(),tmpFami=UInt.alloc();
+								GdipGetFontCollectionFamilyList(coll,1,tmpFami,pNum);
+								GdipCloneFontFamily(tmpFami.item(),pFami);
+							}finally{
+								free(pNum,tmpFami);
+							}
+						}else{
+							GdipGetGenericFontFamilySansSerif(pFami);
+						}
+					}else{
+						var pCol=UInt.alloc();
+						if(opt.file){
+							GdipNewPrivateFontCollection(pCol);
+							GdipPrivateAddFontFile(pCol.item(),opt.file);
+						}else{
+							GdipNewInstalledFontCollection(pCol);
+						}
+						GdipCreateFontFamilyFromName(opt.name, pCol.item(), pFami);
+					}
+					var pFont=UInt.alloc();
+					GdipCreateFont(pFami.item(), opt.size||10,(opt.italic?2:0)+(opt.bold?1:0)+(opt.underline?4:0)+(opt.strike?8:0),0,pFont);
+					
+					var pFmt=UInt.alloc();
+					GdipCreateStringFormat(
+						(opt.rtl				?0x0001:0)
+						+(opt.vertical			?0x0002:0)
+						+(opt.allowOverhanging	?0x0004:0)
+						+(opt.displayControl	?0x0020:0)
+						+(opt.noFallback		?0x0400:0)
+						+(opt.noTrailingSpaces	?0x0800:0)
+						+(opt.noWrap			?0x1000:0)
+						+(opt.lineLimit			?0x2000:0)
+						+(opt.noClip			?0x4000:0)
+					,0,pFmt);
+					return(new this(pFont.item(),pFmt.item(),pCol&&pCol.item()));
+				}finally{
+					GdipDeleteFontFamily(pFami.item());
+					free(pFmt,pFont,pFami,pCol);
+				}
+			},
+		},
+		__new__:function(font,format,col){
+			this.__hFont__=font;
+			this.__hFormat__=format;
+			this.__hCollection__=col;
+		},
+		__free__:function(){
+			GdipDeleteFont(this.__hFont__);
+			GdipDeleteStringFormat(this.__hFormat__);
+			GdipDeletePrivateFontCollection(this.__hCollection__);
+		},
+	});
+	
+	
+	var Image=new Class({},{
+		__class__:{
+			load:function(name,idx){
+				if(name instanceof Pointer){
+					try{
+						var p=UInt.alloc();
+						var s=require('COM').MemoryStream.create();
+						s.write(name);
+						s.move(0);
+						var r=GdipCreateBitmapFromStreamICM(s,p);
+						if(r==0){
+							return(new this(p.item()));
+						}
+					}finally{
+						free(p,s);
+					}
+				}else{
+					//TODO loader plugin
+					try{
+						var p=UInt.alloc();
+						name=cwd().file(name);
+						var r=GdipCreateBitmapFromFileICM(name,p);
+						if(r==0){
+							return(new this(p.item()));
+						}else{
+							var ico=Icon.load(name,idx);
+							return(this.fromHICON(ico.handle));
+						}
+					}finally{
+						free(p,ico);
+					}
+				}
+			},
+			fromHICON:function(hicon){
+				try{
+					var p=UInt.alloc();
+					var r=GdipCreateBitmapFromHICON(hicon,p);
+					if(r==0){
+						return(new this(p.item()));
+					}
+				}finally{
+					free(p);
+				}
+			},
+			
+			capture:function(window,noNC){
+				try{
+					window=new (require('Window').Window)(window?(window.handle||window):GetDesktopWindow());
+					var hdc,w,h;
+					if(noNC){
+						hdc=GetDC(window.handle);
+						w=window.clientWidth;
+						h=window.clientHeight;
+					}else{
+						hdc=GetWindowDC(window.handle);
+						w=window.width;
+						h=window.height;
+					}
+					var img=this.create(w,h);
+					var pHDC=UInt.alloc();
+					gdipCheckResult(GdipGetDC(img.__hGraphics__,pHDC));
+					BitBlt(pHDC.item(),0,0,w,h,hdc,0,0,0x00CC0020);
+					gdipCheckResult(GdipReleaseDC(img.__hGraphics__,pHDC.item()));
+					return(img);
+				}finally{
+					free(pHDC);
+					ReleaseDC(window.handle,hdc);
+				}
+			},
+			fromHBITMAP:function(hbm){
+				try{
+					var p=UInt.alloc();
+					gdipCheckResult(GdipCreateBitmapFromHBITMAP(hbm,0,p));
+					return(new this(p.item()));
+				}finally{
+					p.free();
+				}
+			},
+			fromDIB:function(dib){
+				if(!(dib instanceof BitmapInfo)){
+					dib=new BitmapInfo.pointer(dib);
+				}
+				try{
+					var p=UInt.alloc();
+					gdipCheckResult(GdipCreateBitmapFromGdiDib(dib,dib.inc(1),p));
+					return(new this(p.item()));
+				}finally{
+					p.free();
+				}
+			},
+			create:function(width,height,opt){
+				if((typeof(opt)=='string')||(typeof(opt)=='number')||(opt instanceof Color)){
+					opt={fill:opt};
+				}else if(opt instanceof Pointer){
+					opt={data:opt};
+				}
+				opt=opt||{};
+				if('palette' in opt){
+					//TODO indexed color support
+					opt.size=1;
+					opt.pixelFormat=0x30803;
+				}else{
+					opt.size=4;
+					if('data' in opt){
+						if(opt.data instanceof Pointer){
+							opt.data=opt.data.valueOf();
+						}
+						opt.stride=opt.stride||width*4;
+					}
+					try{
+						var p=UInt.alloc();
+						GdipCreateBitmapFromScan0(width||1,height||1,opt.stride||0,0x26200a,opt.data||0,p);
+						var img=new this(p.item());
+						if("fill" in opt){
+							img.fill(opt.fill);
+						}
+						return(img);
+					}finally{
+						free(p);
+					}
+				}
+			},
+			
+			measureString:function(str,opt)(this.measureText(str,opt)),
+			measureText:function(str,opt){
+				try{
+					var img=this.create(1,1);
+					return(img.measureText(str,opt));
+				}finally{
+					free(img);
+				}
+			},
+			
+			join:function(imgs,width,height,cols,bg){
+				if(!(imgs instanceof Array)){
+					imgs=[imgs];
+				}
+				var count=imgs.length;
+				var out=this.create(width*cols,height*Math.ceil(count/cols),bg);
+				for(var i=0;i<count;i++){
+					try{
+						var input=imgs[i];
+						if(!(input instanceof this)){
+							input=this.load(input);
+						}
+						if((input.width<width)&&(input.height<height)){
+							gdipCheckResult(GdipDrawImageI(
+								out.__hGraphics__,
+								input.__hImage__,
+								width*(i%cols)+(width-input.width)/2,
+								height*Math.floor(i/cols)+(height-input.height)/2
+							));
+						}else if(width<input.width*(height/input.height)){
+							gdipCheckResult(GdipDrawImageRectI(
+								out.__hGraphics__,
+								input.__hImage__,
+								width*(i%cols),
+								height*Math.floor(i/cols)+(height-input.height*(width/input.width))/2,
+								width,
+								input.height*(width/input.width)
+							));
+						}else{
+							gdipCheckResult(GdipDrawImageRectI(
+								out.__hGraphics__,
+								input.__hImage__,
+								width*(i%cols)+(width-input.width*(height/input.height))/2,
+								height*Math.floor(i/cols),
+								input.width*(height/input.height),
+								height
+							));
+						}
+					}finally{
+						if(input!==imgs[i]){
+							free(input);
+						}
+					}
+				}
+				return(out);
+			},
+			
+			
+			composite:function(imgs,func){
+				try{
+					if(!(imgs instanceof Array)){
+						imgs=[imgs];
+					}
+					var a=[];
+					var r=UInt.alloc(4);
+					var pw=r.inc(2), ph=r.inc(3);
+					for(var i=0,l=imgs.length;i<l;i++){
+						var img=imgs[i];
+						if(img instanceof this){
+							pw.update(img.width);
+							ph.update(img.height);
+							var d=BitmapData.alloc();
+							gdipCheckResult(GdipBitmapLockBits(img.__hImage__,r,3,0x26200a,d));
+							d.__hImage__=img.__hImage__;
+							a[a.length]={handle:img.__hImage__, data:d};
+						}
+						return((func||Function.doNothing).apply(this,[UInt.read,UInt.write,a].concat(Array.slice(arguments,1))));
+					}
+				}finally{
+					for(var i=0,l=a.length;i<l;i++){
+						GdipBitmapUnlockBits(a[i].handle,a[i].data);
+						free(a[i].data);
+					}
+					free(r);
+				}
+				
+				
+			},
+			__composite__:function(imgs,func){
+				try{
+					if(!(imgs instanceof Array)){
+						imgs=[imgs];
+					}
+					var count=imgs.length;
+					var p=d;
+					var a=[];
+					var d=BitmapData.alloc(count);
+					var r=UInt.alloc(4);
+					var pw=r.inc(2), ph=r.inc(3);
+					
+					for(var i=0,l=imgs.length;i<l;i++){
+						var img=imgs[i];
+						if(img instanceof this){
+							pw.update(img.width);
+							ph.update(img.height);
+							gdipCheckResult(GdipBitmapLockBits(img.__hImage__,r,3,0x26200a,p));
+							a[a.length]={handle:img.__hImage__, data:p};
+							p=p.inc(1);
+						}else{
+							count--;
+						}
+						return((func||Function.doNothing).apply(this,[d,count].concat(Array.slice(arguments,1))));
+					}
+				}finally{
+					for(var i=0,l=a.length;i<l;i++){
+						GdipBitmapUnlockBits(a[i].handle,a[i].data);
+					}
+					free(d,r);
+				}
+				
+				
+			},
+			
+			
+		},
+		
+		__new__:function(img,gp){
+			if(img){
+				try{
+					var p=UInt.alloc();
+					this.__hImage__=img;
+					GdipGetImageGraphicsContext(img,p);
+					this.__hGraphics__=p.item();
+				}finally{
+					free(p);
+				}
+			}else if(gp){
+				this.__hGraphics__=gp;
+			}
+		},
+		
+		
+		
+		
+		free:function(){
+			if(this.__hImage__){
+				if(this.__hGraphics__){
+					GdipDeleteGraphics(this.__hGraphics__);
+					this.__hGraphics__=null;
+				}
+				GdipDisposeImage(this.__hImage__);
+				this.__hImage__=null;
+			}else if(this.__hGraphics__){
+				GdipDeleteGraphics(this.__hGraphics__);
+				this.__hGraphics__=null;
+			}
+		},
+		getHBITMAP:function(bg){
+			try{
+				var r=UInt.alloc(4);
+				r.inc(2).update(this.width);
+				r.inc(3).update(this.height);
+				var d=BitmapData.alloc();
+				gdipCheckResult(GdipBitmapLockBits(this.__hImage__,r,1,0x26200a,d));
+				return(CreateBitmap(this.width,this.height,1,32,d.scan));
+			}finally{
+				GdipBitmapUnlockBits(this.__hImage__,d);
+				free(d,r);
+			}
+		},
+		
+		getHICON:function(){
+			try{
+				var p=UInt.alloc();
+				gdipCheckResult(GdipCreateHICONFromBitmap(this.__hImage__, p));
+				return(p.item());
+			}finally{
+				free(p);
+			}
+		},
+		toIcon:function()(new Icon(this.getHICON())),
+		
+		
+		drawTo:function(window,opt){
+			try{
+				if(window){
+					opt=opt||{};
+					var hdc=GetDC(window.handle||window);
+					var pGraphics=UInt.alloc();
+					GdipCreateFromHDC(hdc,pGraphics);
+					if(opt.width && opt.height){
+						gdipCheckResult(GdipDrawImageRectRectI(pGraphics.item(), this.__hImage__, opt.x||0,opt.y||0,opt.width,opt.height, opt.x||0,opt.y||0,opt.width||1,opt.height||1, 2, 0,0,0));
+					}else{
+						gdipCheckResult(GdipDrawImageI(pGraphics.item(), this.__hImage__, 0,0));
+					}
+					GdipDeleteGraphics(pGraphics.item());
+				}
+				return(this);
+			}finally{
+				free(pGraphics);
+				ReleaseDC(window.handle||window,hdc);
+			}
+		},
+		
+		toBytes:function(type,opt){
+			opt=opt||{};
+			opt.type=type;
+			return(this.save(null,opt));
+		},
+		save:function(file,opt){
+			opt=opt||{};
+			file=file&&cwd().file(file);
+			try{
+				
+				if(!('type' in opt)){
+					if('extension' in (file||{})){
+						opt.type=String(file.extension).toLowerCase();
+					}
+				}
+				//TODO find encode plugin
+				
+				if(opt.type in encoders){
+					try{
+						var params=[];
+						if('progressive' in opt){
+							params.push({
+								id:"{6d42c53a-229a-4825-8bb7-5c99e2b9a8b8}",
+								value:UInt.alloc().update(opt.progressive?11:12),
+								type:4,
+								count:1,
+							});
+						}
+						if('interlace' in opt){
+							params.push({
+								id:"{3a4e2661-3109-4e56-8536-42c156e7dcfa}",
+								value:UInt.alloc().update(opt.interlace?7:8),
+								type:4,
+								count:1,
+							});
+						}
+						if('quality' in opt){
+							params.push({
+								id:"{1D5BE4B5-FA4A-452D-9CDD-5DB35105E7EB}",
+								value:UInt.alloc().update(opt.quality),
+								type:4,
+								count:1,
+							});
+						}
+						
+						var buf=UInt.alloc(1+7*params.length).update(params.length);
+						var eps=new EncodeParameter.pointer(buf.inc(1));
+						for(var i=0,l=params.length;i<l;i++){
+							var ep=eps.inc(i);
+							var p=params[i];
+							CLSIDFromString(p.id,ep);
+							ep.count=p.count;
+							ep.type=p.type;
+							ep.value=p.value;
+						}
+						if(file){
+							var r=GdipSaveImageToFile(this.__hImage__, file.path, encoders[opt.type], buf);
+							if(0==r){
+								return(file);
+							}else{
+								throw(new Error('GDI+: '+gdipStatus[r]));
+							}
+						}else{
+							try{
+								var st=require('COM').MemoryStream.create();
+								var r=GdipSaveImageToStream(this.__hImage__, st, encoders[opt.type], buf);
+								if(0==r){
+									st.move(0);
+									return(st.readAll());
+								}else{
+									throw(new Error('GDI+: '+gdipStatus[r]));
+								}
+							}finally{
+								free(st);
+							}
+						}
+					}finally{
+						free(buf);
+					}
+				}
+			}finally{
+				if(opt.free){
+					this.free();
+				}
+			}
+		},
+		
+		get width(){
+			try{
+				var p=UInt.alloc();
+				GdipGetImageWidth(this.__hImage__,p);
+				return(p.item());
+			}finally{
+				free(p);
+			}
+		},
+		get height(){
+			try{
+				var p=UInt.alloc();
+				GdipGetImageHeight(this.__hImage__,p);
+				return(p.item());
+			}finally{
+				free(p);
+			}
+		},
+		
+		
+		
+		clone:function(){
+			try{
+				var p=UInt.alloc();
+				//TODO indexed color
+				GdipCloneBitmapAreaI(0,0,this.width,this.height,0x26200a,this.__hImage__,p);
+				return(new this.constructor(p.item()));
+			}finally{
+				free(p);
+			}
+		},
+		
+		getScrolled:function(x,y,loop){
+			var res=this.constructor.create(this.width,this.height);
+			if(loop){
+				if(x<0){
+					x+=this.width;
+				}
+				if(y<0){
+					y+=this.height;
+				}
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, x-this.width, y-this.width));
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, x, y-this.width ));
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, x-this.width, y));
+			}
+			gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, x, y));
+			return(res);
+		},
+		scroll:function(x,y,loop){
+			var img=this.getScrolled(x,y,loop);
+			this.free();
+			this.__hImage__=img.__hImage__;
+			this.__hGraphics__=img.__hGraphics__;
+			return(this);
+		},
+		
+		getJoined:function(img,bottom,bg){
+			var res;
+			if(!(img instanceof this.constructor)){
+			}else if(bottom){
+				var w=Math.max(this.width,img.width);
+				var h=this.height+img.height;
+				var res=this.constructor.create(w,h,bg);
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, Math.floor((w-this.width)/2), 0));
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, img.__hImage__, Math.floor((w-img.width)/2), this.height));
+			}else{
+				var w=this.width+img.width;
+				var h=Math.max(this.height,img.height);
+				var res=this.constructor.create(w,h,bg);
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, 0			,Math.floor((h-this.height)/2)));
+				gdipCheckResult(GdipDrawImageI(res.__hGraphics__, img.__hImage__, this.width	,Math.floor((h-img.height)/2)));
+			}
+			return(res);
+		},
+		join:function(img,bottom,bg){
+			var img=this.getJoined(img,bottom,bg);
+			this.free();
+			this.__hImage__=img.__hImage__;
+			this.__hGraphics__=img.__hGraphics__;
+			return(this);
+		},
+		
+		
+		getCropped:function(x,y,width,height){
+			x=x||0;
+			y=y||0;
+			if(width<0){
+				width=this.width+width;
+			}else{
+				width=width||(this.width-x);
+			}
+			if(height<0){
+				height=this.height+height;
+			}else{
+				height=height||(this.height-y);
+			}
+			
+			try{
+				var p=UInt.alloc();
+				//TODO indexed color
+				GdipCloneBitmapAreaI(x,y,width,height,0x26200a,this.__hImage__,p);
+				return(new this.constructor(p.item()));
+			}finally{
+				free(p);
+			}
+		},
+		crop:function(x,y,width,height){
+			var img=this.getCropped(x,y,width,height);
+			this.free();
+			this.__hImage__=img.__hImage__;
+			this.__hGraphics__=img.__hGraphics__;
+			return(this);
+		},
+		
+		
+		
+		getExtended:function(left,top,right,bottom,bg){
+			var w=this.width+(left||0)+(right||0);
+			var h=this.height+(top||0)+(bottom||0);
+			var res=this.constructor.create(w,h,bg);
+			gdipCheckResult(GdipDrawImageI(res.__hGraphics__, this.__hImage__, left||0, top||0));
+			return(res);
+		},
+		
+		extend:function(left,top,right,bottom,bg){
+			var img=this.getExtended(left,top,right,bottom,bg);
+			this.free();
+			this.__hImage__=img.__hImage__;
+			this.__hGraphics__=img.__hGraphics__;
+			return(this);
+		},
+		
+		
+		
+		
+		getResized:function(width,height,mode){
+			if(!width&&!height){
+				width=this.width;
+				height=this.height;
+			}else if(!height){
+				height=this.height*(width/this.width);
+			}else if(!width){
+				width=this.width*(height/this.height);
+			}
+			var img=this.constructor.create(width,height);
+			if(mode){
+				GdipSetInterpolationMode(img.__hGraphics__,interpolationModes[mode]||mode);
+			}
+			GdipDrawImageRectI(img.__hGraphics__,this.__hImage__,0,0,width,height);
+			return(img);
+		},
+		resize:function(width,height,mode){
+			var img=this.getResized(width,height,mode);
+			this.free();
+			this.__hImage__=img.__hImage__;
+			this.__hGraphics__=img.__hGraphics__;
+			return(this);
+		},
+		
+		
+		
+		rotate:function(rad){
+			rad=(rad||0)%(Math.PI*2);
+			if(rad<0){
+				rad+=Math.PI*2;
+			}
+			switch(rad){
+				case(0):{
+					break;
+				}case(Math.PI/2):{
+					GdipImageRotateFlip(this.__hImage__,1);
+					break;
+				}case(Math.PI):{
+					GdipImageRotateFlip(this.__hImage__,2);
+					break;
+				}case(Math.PI*3/2):{
+					GdipImageRotateFlip(this.__hImage__,3);
+					break;
+				}default:{
+					var img=this.getRotated(rad);
+					this.free();
+					this.__hImage__=img.__hImage__;
+					this.__hGraphics__=img.__hGraphics__;
+					break;
+				}
+			}
+			return(this);
+		},
+		
+		getRotated:function(rad,expand){
+			rad=(rad||0)%(Math.PI*2);
+			switch(rad){
+				case(0):{
+					return(this.clone());
+				}case(Math.PI/2):{
+				}case(Math.PI):{
+				}case(Math.PI*3/2):{
+					return(this.clone().rotate(rad));
+				}default:{
+					try{
+						if(rad>Math.PI){
+							rad=Math.PI*2-rad;
+						}else{
+							rad=-rad;
+						}
+						var w2=this.width/2, h2=this.height/2;
+						var l=Math.sqrt(w2*w2+h2*h2);
+						var ulR=Math.atan2(h2,-w2)+rad;
+						var urR=Math.atan2(h2,w2)+rad;
+						var llR=Math.atan2(-h2,-w2)+rad;
+						var ulX=Math.cos(ulR)*l;
+						var ulY=Math.sin(ulR)*l;
+						var urX=Math.cos(urR)*l;
+						var urY=Math.sin(urR)*l;
+						var llX=Math.cos(llR)*l;
+						var llY=Math.sin(llR)*l;
+						
+						var width=2*Math.max(Math.abs(ulX),Math.abs(urX),Math.abs(llX));
+						var height=2*Math.max(Math.abs(ulY),Math.abs(urY),Math.abs(llY));
+						
+						var w22=width/2;
+						var h22=height/2;
+						var img=this.constructor.create(Math.floor(width),Math.floor(height));
+						var p=UInt.alloc(6);
+						p.update(w22+ulX);
+						p.inc(1).update(h22-ulY);
+						p.inc(2).update(w22+urX);
+						p.inc(3).update(h22-urY);
+						p.inc(4).update(w22+llX);
+						p.inc(5).update(h22-llY);
+						GdipDrawImagePointsI(img.__hGraphics__,this.__hImage__,p,3);
+						return(img);
+					}finally{
+						free(p);
+					}
+				}
+			}
+		},
+		
+		flip:function(y){
+			GdipImageRotateFlip(this.__hImage__,y?6:4);
+			return(this);
+		},
+		getFlipped:function(y)(this.clone().flip(y)),
+		
+		
+		
+		
+		
+		getPixel:function(x,y){
+			try{
+				var p=UInt.alloc();
+				gdipCheckResult(GdipBitmapGetPixel(this.__hImage__, x,y, p));
+				var c=p.item();
+				return(new Color((c>>16)&0xFF,(c>>8)&0xFF, (c)&0xFF, (c>>32)&0xFF));
+			}finally{
+				free(p);
+			}
+		},
+		setPixel:function(x,y,color){
+			if(!(color instanceof Color)){
+				color=new Color(color);
+			}
+			gdipCheckResult(GdipBitmapSetPixel(this.__hImage__,x,y, color.valueOf()));
+			return(this);
+		},
+		getPixelBytes:function(){
+			try{
+				var w=this.width,h=this.height;
+				var r=UInt.alloc(4);
+				r.inc(2).update(w);
+				r.inc(3).update(h);
+				var d=BitmapData.alloc();
+				d.width=w;
+				d.height=h;
+				d.stride=w*4;
+				d.format=0x26200a;
+				var res=UInt.alloc(w*h);
+				d.scan=res;
+				gdipCheckResult(GdipBitmapLockBits(this.__hImage__,r,7,0x26200a,d));
+				return(res);
+			}finally{
+				GdipBitmapUnlockBits(this.__hImage__,d);
+				free(d,r);
+			}
+		},
+		
+		filter:function(func)(this.__filter__(function()(func.apply(this,[UInt.read,UInt.write].concat(Array.slice(arguments)))))),
+		__filter__:function(func){
+			try{
+				var r=UInt.alloc(4);
+				r.inc(2).update(this.width);
+				r.inc(3).update(this.height);
+				var d=BitmapData.alloc();
+				gdipCheckResult(GdipBitmapLockBits(this.__hImage__,r,3,0x26200a,d));
+				return((func||Function.doNothing).apply(this,[d.scan.valueOf(), d.width,d.height,4,d.stride].concat(Array.slice(arguments,1))));
+			}finally{
+				GdipBitmapUnlockBits(this.__hImage__,d);
+				free(d,r);
+			}
+		},
+		
+		
+		getHistogram:function(mode){
+			try{
+				var buf,res;
+				if(!mode||(mode=='total')){
+					buf=UInt.alloc(256);
+					this.__filter__(function(addr,width,height,size,stride){
+						histogram_total(addr,width,height,stride,buf);
+					});
+					res=[];
+					for(var i=0;i<256;i++){
+						res[i]=buf.inc(i).item();
+					}
+					return(res);
+				}else if(mode=='rgb'){
+					buf=UInt.alloc(768);
+					this.__filter__(function(addr,width,height,size,stride){
+						histogram_rgb(addr,width,height,stride,buf);
+					});
+					var red=[],green=[],blue=[];
+					for(var i=0;i<256;i++){
+						red[i]=buf.inc(i).item();
+						green[i]=buf.inc(256+i).item();
+						blue[i]=buf.inc(512+i).item();
+					}
+					return({red:red,green:green,blue:blue});
+				}else{
+					buf=UInt.alloc(768);
+					this.__filter__(function(addr,width,height,size,stride){
+						histogram_sum(addr,width,height,stride,buf);
+					});
+					res=[];
+					for(var i=0;i<768;i++){
+						res[i]=buf.inc(i).item();
+					}
+					return(res);
+				}
+			}finally{
+				free(buf);
+			}
+		},
+		
+		normalize:function(threshold){
+			var h=this.getHistogram();
+			threshold=threshold||0;
+			var min,max,sum=0;
+			for(var i=0;i<256;i++){
+				sum+=h[i];
+				if(sum>threshold){
+					min=i;
+					break;
+				}
+			}
+			sum=0;
+			for(var i=255;i>=0;i--){
+				sum+=h[i];
+				if(sum>threshold){
+					max=i;
+					break;
+				}
+			}
+			this.adjustBC(Math.round(127-((min+max)/2)),256/(max-min));
+		},
+		
+		
+		threshold:function(v,avg){
+			this.__filter__(function(addr,width,height,size,stride){
+				(avg?threshold_avg:threshold_brightness)(addr,width,height,stride,v);
+			});
+			return(this);
+		},
+		
+		replaceColor:function(from,to,threshold){
+			if(!(from instanceof Color)){
+				from=new Color(from);
+			}
+			if(!(to instanceof Color)){
+				to=new Color(to);
+			}
+			if(arguments.length>2){
+				this.__filter__(function(addr,width,height,size,stride){
+					replaceColorThreshold(addr,width,height,stride,from.valueOf(),to.valueOf(),threshold);
+				});
+			}else{
+				this.__filter__(function(addr,width,height,size,stride){
+					replaceColor(addr,width,height,stride,from.valueOf(),to.valueOf());
+				});
+			}
+			return(this);
+		},
+		
+		or:function(v){
+			this.__filter__(function(addr,width,height,size,stride){
+				pixelOr(addr,width,height,stride,v);
+			});
+			return(this);
+		},
+		and:function(v){
+			this.__filter__(function(addr,width,height,size,stride){
+				pixelAnd(addr,width,height,stride,v);
+			});
+			return(this);
+		},
+		xor:function(v){
+			this.__filter__(function(addr,width,height,size,stride){
+				pixelXor(addr,width,height,stride,v);
+			});
+			return(this);
+		},
+		
+		
+		thresholdAlpha:function(value){
+			this.__filter__(function(addr,width,height,size,stride){
+				threshold_alpha(addr,width,height,stride,value);
+			});
+			return(this);
+		},
+		updateAlpha:function(src,bri){
+			if(arguments.length===0){
+				this.__filter__(function(addr,width,height,size,stride){
+					brightness2alpha(addr,width,height,stride);
+				});
+			}else if(src instanceof Image){
+				this.__filter__(function(addr,width,height,size,stride){
+					src.__filter__(function(addr2,width2,height2,size2,stride2){
+						(bri?copy_alpha_from_brightness:copy_alpha)(addr,stride,addr2,stride2,width,height);
+					});
+				});
+			}else{
+				this.__filter__(function(addr,width,height,size,stride){
+					update_alpha(addr,width,height,stride,src);
+				});
+			}
+			return(this);
+		},
+		
+		
+		multiplyAlpha:function(src){
+			this.__filter__(function(addr,width,height,size,stride){
+				if(src instanceof Image){
+					src.__filter__(function(addr2,width2,height2,size2,stride2){
+						mix_alpha(addr,stride, addr2,stride2, width,height);
+					});
+				}else{
+					multiply_alpha(addr,width,height,stride,src);
+				}
+			});
+			return(this);
+		},
+		
+		
+		adjustBC:function(brightness,contrast,blue){
+			try{
+				var a=Byte.alloc(256*3);
+				if(brightness instanceof Array){
+					if((contrast instanceof Array)&&(blue instanceof Array)){
+						for(var i=0;i<256;i++){
+							a.inc(i).update(brightness[i]||i);
+							a.inc(256+i).update(contrast[i]||i);
+							a.inc(512+i).update(blue[i]||i);
+						}
+					}else{
+						for(var i=0;i<256;i++){
+							a.inc(i).update(brightness[i]||i);
+							a.inc(256+i).update(brightness[i]||i);
+							a.inc(512+i).update(brightness[i]||i);
+						}
+					}
+				}else{
+					for(var i=0;i<256;i++){
+						var v=Math.max(0,Math.min(255,Math.round((i-127+brightness)*contrast+127)));
+						a.inc(i).update(v);
+						a.inc(256+i).update(v);
+						a.inc(512+i).update(v);
+					}
+				}
+				img.__filter__(function(addr,width,height,size,stride){
+					adjust_brightness(addr,width,height,stride,a);
+				});
+				return(this);
+			}finally{
+				free(a);
+			}
+		},
+		
+		getNegated:function()(this.clone().nagate()),
+		negate:function(){
+			this.__filter__(function(addr,width,height,size,stride){
+				negate(addr,width,height,stride);
+			});
+			return(this);
+		},
+		
+		getGrayed:function(type)(this.clone().gray(type)),
+		gray:function(type){
+			this.__filter__(function(addr,width,height,size,stride){
+				switch(type){
+					case(1):case('avg'):case('average'):{
+						mono_avg(addr,width,height,stride);
+						break;
+					}case(2):case('weight'):{
+						mono_weight(addr,width,height,stride);
+						break;
+					}case(3):case('alpha'):{
+						mono_alpha(addr,width,height,stride);
+						break;
+					}default:{
+						mono_brightness(addr,width,height,stride);
+						break;
+					}
+				};
+			});
+			return(this);
+		},
+		
+		getBlurred:function(sigma,radius)(this.clone().blur(sigma,radius)),
+		blur:function(sigma,radius){
+			this.__filter__(function(addr,width,height,size,stride){
+				try{
+					var sig=sigma||1;
+					var n=radius||((sig<0.5)?1:Math.min(10,Math.max(2,Math.ceil(sig))));
+					var row=n*2+1;
+					var cnt=row*row;
+					var f=Float.alloc(cnt);
+					var tmp=[],sum=0;
+					var A=1/(Math.PI*2*sig*sig), B=-1/(2*sig*sig);
+					for(var i=0;i<row;i++){
+						for(var j=0;j<row;j++){
+							sum+=tmp[j+i*row]=A*Math.exp(B*((i-n)*(i-n)+(j-n)*(j-n)));
+						}
+					}
+					for(var i=0;i<cnt;i++){
+						f.inc(i).update(tmp[i]/sum);
+					}
+					var buf=UInt.alloc((width+n*2)*(height+n*2));
+					prepareMatrixFilter(addr,stride, buf.valueOf(),(width+n*2)*size, width,height,n);
+					matrixFilter(buf.valueOf(),(width+n*2)*size, addr,stride, width,height, f,n);
+				}finally{
+					free(f,buf);
+				}
+			});
+			return(this);
+		},
+		
+		getEdged:function(sigma1,sigma2,opt)(this.clone().edge(sigma1,sigma2,opt)),
+		edge:function(sigma1,sigma2,opt){
+			this.__filter__(function(addr,width,height,size,stride){
+				try{
+					opt=opt||{};
+					if((sigma1&&sigma2)&&(sigma1<sigma2)){
+						[sigma1,sigma2]=[sigma2,sigma1];
+					}
+					var sig=sigma1||1;
+					var n=opt.radius||((sig<0.5)?1:Math.min(10,Math.max(2,Math.ceil(sig))));
+					var row=n*2+1;
+					var cnt=row*row;
+					var f=Float.alloc(cnt);
+					var tmp=[],sum=0;
+					var A=1/(Math.PI*2*sig*sig), B=-1/(2*sig*sig);
+					for(var i=0;i<row;i++){
+						for(var j=0;j<row;j++){
+							sum+=tmp[j+i*row]=A*Math.exp(B*((i-n)*(i-n)+(j-n)*(j-n)));
+						}
+					}
+					for(var i=0;i<cnt;i++){
+						f.inc(i).update(tmp[i]/sum);
+					}
+					var buf=UInt.alloc((width+n*2)*(height+n*2));
+					prepareMatrixFilter(addr,stride, buf.valueOf(),(width+n*2)*size, width,height,n);
+					matrixFilter(buf.valueOf(),(width+n*2)*size, addr,stride, width,height, f,n);
+					if(sigma2){
+						sig=sigma2;
+						sum=0;
+						var A=1/(Math.PI*2*sig*sig), B=-1/(2*sig*sig);
+						for(var i=0;i<row;i++){
+							for(var j=0;j<row;j++){
+								sum+=tmp[j+i*row]=A*Math.exp(B*((i-n)*(i-n)+(j-n)*(j-n)));
+							}
+						}
+						for(var i=0;i<cnt;i++){
+							f.inc(i).update(tmp[i]/sum);
+						}
+						var buf2=UInt.alloc(width*height);
+						matrixFilter(buf.valueOf(),(width+n*2)*size, buf2.valueOf(),width*size, width,height, f,n);
+						pixelDiff(addr,stride,buf2.valueOf(),width*size,width,height);
+					}else{
+						pixelDiff(addr,stride, buf.valueOf() + n*(n*2+width+1)*size ,(width+n*2)*size, width,height);
+					}
+					if(opt.gray){
+						switch(opt.gray){
+							case(1):case('avg'):case('average'):{
+								mono_avg(addr,width,height,stride);
+								break;
+							}case(2):case('weight'):{
+								mono_weight(addr,width,height,stride);
+								break;
+							}default:{
+								mono_brightness(addr,width,height,stride);
+								break;
+							}
+						}
+					}
+					if(opt.negate){
+						negate(addr,width,height,stride);
+					}
+				}finally{
+					free(f,buf,buf2);
+				}
+			});
+			if(opt.normalize){
+				this.normalize();
+			}
+			if(opt.threshold){
+				this.threshold(opt.threshold);
+			}
+			return(this);
+		},
+		
+		getMatrixFiltered:function(filter)(this.clone().matrixFilter(filter)),
+		matrixFilter:function(filter){
+			this.__filter__(function(addr,width,height,size,stride){
+				try{
+					filter=filter||[[1]];
+					var rows=filter.length;
+					if(rows%2==0){
+						rows--;
+					}
+					var n=(rows-1)/2;
+					if(n){
+						var f=Float.alloc(rows*rows);
+						for(var y=0;y<rows;y++){
+							for(var x=0;x<rows;x++){
+								f.inc(x+y*rows).update((filter[y]||[])[x]||0);
+							}
+						}
+						var buf=UInt.alloc((width+n*2)*(height+n*2));
+						prepareMatrixFilter(addr,stride, buf.valueOf(),(width+n*2)*size, width,height,n);
+						matrixFilter(buf.valueOf(),(width+n*2)*size, addr,stride, width,height, f,n);
+					}
+				}finally{
+					free(f,buf);
+				}
+			});
+			return(this);
+		},
+		getDiff:function(img)(this.clone().diff(img)),
+		diff:function(img){
+			if(img instanceof Image){
+				try{
+					var r1=UInt.alloc(4);
+					r1.inc(2).update(this.width);
+					r1.inc(3).update(this.height);
+					var d1=BitmapData.alloc();
+					gdipCheckResult(GdipBitmapLockBits(this.__hImage__,r1,3,0x26200a,d1));
+					
+					var r2=UInt.alloc(4);
+					r2.inc(2).update(img.width);
+					r2.inc(3).update(img.height);
+					var d2=BitmapData.alloc();
+					gdipCheckResult(GdipBitmapLockBits(img.__hImage__,r2,3,0x26200a,d2));
+					pixelDiff(d1.scan.valueOf(),d1.stride, d2.scan.valueOf(),d2.stride, Math.min(this.width,img.width),Math.min(this.height,img.height));
+					return(this);
+				}finally{
+					GdipBitmapUnlockBits(this.__hImage__,d1);
+					GdipBitmapUnlockBits(img.__hImage__,d2);
+					free(d1,d2,r1,r2);
+				}
+			}
+			return(this);
+		},
+		getSharpened:function(level)(this.clone().sharpen(level)),
+		sharpen:function(level){
+			level=level||0.5;
+			this.matrixFilter([[0,-level,0],[-level,1+4*level,-level],[0,-level,0]]);
+			return(this);
+		},
+		
+		
+		__setSmooth__:function(opt){
+			GdipSetSmoothingMode(this.__hGraphics__, opt?4:3);
+		},
+		__getBrush__:function(opt,replace){
+			if((opt===null)||(opt==='')){
+				opt=new Color(0,0,0,0);
+				GdipSetCompositingMode(this.__hGraphics__, 1);
+			}else{
+				if(opt==0){
+					opt=new Color(0,0,0,255);
+				}
+				GdipSetCompositingMode(this.__hGraphics__,replace?1:0);
+			}
+			return(Brush.create(opt||this.fillStyle||0));
+		},
+		
+		__getPen__:function(pen,replace){
+			if(pen==null){
+				pen={brush:new Color(0,0,0,0)};
+				GdipSetCompositingMode(this.__hGraphics__, 1);
+			}else if((typeof(pen)=='number')&&(pen<0)){
+				pen={brush:new Color(0,0,0,0), width:-pen};
+				GdipSetCompositingMode(this.__hGraphics__, 1);
+			}else if(typeof(pen)=='object'){
+				pen=Object.extend({
+					brush:this.strokeStyle||0,
+					width:this.lineWidth,
+					cap:this.lineCap,
+					join:this.lineJoin,
+					miterLimit:this.miterLimit,
+				},pen);
+				GdipSetCompositingMode(this.__hGraphics__,replace?1:0);
+			}else{
+				pen={brush:pen};
+				GdipSetCompositingMode(this.__hGraphics__,replace?1:0);
+			}
+			return(Pen.create(pen));
+		},
+		
+		
+		clear:function(s)(this.fill(null,s)),
+		erase:function(s)(this.fill(null,s)),
+		fill:function(b,r,s){
+			try{
+				var brush=this.__getBrush__(b,r);
+				if('__path__' in this){
+					this.__setSmooth__(s);
+				}else{
+					gdipCheckResult(GdipFillRectangleI(this.__hGraphics__,brush.__handle__,0,0,this.width,this.height));
+				}
+				return(this);
+			}finally{
+				free(brush);
+			}
+		},
+		clearRect:function(x,y,w,h)(this.fillRect(x,y,w,h,null,true)),
+		eraseRect:function(x,y,w,h)(this.fillRect(x,y,w,h,null,true)),
+		fillRect:function(x,y,w,h,opt,replace){
+			try{
+				var brush=this.__getBrush__(opt,replace);
+				if(w||h){
+					gdipCheckResult(GdipFillRectangleI(this.__hGraphics__,brush.__handle__,x||0,y||0,w,h));
+				}
+				return(this);
+			}finally{
+				free(brush);
+			}
+		},
+		drawRect:function(x,y,w,h,pen,replace)(this.strokeRect(x,y,w,h,pen,replace)),
+		strokeRect:function(x,y,w,h,pen,replace){
+			try{
+				var p=this.__getPen__(pen,replace);
+				if(w||h){
+					gdipCheckResult(GdipDrawRectangleI(this.__hGraphics__,p.__handle__,x||0,y||0,w,h));
+				}
+				return(this);
+			}finally{
+				free(p);
+			}
+		},
+		
+		__createPoints__:function(points){
+			var count=points.length;
+			var p=UInt.alloc(count*2);
+			for(var i=0;i<count;i++){
+				p.inc(i*2).update(points[i].x);
+				p.inc(i*2+1).update(points[i].y);
+			}
+			return(p);
+		},
+		clearPolygon:function(points,w,s)(this.fillPolygon(points,null,w,s)),
+		erasePolygon:function(points,w,s)(this.fillPolygon(points,null,w,s)),
+		fillPolygon:function(points,b,winding,s){
+			try{
+				var brush=this.__getBrush__(b);
+				points=Point.createArray(points);
+				var count=points.length;
+				if(count>2){
+					this.__setSmooth__(s);
+					var p=this.__createPoints__(points);
+					gdipCheckResult(GdipFillPolygonI(this.__hGraphics__, brush.__handle__, p, count, winding?1:0));
+				}
+				return(this);
+			}finally{
+				free(brush,p);
+			}
+		},
+		drawPolygon:function(points,pen,s)(this.strokePolygon(points,pen,s)),
+		strokePolygon:function(points,pen,s){
+			try{
+				var pen=this.__getPen__(pen);
+				points=Point.createArray(points);
+				var count=points.length;
+				if(count>2){
+					this.__setSmooth__(s);
+					var p=this.__createPoints__(points);
+					gdipCheckResult(GdipDrawPolygonI(this.__hGraphics__, pen.__handle__, p, count));
+				}
+				return(this);
+			}finally{
+				free(pen,p);
+			}
+		},
+		drawLines:function(points,pen,s)(this.strokeLines(points,pen,s)),
+		strokeLines:function(points,pen,s){
+			try{
+				var pen=this.__getPen__(pen);
+				points=Point.createArray(points);
+				var count=points.length;
+				if(count>1){
+					this.__setSmooth__(s);
+					var p=this.__createPoints__(points);
+					gdipCheckResult(GdipDrawLinesI(this.__hGraphics__, pen.__handle__, p, count));
+				}
+				return(this);
+			}finally{
+				free(pen,p);
+			}
+		},
+		drawLine:function(x1,y1,x2,y2,pen,s)(this.strokeLines([x1,y1,x2,y2],pen,s)),
+		strokeLine:function(x1,y1,x2,y2,pen,s)(this.strokeLines([x1,y1,x2,y2],pen,s)),
+		
+		drawCurve:function(points,pen,opt)(this.strokeCurve(points,pen,opt)),
+		strokeCurve:function(points,pen, opt, smooth){
+			try{
+				if(typeof(opt)!='object'){
+					opt={tension:opt};
+				}else if(opt instanceof Array){
+					opt={start:opt[0], count:opt[1]};
+				}else{
+					opt=opt||{};
+				}
+				var pen=this.__getPen__(pen);
+				points=Point.createArray(points);
+				var count=points.length;
+				if(count>2){
+					var p=this.__createPoints__(points);
+					this.__setSmooth__(smooth);
+					if(opt.closed){
+						gdipCheckResult(GdipDrawClosedCurve2I(this.__hGraphics__, pen.__handle__, p, count, ('tension' in opt)?(opt.tension||0):0.5));
+					}else{
+						gdipCheckResult(GdipDrawCurve3I(this.__hGraphics__, pen.__handle__, p, count, opt.start||0, opt.count||(count-(opt.start||0)-1), ('tension' in opt)?(opt.tension||0):0.5));
+					}
+				}
+				return(this);
+			}finally{
+				free(pen,p);
+			}
+		},
+		eraseCurve:function(points,tension,smooth)(this.fillCurve(points,null,tension,smooth)),
+		clearCurve:function(points,tension,smooth)(this.fillCurve(points,null,tension,smooth)),
+		fillCurve:function(points,b, tension, smooth){
+			try{
+				var brush=this.__getBrush__(b);
+				points=Point.createArray(points);
+				var count=points.length;
+				if(count>2){
+					var p=this.__createPoints__(points);
+					this.__setSmooth__(smooth);
+					gdipCheckResult(GdipFillClosedCurve2I(this.__hGraphics__, brush.__handle__, p, count, (typeof(tension)!='undefined')?(tension||0):0.5));
+				}
+				return(this);
+			}finally{
+				free(brush,p);
+			}
+		},
+		
+		drawCircle:function(x,y,r,pen,s)(this.strokeEllipse(x-r,y-r,r*2,r*2,pen,s)),
+		strokeCircle:function(x,y,r,pen,s)(this.strokeEllipse(x-r,y-r,r*2,r*2,pen,s)),
+		eraseCircle:function(x,y,r,s)(this.fillEllipse(x-r,y-r,r*2,r*2,null,s)),
+		clearCircle:function(x,y,r,s)(this.fillEllipse(x-r,y-r,r*2,r*2,null,s)),
+		fillCircle:function(x,y,r,b,s)(this.fillEllipse(x-r,y-r,r*2,r*2,b,s)),
+		
+		drawEllipse:function(x,y,w,h,pen,s)(this.strokeEllipse(x,y,w,h,pen,s)),
+		strokeEllipse:function(x,y,w,h,pen,s){
+			try{
+				var p=this.__getPen__(pen);
+				this.__setSmooth__(s);
+				gdipCheckResult(GdipDrawEllipseI(this.__hGraphics__, p.__handle__,x,y,w,h));
+				return(this);
+			}finally{
+				free(p);
+			}
+		},
+		eraseEllipse:function(x,y,w,h,s)(this.fillEllipse(x,y,w,h,null,s)),
+		clearEllipse:function(x,y,w,h,s)(this.fillEllipse(x,y,w,h,null,s)),
+		fillEllipse:function(x,y,w,h,b,s){
+			try{
+				var brush=this.__getBrush__(b);
+				this.__setSmooth__(s);
+				gdipCheckResult(GdipFillEllipseI(this.__hGraphics__, brush.__handle__,x,y,w,h));
+				return(this);
+			}finally{
+				free(brush);
+			}
+		},
+		
+		
+		drawArc:function(x,y,w,h,start,sweep,pen,s)(this.strokeArc(x,y,w,h,start,sweep,pen,s)),
+		strokeArc:function(x,y,w,h,start,sweep,pen,s){
+			try{
+				var p=this.__getPen__(pen);
+				this.__setSmooth__(s);
+				gdipCheckResult(GdipDrawArcI(this.__hGraphics__, p.__handle__,x,y,w,h,start*180/Math.PI,sweep*180/Math.PI));
+				return(this);
+			}finally{
+				free(p);
+			}
+		},
+		drawPie:function(x,y,w,h,start,sweep,pen,s)(this.strokeArc(x,y,w,h,start,sweep,pen,s)),
+		strokePie:function(x,y,w,h,start,sweep,pen,s){
+			try{
+				var p=this.__getPen__(pen);
+				this.__setSmooth__(s);
+				gdipCheckResult(GdipDrawPieI(this.__hGraphics__, p.__handle__,x,y,w,h,start*180/Math.PI,sweep*180/Math.PI));
+				return(this);
+			}finally{
+				free(p);
+			}
+		},
+		
+		erasePie:function(x,y,w,h,start,sweep,s)(this.strokeArc(x,y,r,start,sweep,null,s)),
+		clearPie:function(x,y,w,h,start,sweep,s)(this.strokeArc(x,y,r,start,sweep,null,s)),
+		fillPie:function(x,y,w,h,start,sweep,b,s){
+			try{
+				var brush=this.__getBrush__(b);
+				this.__setSmooth__(s);
+				gdipCheckResult(GdipFillPieI(this.__hGraphics__, brush.__handle__,x,y,w,h,start*180/Math.PI,sweep*180/Math.PI));
+				return(this);
+			}finally{
+				free(brush);
+			}
+		},
+		
+		
+		
+		
+		
+		
+		
+		
+		__getFont__:function(opt){
+			if(typeof(opt)=='string'){
+				opt={name:opt};
+			}else if(typeof(opt)=='number'){
+				opt={size:opt};
+			}else{
+				opt=opt||{};
+			}
+			return(Font.create(Object.extend({name:this.fontFamily, size:this.fontSize},opt)));
+		},
+		
+		drawString:function(str,x,y,opt)(this.fillText(str,x,y,opt)),
+		fillString:function(str,x,y,opt)(this.fillText(str,x,y,opt)),
+		drawText:function(str,x,y,opt)(this.fillText(str,x,y,opt)),
+		fillText:function(str,x,y,opt){
+			try{
+				var font=this.__getFont__(opt);
+				opt=opt||{};
+				var brush=this.__getBrush__(opt.color||opt.brush||0);
+				var rect=Float.alloc(4);
+				rect.update(x||0);
+				rect.inc(1).update(y||0);
+				rect.inc(2).update(opt.width||0);
+				rect.inc(3).update(opt.height||0);
+				if(opt.smooth){
+					GdipSetTextRenderingHint(this.__hGraphics__, opt.noHint?4:3);
+					GdipSetTextContrast(this.__hGraphics__, Math.floor((opt.contrast||0)*12));
+				}else{
+					GdipSetTextRenderingHint(this.__hGraphics__, opt.noHint?2:1);
+				}
+				gdipCheckResult(GdipDrawString(this.__hGraphics__, str,str.length, font.__hFont__, rect, font.__hFormat__, brush.__handle__));
+			}finally{
+				free(font,rect,brush);
+			}
+		},
+		measureString:function(str,opt)(this.measureText(str,opt)),
+		measureText:function(str,opt){
+			try{
+				var font=this.__getFont__(opt);
+				opt=opt||{};
+				var rect=Float.alloc(4);
+				rect.inc(2).update(opt.width||0);
+				rect.inc(3).update(opt.height||0);
+				if(opt.smooth){
+					GdipSetTextRenderingHint(this.__hGraphics__, opt.noHint?4:3);
+					GdipSetTextContrast(this.__hGraphics__, Math.floor((opt.contrast||0)*12));
+				}else{
+					GdipSetTextRenderingHint(this.__hGraphics__, opt.noHint?2:1);
+				}
+				var c=UInt.alloc(),l=UInt.alloc();
+				gdipCheckResult(GdipMeasureString(this.__hGraphics__, str,str.length, font.__hFont__, rect, font.__hFormat__, rect,c,l));
+				return({
+					width:Math.ceil(rect.inc(2).item()),
+					height:Math.ceil(rect.inc(3).item()),
+					length:c.item(),
+					lineCount:l.item(),
+				});
+				
+			}finally{
+				free(font,rect,c,l);
+			}
+		},
+		
+		
+		drawImage:function(img,x,y,w,h,opt){
+			if(typeof(x)=='object'){
+				if(x instanceof Array){
+					opt={points:x};
+				}else{
+					opt=x;
+				}
+			}else{
+				opt=Object.extend({x:x,y:y,width:w,height:h},opt||{});
+			}
+			
+			if(opt.mode){
+				GdipSetInterpolationMode(this.__hGraphics__,interpolationModes[opt.mode]||opt.mode||0);
+			}
+			try{
+				if(!(img instanceof Image)){
+					var img2free=(img=Image.load(img));
+				}
+				if(('points' in opt) && (opt.points instanceof Array)){
+					opt.points=Point.createArray(opt.points);
+					if(opt.points.length>2){
+						var count=Math.min(opt.points.length,3);
+						var points=UInt.alloc(count*2);
+						for(var i=0,a=opt.points;i<count;i++){
+							points.inc(i*2).update(a[i].x);
+							points.inc(i*2+1).update(a[i].y);
+						}
+						gdipCheckResult(GdipDrawImagePointsI(this.__hGraphics__, img.__hImage__, points, count));
+					}
+				}else if('src' in opt){
+					var src=opt.src;
+					src.x=src.x||0;
+					src.y=src.y||0;
+					src.width=src.width||img.width-src.x;
+					src.height=src.height||img.height-src.y;
+					
+					opt.x=opt.x||0;
+					opt.y=opt.y||0;
+					if(!opt.width&&!opt.height){
+						opt.width=src.width;
+						opt.height=src.height;
+					}else if(!opt.width){
+						opt.width=src.width*(opt.height/src.height);
+					}else if(!opt.height){
+						opt.height=src.height*(opt.width/src.width);
+					}
+					gdipCheckResult(GdipDrawImageRectRectI(this.__hGraphics__, img.__hImage__, opt.x,opt.y,opt.width,opt.height, src.x,src.y,src.width,src.height, 2, 0,0,0));
+				}else if(!opt.width&&!opt.height){
+					gdipCheckResult(GdipDrawImageI(this.__hGraphics__, img.__hImage__, opt.x||0,opt.y||0));
+				}else{
+					if(!opt.width){
+						opt.width=img.width*(opt.height/img.height);
+					}else if(!opt.height){
+						opt.height=img.height*(opt.width/img.width);
+					}
+					gdipCheckResult(GdipDrawImageRectI(this.__hGraphics__, img.__hImage__, opt.x||0,opt.y||0,opt.width,opt.height));
+				}
+				return(this);
+			}finally{
+				free(img2free, points);
+			}
+		},
+		
+		
+		
+		
+		getSeparated:function()(this.clone().separate()),
+		separate:function(){
+			try{
+				var w=this.width, h=this.height;
+				var rect=UInt.alloc(4);
+				rect.inc(2).update(w);
+				rect.inc(3).update(h);
+				
+				var g=this.constructor.create(w,h);
+				var b=this.constructor.create(w,h);
+				
+				var dr=BitmapData.alloc(), dg=BitmapData.alloc(), db=BitmapData.alloc();
+				gdipCheckResult(GdipBitmapLockBits(this.__hImage__,rect,3,0x26200a,dr));
+				gdipCheckResult(GdipBitmapLockBits(g.__hImage__,rect,3,0x26200a,dg));
+				gdipCheckResult(GdipBitmapLockBits(b.__hImage__,rect,3,0x26200a,db));
+				separate(dr.scan.valueOf(),dr.stride, dg.scan.valueOf(),dg.stride, db.scan.valueOf(),db.stride, dr.width,dr.height);
+				
+				return(new SeparatedImage(b,g,this));
+			}finally{
+				GdipBitmapUnlockBits(b.__hImage__,db);
+				GdipBitmapUnlockBits(g.__hImage__,dg);
+				GdipBitmapUnlockBits(this.__hImage__,dr);
+				free(rect,dr,dg,db);
+			}
+		},
+	});
+	
+	var SeparatedImage=new Class({
+		__new__:function(r,g,b){
+			this.red=r;
+			this.green=g;
+			this.blue=b;
+		},
+		free:function(){
+			free(this.red,this.green,this.blue);
+		},
+		
+		get width()(this.blue.width),
+		get height()(this.blue.height),
+		
+		clone:function()(new this.constructor(this.red.clone(),this.green.clone(),this.blue.clone())),
+		getCombined:function()(this.clone().combine()),
+		combine:function(){
+			try{
+				var rect=UInt.alloc(4);
+				rect.inc(2).update(this.blue.width);
+				rect.inc(3).update(this.blue.height);
+				
+				var dr=BitmapData.alloc(), dg=BitmapData.alloc(), db=BitmapData.alloc();
+				gdipCheckResult(GdipBitmapLockBits(this.red.__hImage__,rect,3,0x26200a,dr));
+				gdipCheckResult(GdipBitmapLockBits(this.green.__hImage__,rect,3,0x26200a,dg));
+				gdipCheckResult(GdipBitmapLockBits(this.blue.__hImage__,rect,3,0x26200a,db));
+				
+				combine(db.scan.valueOf(),db.stride, dg.scan.valueOf(),dg.stride, dr.scan.valueOf(),dr.stride, dr.width,dr.height);
+				
+				return(this.blue);
+			}finally{
+				GdipBitmapUnlockBits(this.blue.__hImage__,db);
+				GdipBitmapUnlockBits(this.green.__hImage__,dg);
+				GdipBitmapUnlockBits(this.red.__hImage__,dr);
+				free(rect,dr,dg,db,this.blue,this.green);
+			}
+		},
+	});
+	
+	var DeviceContext=new Class({
+		__new__:function(handle,window){
+			this.handle=handle;
+			this.window=window;
+		},
+		free:function(){
+			if(this.handle){
+				this.bitmap=null;
+				if(this.window){
+					ReleaseDC(this.window,this.handle);
+				}else{
+					DeleteDC(this.handle);
+				}
+				this.handle=0;
+			}
+		},
+		duplicate:function(){
+			var h=CreateCompatibleDC(this.handle);
+			if(h){
+				return(new this.constructor(h));
+			}
+		},
+		set bitmap(bmp){
+			if(typeof(bmp)=='number'){
+				bmp=new Bitmap(bmp,true);
+			}else if((bmp||{}).handle){
+				bmp=new Bitmap(bmp.handle,true);
+			}else{
+				bmp=Bitamp.load(bmp);
+			}
+			if(this.__currentBitmap__){
+				this.__currentBitmap__.free();
+			}
+			if(bmp.handle){
+				var old=SelectObject(this.handle,bmp.handle);
+				if(!this.__defaultBitmap__){
+					this.__defaultBitmap__=old;
+				}
+				this.__currentBitmap__=bmp;
+			}else if(this.__defaultBitmap__){
+				SelectObject(this.handle,this.__defaultBitmap__);
+				this.__currentBitmap__=null;
+			}
+		},
+		get bitmap()(this.__currentBitmap__),
+	});
+
+
+
+	var Bitmap=new Class({
+		__class__:{
+			create:function(){
+				//TODO implement later
+			},
+			load:function(f,width,height){
+				var h=LoadImage(0,f.path,0,width||0,height||width||0,0x00002010);
+				if(h){
+					return(new this(h));
+				}
+			},
+		},
+		__new__:function(handle,shared){
+			this.handle=handle;
+			this.shared=shared;
+		},
+		free:function(){
+			if(this.handle && !this.shared){
+				DeleteObject(this.handle);
+				this.handle=0;
+			}
+		},
+		get size(){
+			try{
+				var info=BitmapInfo.alloc();
+				info.size=40;
+				GetDIBits(GetDC(0),this.handle,0,0,null,info,0);
+				return({width:info.width,height:info.height, bpp:info.bpp});
+				
+			}finally{
+				info&&info.free();
+			}
+		},
+		
+		get width()((this.size||{}).width),
+		get height()((this.size||{}).height),
+		get bpp()((this.size||{}).bpp),
+	});
+
+
+	var Icon=new Class({
+		__class__:{
+			create:function(){
+				//TODO implement later
+			},
+			load:function(f,width,tc,height){
+				if(typeof(f)=='string'){
+					f=cwd().file(f);
+				}
+				if(!f){
+				}else if(f.extLC=='.ico'){
+					var flags=0x00000010;
+					if(typeof(height)=='undefined'){
+						height=width;
+					}
+					if(width==-1){
+						width=0;
+						flags|=0x40;
+					}
+					if(height=-1){
+						height=0;
+						flags|=0x40;
+					}
+					var h=LoadImage(0,f.path,1,width||0,height||0, flags);
+					if(h){
+						return(new this(h));
+					}
+				}else if(f.extLC=='.bmp'){
+					try{
+						var il=ImageList.load(f,width,tc);
+						return(il.item(0));
+					}finally{
+						il&&il.free();
+					}
+				}else{
+					try{
+						var buf=WChar.alloc(512);
+						var idx=UInt.alloc().update(width);
+						buf.update(f.path);
+						var h=ExtractAssociatedIcon(Main.handle,buf,idx);
+						if(h){
+							return(new this(h));
+						}
+					}finally{
+						free(buf,idx);
+					}
+				}
+			},
+		},
+		__new__:function(handle,shared){
+			this.handle=handle;
+			this.shared=shared;
+		},
+		free:function(){
+			if(this.handle && !this.shared){
+				DestroyIcon(this.handle);
+				this.handle=0;
+			}
+		},
+		get bitmap(){
+			try{
+				var info=IconInfo.alloc();
+				GetIconInfo(this.handle,info);
+				return(new Bitmap(info.hBitmap,true));
+			}finally{
+				info&&info.free();
+			}
+		},
+		get mask(){
+			try{
+				var info=IconInfo.alloc();
+				GetIconInfo(this.handle,info);
+				return(new Bitmap(info.hMaskBitmap,true));
+			}finally{
+				info&&info.free();
+			}
+		},
+		
+		get size()(this.bitmap.size),
+		get width()((this.size||{}).width),
+		get height()((this.size||{}).height),
+		get bpp()((this.size||{}).bpp),
+		
+		
+		toImage:function()(Image.fromHICON(this.handle)),
+		
+		
+	});
+
+
+	var Cursor=new Class({
+		__class__:{
+			load:function(f,width,height){
+				if(typeof(f)=='string'){
+					f=cwd().file(f);
+				}
+				if(f.extLC=='.cur'){
+					var flags=0x00000010;
+					if(typeof(height)=='undefined'){
+						height=width;
+					}
+					if(width==-1){
+						width=0;
+						flags|=0x40;
+					}
+					if(height=-1){
+						height=0;
+						flags|=0x40;
+					}
+					var h=LoadImage(0,f.path,2,width||0,height||0, flags);
+					if(h){
+						return(new this(h));
+					}
+				}
+			},
+		},
+		__new__:function(handle,shared){
+			this.handle=handle;
+			this.shared=shared;
+		},
+		free:function(){
+			if(this.handle && !this.shared){
+				DestroyCursor(this.handle);
+				this.handle=0;
+			}
+		},
+		get size(){
+			try{
+				var info=IconInfo.alloc();
+				GetIconInfo(this.handle,info);
+				return((new Bitmap(info.hBitmap,true)).size);
+			}finally{
+				info&&info.free();
+			}
+		},
+		get width()((this.size||{}).width),
+		get height()((this.size||{}).height),
+		get bpp()((this.size||{}).bpp),
+	});
+
+
+
+
+
+	var ImageList=new Class({
+		__class__:{
+			create:function(){
+			},
+			load:function(f,width,transcolor){
+				if(typeof(f)=='string'){
+					f=cwd().file(f);
+				}
+				width=width||16;
+				if(typeof(transcolor)!='number'){
+					transcolor=(typeof(transcolor)=='undefined')?0xFFFFFFFF:0xFF000000;
+				}
+				var h=ImageList_LoadImage(0,f.path,width,32,transcolor,0,0x00000010);
+				if(h){
+					return(new this(h));
+				}
+			},
+			
+			
+		},
+		__new__:function(handle,shared){
+			this.handle=handle;
+			this.shared=shared;
+		},
+		
+		
+		
+		get width(){
+			try{
+				var s=UInt.alloc(2);
+				ImageList_GetIconSize(this.handle,s,s.inc(1));
+				return(s.item());
+			}finally{
+				s&&s.free();
+			}
+		},
+		get height(){
+			try{
+				var s=UInt.alloc(2);
+				ImageList_GetIconSize(this.handle,s,s.inc(1));
+				return(s.item(1));
+			}finally{
+				s&&s.free();
+			}
+		},
+		get count()(ImageList_GetImageCount(this.handle)),
+		
+		item:function(idx){
+			var h=ImageList_GetIcon(this.handle,idx||0,1);
+			if(h){
+				return(new Icon(h));
+			}
+		},
+		
+		
+	});
+	
+	
+	this.DeviceContext=DeviceContext;
+	this.Bitmap=Bitmap;
+	this.Icon=Icon;
+	this.Cursor=Cursor;
+	this.ImageList=ImageList;
+	
+	
+	
+	this.Image=Image;
+	this.SeparatedImage=SeparatedImage;
+})

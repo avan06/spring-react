@@ -1,0 +1,68 @@
+(function(){
+	
+	
+	
+	var KDTree=new Class({
+		__new__:function(a,dim){
+			this.dimensions=dim=dim||a[0].length;
+			this.__tree__=(function build(array,depth){
+				switch(array.length){
+					case(0):return(null);
+					case(1):return(array[0]);
+					default:{
+						var mid=array.length>>>1;
+						var ax=depth%dim;
+						array.sort(function(a,b)(a[ax]-b[ax]));
+						++depth;
+						return({
+							mid:array[mid],
+							low:build(array.slice(0,mid),depth),
+							high:build(array.slice(mid+1),depth),
+						});
+					}
+				}
+			})(a.slice(),0);
+			
+		},
+		
+		findNearest:function(p)((function find(node,point,depth){
+			var mid=node.mid;
+			var dim=mid.length;
+			var ax=depth%dim;
+			var leaf,leaf2,ds,d,v;
+			var [a,b]=(point[ax]<mid[ax])?[node.low,node.high]:[node.high,node.low];
+			
+			++depth;
+			if(a){
+				leaf=(a instanceof Array)?a:find(a,point,depth);
+				if(b){
+					ds=-(d=point[ax]-mid[ax])*d;
+					for(var i=0;i<dim;++i){
+						ds+=(d=point[i]-leaf[i])*d;
+					}
+					if(ds>0){
+						leaf2=(b instanceof Array)?b:find(b,point,depth);
+						ds=0;
+						for(var i=0;i<dim;++i){
+							ds+=(d=(v=point[i])-leaf[i])*d-(d=v-leaf2[i])*d;
+						}
+						if(ds<0){
+							leaf=leaf2;
+						}
+					}
+				}
+			}else{
+				leaf=(b instanceof Array)?b:find(b,point,depth);
+			}
+			ds=0;
+			for(var i=0;i<dim;++i){
+				ds+=(d=(v=point[i])-leaf[i])*d-(d=v-mid[i])*d;
+			}
+			return((ds>0)?mid:leaf);
+		})(this.__tree__,p,0)),
+		
+		
+	});
+	
+	this.KDTree=KDTree;
+})

@@ -1,0 +1,97 @@
+.table-condensed > thead > tr > th,
+.table-condensed > tbody > tr > th,
+.table-condensed > tfoot > tr > th,
+.table-condensed > thead > tr > td,
+.table-condensed > tbody > tr > td,
+.table-condensed > tfoot > tr > td {
+  padding: 2px;
+  border-top: 0px ;
+}
+
+.form-control {
+  padding: 1px;
+}
+.form-group, .table{
+  margin-bottom: 0px;
+}
+.darkBg {
+    color: #fff;
+    font-size: 12px;
+    font-weight:normal;    
+    background-color: #015666;
+}
+.darkBgMid {
+    color: #fff;
+    background-color: #015666;
+    font-size: 16px;
+    font-weight: bold;   
+}
+.darkBgLarge {
+    color: #fff;
+    background-color: #015666;
+    font-size: 20px;
+    font-weight: bold;   
+}
+.form-login .modal-dialog {
+    width: 400px;
+}
+.alert .modal-dialog {
+    width: 380px;
+}
+.alert .modal-content {
+  color: #5454dd;
+  background-color: #FFFFCC;
+}
+.deleteCfm .modal-dialog {
+    width: 300px;
+}
+
+.deleteCfm .modal-content {
+  color: #5454dd;
+  background-color: #FFFFCC;
+}
+.col-xs-1, .col-xs-2, .col-xs-3, .col-xs-4, .col-xs-5, .col-xs-6, .col-xs-7, .col-xs-8, .col-xs-9, .col-xs-10, .col-xs-11, .col-xs-12{
+  padding-right:5px;
+  padding-left:5px;
+}  
+
+.wscrolltable thead, tbody, tr, td, th { display: block; }
+.wscrolltable thead th {
+    height: 22px;
+    font-size: 12px;
+}
+.wscrolltable thead th {
+    height: 22px;
+    font-size: 12px;
+    background-color:#e8e8e8 !important;
+}
+.wscrolltable tr:after {
+    content: ' ';
+    display: block;
+    visibility: hidden;
+    clear: both;
+}
+.wscrolltable tbody td, thead th {
+    float: left;
+    font-size: 12px;
+}
+.wscrolltable thead th {
+    overflow-x: hidden;
+    overflow-y: hidden;
+} 
+.wscrolltable tbody td {
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    height:21px;
+} 
+.form-control[disabled] {
+    color: #5454dd;
+    background-color: #FFFFCC;
+    cursor:default
+}
+.usertab > li> a{
+  padding:3px;  
+  width:80px;
+  text-align:center;
+}

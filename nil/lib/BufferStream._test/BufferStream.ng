@@ -1,0 +1,83 @@
+(function(){
+	var BufferStream=new Class({},StreamMixin,{
+		__new__:function(opt){
+			this.__writing__=!!(opt.append||opt.write);
+			if(opt.buffer){
+				opt.encoding=opt.encoding||"utf8";
+				var obj=opt.buffer;
+				if(!(obj instanceof Pointer)){
+					obj=MBString.from(String(obj),opt.encoding);
+					obj.count=obj.length;
+					this.__needFree__=true;
+				}else{
+					this.__needFree__=!!opt.free;
+				}
+				this.encoding=opt.encoding;
+				this.__bytesObject__=obj;
+				this.__bytesSize__=obj.size;
+				this.__bytesUsed__=obj.size;
+				this.__bytesPosition__=opt.append?obj.size:0;
+			}else{
+				this.__needFree__=true;
+				this.__bytesAvailable__=opt.bufferSize||8192;
+				this.__bytesObject__=Byte.alloc(this.__bytesAvailable__);
+				this.__bytesUsed__=0;
+				this.__bytesPosition__=0;
+			}
+			if(typeof(opt.write)=='function'){
+				this.__saveFunc__=opt.write;
+			}
+			
+		},
+		__free__:function(){
+			if(this.__saveFunc__){
+				this.__saveFunc__(this.bytes);
+			}
+			if(this.__needFree__){
+				this.__bytesObject__.free();
+			}
+		},
+		
+		get bytes(){
+			if(this.__bytesUsed__>0){
+				var r=this.__bytesObject__.inc(0);
+				r.count=this.__bytesUsed__;
+				return(r);
+			}
+		},
+		
+		__extend__:function(){
+			this.__needFree__=true;
+			this.__bytesAvailable__=this.__bytesAvailable__*2;
+			var buf=Byte.alloc(this.__bytesAvailable__);
+			this.__bytesObject__.copy(buf,this.__bytesUsed__);
+			this.__bytesObject__.free();
+			this.__bytesObject__=buf;
+		},
+		__read__:function(addr,size){
+			var size2=Math.min(this.__bytesUsed__-this.__bytesPosition__,size);
+			var p=this.__bytesObject__.inc(this.__bytesPosition__)
+			p.copy(addr,size);
+			this.__eof__=size!=size2;
+			return(size2);
+		},
+		__write__:function(addr,size){
+			if(this.__writing__){
+				try{
+					if(this.__bytesAvailable__<(this.__bytesPosition__+size)){
+						this.__extend__();
+					}
+					var p=new (Byte.pointer)(addr);
+					p.copy(this.__bytesObject__.inc(this.__bytesPosition__),size);
+					this.__bytesPosition__+=size;
+					this.__bytesUsed__=Math.max(this.__bytesPosition__,this.__bytesUsed__);
+					return(size);
+				}catch(e){
+					return(0);
+				}finally{
+				}
+			}
+		},
+	});
+	this.BufferStream=BufferStream;
+})

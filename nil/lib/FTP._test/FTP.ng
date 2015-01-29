@@ -1,0 +1,463 @@
+(function(){
+	
+	var {TCP,SSL,IPAddress,ConnectError,ConnectionTimeout}=require('Socket');
+	
+	var getQuoted=function(s)(s.replace(/^.*?"|".*$/g,''));
+	
+	var FTP=new Class({
+		__new__:function(opt){
+			opt=opt||{};
+			this.debug=opt.debug;
+			this.host=opt.host;
+			this.ssl=opt.ssl;
+			if(opt.ssl){
+				this.port=opt.port||990;
+				this.__connection__=SSL.connect(this.host,this.port,this.proxy,opt.connectionTimeOut||opt.timeout);
+			}else{
+				this.port=opt.port||21;
+				this.__connection__=TCP.connect(this.host,this.port,opt.connectionTimeOut||opt.timeout);
+			}
+			this.__connection__.lineSeparator='\r\n';
+			this.__readResponse__();
+			
+			if(opt.auth){
+				this.__command__('AUTH','SSL');
+				this.__connection__=SSL.connect(this.__connection__);
+				this.ssl=true;
+			}
+			this.__command__('USER',opt.user||'anonymous');
+			this.__command__('PASS',opt.password||'anonymous@example.com');
+		},
+		free:function(){
+			if(this.__currentFile__){
+				this.__currentFile__.free();
+			}
+			this.__command__('QUIT');
+			free(this.__connection__);
+		},
+		__readResponse__:function(){
+			var code,res,l,m;
+			while(true){
+				l=this.__connection__.readLine();
+				this.debug && println("S: "+l);
+				m=l.match(/^(\d+)(-|\s+)(.*)$/);
+				if(!res){
+					res=[m[1]];
+				}
+				res.push(m[3]);
+				if(m[2]!='-'){
+					break;
+				}
+			}
+			if(!res){
+				throw("unexpected response");
+			}else if(res[0].match(/^[45]/)){
+				throw(res);
+			}else{
+				return(res);
+			}
+			
+		},
+		__command__:function(name,params){
+			if(this.__streamOpened__){
+				throw("FTP: Command is not executable while stream is opened");
+			}
+			this.debug && println("C: "+Array.join(arguments,' '));
+			this.__connection__.writeLine(Array.join(arguments,' '));
+			return(this.__readResponse__());
+		},
+		file:function(p)(new FTPFile(this,p)),
+		directory:function(p)(new FTPDirectory(this,p)),
+	});
+	
+	var FTPStream=new Class({},StreamMixin,{
+		__new__:function(ftp,file){
+			this.__ftp__=ftp;
+			this.file=file;
+			if(ftp.ssl){
+				ftp.__command__('PBSZ','0');
+				ftp.__command__('PROT','P');
+			}
+			ftp.__command__('TYPE',"I");
+			var addr=ftp.__command__('PASV')[1].match(/(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)/);
+			if(!addr){
+				throw("FTP: PASV failed");
+			}
+			var host=addr.slice(1,5).join('.');
+			var port=addr[5]*256+addr[6]*1;
+			var conn;
+			if(ftp.ssl){
+				this.stream=SSL.connect(host,port,ftp.connectionTimeOut);
+			}else{
+				this.stream=TCP.connect(host,port,ftp.connectionTimeOut);
+			}
+			this.stream.lineSeparator='\r\n';
+		},
+		__free__:function(){
+			free(this.stream);
+			this.__ftp__.__readResponse__();
+			this.__ftp__.__streamOpened__=false;
+		},
+		get __eof__()(this.stream.eof),
+		__read__:function(addr,size)(this.stream.readTo(addr,size,0,false)),
+		__write__:function(addr,size){
+			var ptr=new (Byte.pointer)(addr);
+			ptr.count=size;
+			return(this.stream.write(ptr));
+		},
+	});
+	
+	
+	var AbstractFTPFile=new Class({
+		__new__:function(parent,path){
+			path=String(path||"").replace(/^(.+)\/$/,'$1');
+			this.__ftp__=parent;
+			this.path=path;
+			this.name=path.replace(/^.*\/(.*)$/,'$1');
+		},
+		get parent()((this.path=='/')?void(0):new FTPDirectory(this.__ftp__,this.path.replace(/[^\/]+$/,''))),
+		get time(){
+			if(!this.__time__ && !this.__ftp__.noMDTM){
+				try{
+					this.__time__=Date.from(this.__ftp__.__command__('MDTM',this.path)[1],0);
+				}catch(e){
+					this.__ftp__.noMDTM=true;
+				}
+			}
+			return(this.__time__);
+		},
+		
+		rename:function(name){
+			try{
+				var to=(this.constructor==FTPFile)?this.parent.file(name):this.parent.directory(name);
+				this.__ftp__.__command__('RNFR',this.path);
+				this.__ftp__.__command__('RNTO',to.path);
+				return(to);
+			}catch(e){
+				return(false);
+			}
+		},
+		
+		move:function(path){
+			try{
+				var to=new this.constructor(this.__ftp__,path);
+				this.__ftp__.__command__('RNFR',this.path);
+				this.__ftp__.__command__('RNTO',to.path);
+				return(to);
+			}catch(e){
+				return(false);
+			}
+		},
+		
+		chmod:function(perm){
+			if(!this.__ftp__.noCHMOD){
+				try{
+					this.__ftp__.__command__('SITE','CHMOD',perm,this.path);
+				}catch(e){
+				}
+			}
+		},
+	});
+	
+	var FTPDirectory=new Class(AbstractFTPFile,{
+		get children(){
+			var list={};
+			try{
+				this.__ftp__.__command__('CWD',this.path);
+				var conn=new FTPStream(this.__ftp__);
+				try{
+					if(this.__ftp__.noMLSD){
+						throw({});
+					}
+					this.__ftp__.__command__('MLSD');
+					
+					for(let l in conn.lines){
+						var [,inf,name]=l.match(/^(.*;) (.*)$/);
+						var o={},m;
+						var re=/(\w+)=(.*?);/g;
+						while(m=re.exec(inf)){
+							o[m[1]]=m[2];
+						}
+						
+						if(name=='.'){
+							this.__time__=Date.from(o.modify);
+						}else if(name=='..'){
+						}else if(o.type=='dir'){
+							list[name]=(Object.extend(this.directory(name),{
+								__time__:Date.from(o.modify||o.create,0),
+							}));
+						}else{
+							list[name]=(Object.extend(this.file(name),{
+								__time__:Date.from(o.modify||o.create,0),
+								__size__:parseInt(o.size),
+							}));
+						}
+					}
+				}catch(e if e[0]=='550'){
+				}catch(e){
+					this.__ftp__.noMLSD=true;
+					this.__ftp__.__command__('LIST');
+					while(!conn.eof){
+						var l=conn.readLine();
+						var [,type,size,name]=l.match(/^(.)\S+\s+\S+\s+\S+\s+\S+\s+(\d+)\s+\S+\s+\S+\s+\S+\s+(.*)$/);
+						if(name=='.'){
+						}else if(name=='..'){
+						}else{
+							if(type=='d'){
+								list[name]=(this.directory(name));
+							}else{
+								list[name]=(Object.extend(this.file(name),{
+									__size__:parseInt(size),
+								}));
+							}
+						}
+					}
+				}
+			}catch(e if e[0]=='550'){
+			}finally{
+				free(conn);
+			}
+			for(let [n,v] in Iterator(list)){
+				yield(v);
+			}
+		},
+		get exists(){
+			try{
+				this.__ftp__.__command__('CWD',this.path);
+				return(this);
+			}catch(e){
+				return(false);
+			}
+		},
+		get directories(){
+			for(let c in this.children){
+				if(c instanceof FTPDirectory){
+					yield(c);
+				}
+			}
+		},
+		get files(){
+			for(let c in this.children){
+				if(c instanceof FTPFile){
+					yield(c);
+				}
+			}
+		},
+		
+		file:function(n)(new FTPFile(this.__ftp__,this.path.replace(/\/$/,'')+'/'+n)),
+		directory:function(n)(new FTPDirectory(this.__ftp__,this.path.replace(/\/$/,'')+'/'+n)),
+		
+		create:function(){
+			if(!this.exists){
+				if(this.parent && !this.parent.exists){
+					this.parent.create();
+				}
+				this.__ftp__.__command__('MKD',this.path);
+			}
+			return(this.exists);
+		},
+		remove:function(){
+			this.__ftp__.__command__('RMD',this.path);
+		},
+		
+		upload:function(file){
+			if(!file.name || (typeof(file.openRead)!='function')){
+				file=cwd().file(file);
+			}
+			try{
+				var dest=this.file(file.name).openNew();
+				var s=file.openRead();
+				s.redirect(dest);
+			}finally{
+				free(s,dest);
+			}
+		},
+		
+	});
+	
+	
+	
+	var FTPFile=new Class(AbstractFTPFile,{
+		get size(){
+			if(!this.__size__){
+				if(!this.__ftp__.noSIZE){
+					try{
+						this.__size__=parseInt(this.__ftp__.__command__('SIZE',this.path)[1]);
+					}catch(e){
+						this.__ftp__.noSIZE=true;
+					}
+				}
+				if(this.__ftp__.noSIZE){
+					for(let c in this.parent.files){
+						if(c.path==this.path){
+							this.__size__=c.size;
+						}
+					}
+				}
+			}
+			return(this.__size__);
+		},
+		
+		get exists(){
+			try{
+				this.__size__=parseInt(this.__ftp__.__command__('SIZE',this.path)[1]);
+				return(this);
+			}catch(e){
+				this.__ftp__.noSIZE=true;
+				var p=this.parent;
+				for(let c in this.parent.files){
+					if(c.path==this.path){
+						return(this);
+					}
+				}
+			}
+			return(false);
+		},
+		
+		
+		
+		openRead:function(){
+			var conn=new FTPStream(this.__ftp__);
+			this.__ftp__.__command__('RETR',this.path);
+			this.__ftp__.__streamOpened__=true;
+			return(conn);
+		},
+		
+		
+		openNew:function(){
+			var conn=new FTPStream(this.__ftp__);
+			this.__ftp__.__command__('STOR',this.path);
+			this.__ftp__.__streamOpened__=true;
+			this.__size__=null;
+			return(conn);
+		},
+		
+		
+		openAppend:function(){
+			if(!this.__ftp__.noAPPE){
+				try{
+					var conn=new FTPStream(this.__ftp__);
+					this.__ftp__.__command__('APPE',this.path);
+					this.__ftp__.__streamOpened__=true;
+					this.__size__=null;
+					return(conn);
+				}catch(e){
+					this.__ftp__.noAPPE=true;
+				}
+			}
+		},
+		
+		
+		openResume:function(pos){
+			if(!this.__ftp__.noREST){
+				try{
+					var conn=new FTPStream(this.__ftp__);
+					this.__ftp__.__command__('REST',pos||0);
+					this.__ftp__.__command__('RETR',this.path);
+					this.__ftp__.__streamOpened__=true;
+					return(conn);
+				}catch(e){
+					this.__ftp__.noREST=true;
+				}
+			}
+		},
+		
+		create:function(){
+			if(!this.exists){
+				try{
+					var s=this.openNew();
+					return(this);
+				}finally{
+					free(s);
+				}
+			}
+		},
+		
+		remove:function(){
+			this.__ftp__.__command__('DELE',this.path);
+		},
+		
+		
+		
+		load:function(type){
+			try{
+				var s=this.openRead();
+				if(!type || typeof(type)=='string'){
+					s.encoding=type||this.encoding;
+					return(s.readText());
+				}else{
+					return(s.read(type));
+				}
+			}finally{
+				s&&s.free();
+			}
+		},
+		loadBytes:function(){
+			try{
+				var s=this.openRead();
+				return(s.readAll());
+			}catch(e){
+			}finally{
+				s&&s.free();
+			}
+			
+		},
+		update:function(value,cs){
+			try{
+				var s=this.openNew(true);
+				s.encoding=cs;
+				s.write(value);
+				return(this);
+			}finally{
+				s&&s.free();
+			}
+		},
+		append:function(value,cs){
+			try{
+				var s=this.openAppend(true);
+				s.charset=cs;
+				s.write(value);
+				return(this);
+			}finally{
+				s&&s.free();
+			}
+		},
+		
+		download:function(file,resume){
+			try{
+				var s,dest;
+				if(typeof(file)=='string'){
+					if(file.match(/[\\\/]$/)){
+						file=cwd().directory(file).file(this.name);
+					}else{
+						file=cwd().file(file);
+					}
+				}else if(typeof(file.file)=='function'){
+					file=file.file(this.name);
+				}
+				if(resume && file.exists){
+					s=this.openResume(file.size);
+					dest=file.openAppend();
+				}else{
+					s=this.openRead();
+					dest=file.openNew();
+				}
+				s.redirect(dest);
+			}finally{
+				free(s,dest);
+			}
+		},
+		
+		
+		
+		
+	});
+	
+	
+	
+	this.FTP=FTP;
+	
+	
+	
+	
+})

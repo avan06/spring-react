@@ -1,0 +1,302 @@
+(function(){
+	
+	var shell32=WinLibrary.load('shell32.dll');
+	var ole32=WinLibrary.load('ole32.dll');
+	var comdlg32=WinLibrary.load('comdlg32.dll');
+	
+	var BrowsCallback=StdCallFunction.define([UInt,UInt,UInt,UInt],UInt);
+	var BrowseInfo=new Struct({
+		hwnd:		UInt,
+		root:		WideString,
+		name:		WideString,
+		title:		WideString,
+		flags:		UInt,
+		callback:	BrowsCallback,
+		lparam:		UInt,
+		image:		Int,
+		
+	});
+	var SendMessage=			user32.proc('SendMessageW',[UInt,UInt,UInt,UInt],UInt);
+	var ILCreateFromPath=		shell32.proc('ILCreateFromPathW',[WideString],UInt);
+	var SHParseDisplayName=		shell32.proc('SHParseDisplayName',[WideString,Pointer,Pointer,UInt,Pointer],Int);
+	var SHBrowseForFolder=		shell32.proc('SHBrowseForFolderW',[BrowseInfo],UInt);
+	var SHGetPathFromIDList=	shell32.proc('SHGetPathFromIDListW',[UInt,WideString],Int);
+	var CoTaskMemFree=			ole32.proc('CoTaskMemFree',[UInt],UInt);
+	
+	var SHGetFolderLocation=	shell32.proc('SHGetFolderLocation',[UInt,Int,UInt,UInt,Pointer],Int);
+	
+	var FolderDialog=new Class({
+		__class__:{
+			programs:                0x0002, // Start Menu\Programs
+			controls:                0x0003, // My Computer\Control Panel
+			printers:                0x0004, // My Computer\Printers
+			personal:                0x0005, // My Documents
+			favorites:               0x0006, // <user name>\Favorites
+			startup:                 0x0007, // Start Menu\Programs\Startup
+			recent:                  0x0008, // <user name>\Recent
+			sendto:                  0x0009, // <user name>\SendTo
+			bitbucket:               0x000a, // <desktop>\Recycle Bin
+			startmenu:               0x000b, // <user name>\Start Menu
+			mymusic:                 0x000d, // "My Music" folder
+			myvideo:                 0x000e, // "My Videos" folder
+			desktop:                 0x0010, // <user name>\Desktop
+			drives:                  0x0011, // My Computer
+			network:                 0x0012, // Network Neighborhood (My Network Places)
+			nethood:                 0x0013, // <user name>\nethood
+			fonts:                   0x0014, // windows\fonts
+			templates:               0x0015,
+			commonStartmenu:         0x0016, // All Users\Start Menu
+			commonPrograms:          0X0017, // All Users\Start Menu\Programs
+			commonStartup:           0x0018, // All Users\Startup
+			commonDesktop:           0x0019, // All Users\Desktop
+			appData:                 0x001a, // <user name>\Application Data
+			printHood:               0x001b, // <user name>\PrintHood
+			localAppData:            0x001c, // <user name>\Local Settings\Applicaiton Data (non roaming)
+			altStartup:              0x001d, // non localized startup
+			commonAltStartup:        0x001e, // non localized common startup
+			commonFavorites:         0x001f,
+			internetCache:           0x0020,
+			cookies:                 0x0021,
+			history:                 0x0022,
+			commonAppData:           0x0023, // All Users\Application Data
+			windows:                 0x0024, // GetWindowsDirectory()
+			system:                  0x0025, // GetSystemDirectory()
+			programFiles:            0x0026, // C:\Program Files
+			myPictures:              0x0027, // C:\Program Files\My Pictures
+			profile:                 0x0028, // USERPROFILE
+			systemX86:               0x0029, // x86 system directory on RISC
+			programFilesX86:         0x002a, // x86 C:\Program Files on RISC
+			commonProgramFiles:      0x002b, // C:\Program Files\Common
+			commonProgramFilesX86:   0x002c, // x86 Program Files\Common on RISC
+			commonTemplates:         0x002d, // All Users\Templates
+			commonDocuments:         0x002e, // All Users\Documents
+			commonAdmintools:        0x002f, // All Users\Start Menu\Programs\Administrative Tools
+			adminTools:              0x0030, // <user name>\Start Menu\Programs\Administrative Tools
+			connections:             0x0031, // Network and Dial-up Connections
+			commonMusic:             0x0035, // All Users\My Music
+			commonPictures:          0x0036, // All Users\My Pictures
+			commonVideo:             0x0037, // All Users\My Video
+			resources:               0x0038, // Resource Direcotry
+			localizedResources:      0x0039, // Localized Resource Direcotry
+			commonOEMLinks:          0x003a, // Links to All Users OEM specific apps
+			cdBurnArea:              0x003b, // USERPROFILE\Local Settings\Application Data\Microsoft\CD Burning
+			computersNearMe:         0x003d, // Computers Near Me (computered from Workgroup membership)
+			show:function(opt){
+				var dlg=new this(opt);
+				return(dlg.show());
+			},
+			define:function(opt){
+				return(new Class(this,opt||{}));
+			},
+		},
+		__new__:function(opt){
+			Object.extend(this,opt||{});
+		},
+		onlyFileSystem:true,
+		editable:true,
+		validate:true,
+		
+		show:function(){
+			try{
+				var inf=BrowseInfo.alloc();
+				var title,root,dir, path, cb, res;
+				
+				inf.hwnd=(this.owner||{}).handle||0;
+				if(this.root){
+					if(typeof(this.root)=='number'){
+						try{
+							var p=UInt.alloc();
+							SHGetFolderLocation(0,this.root,0,0,p);
+							inf.root=(root=p.item());
+						}finally{
+							free(p);
+						}
+					}else{
+						inf.root=(root=ILCreateFromPath(this.root));
+					}
+				}
+				if(this.title){
+					inf.title=title=(WideString.from(this.title));
+				}
+				if(this.directory){
+					dir=WideString.from(this.directory);
+					inf.callback=(cb=BrowsCallback.from(function(hwnd,msg,lp,wp){
+						if(msg==1){
+							SendMessage(hwnd,0x400+103,1,dir.valueOf());
+						}
+					}));
+				}
+				inf.flags=0x00000040
+					|(this.onlyFileSystem		?0x00000001:0)
+					|(this.dontGoBelowDomain	?0x00000002:0)
+					|(this.returnFSAncestors	?0x00000008:0)
+					|(this.editable				?0x00000010:0)
+					|(this.validate				?0x00000020:0)
+					|(this.noNewFolder			?0x00000200:0)
+					|(this.noDereferenceLinks	?0x00000400:0)
+					|(this.forComputer			?0x00001000:0)
+					|(this.forPrinter			?0x00002000:0)
+					|(this.includeFiles			?0x00004000:0)
+					|(this.includeURLs			?0x00000080:0)
+					|(this.shareable			?0x00008000:0)
+					|(this.browseFileJunctions	?0x00010000:0)
+				;
+				if(res=SHBrowseForFolder(inf)){
+					SHGetPathFromIDList(res,path=WChar.alloc(1024));
+					this.result=new Directory(path);
+					if(this.result.exists){
+						this.directory=this.result;
+					}else{
+						this.directory=void(0);
+						this.result=this.file=new File(path);
+					}
+					return(this.result);
+				}
+			}finally{
+				root && CoTaskMemFree(root);
+				res && CoTaskMemFree(res);
+				free(inf,title,dir,cb,path);
+			}
+		},
+	});
+	
+	
+	
+/*
+OFN_ENABLEHOOK
+0x00000020
+OFN_ENABLEINCLUDENOTIFY
+0x00400000
+OFN_ENABLETEMPLATE
+0x00000040
+OFN_SHAREAWARE
+0x00004000
+OFN_SHOWHELP
+0x00000010
+*/
+	var OpenFileNameStruct=new Struct({
+		size:			UInt,
+		hwnd:			UInt,
+		hInstance:		UInt,
+		filters:		Pointer,
+		customFilter:	Pointer,
+		maxCustFilter:	Int,
+		filterIndex:	Int,
+		files:			Pointer,
+		maxFiles:		Int,
+		fileTitle:		WideString,
+		maxFileTitle:	Int,
+		initialDir:		WideString,
+		title:			WideString,
+		flags:			UInt,
+		fileOffset:		UShort,
+		fileExtension:	UShort,
+		defExt:			WideString,
+		lparam:			UInt,
+		hook:			Pointer,
+		templateName:	WideString,
+		res1:			UInt,
+		res2:			UInt,
+		flagsEx:		UInt,
+	});
+	var GetOpenFileName=	comdlg32.proc("GetOpenFileNameW",[OpenFileNameStruct],UInt);
+	var GetSaveFileName=	comdlg32.proc("GetSaveFileNameW",[OpenFileNameStruct],UInt);
+	
+	
+	var FileDialog=new Class({
+		__class__:{
+			show:function(opt){
+				var dlg=new this(opt);
+				return(dlg.show());
+			},
+			define:function(opt){
+				return(new Class(this,opt||{}));
+			},
+		},
+		__new__:function(opt){
+			Object.extend(this,opt||{});
+		},
+		show:function(){
+			try{
+				var inf=OpenFileNameStruct.alloc();
+				inf.size=88;
+				
+				var flt, files, dir, title, ext;
+				var filters=[];
+				if(this.filters){
+					var a=[];
+					for(let [n,v] in Iterator(this.filters)){
+						filters[filters.length]=v;
+						a[a.length]=n+' ('+v+')';
+						a[a.length]=v;
+					}
+					inf.filterIndex=filters.indexOf(this.filter||filters[0])+1;
+					inf.filters=(flt=MultiWideString.from(a));
+				}
+				
+				inf.hwnd=(this.owner||{}).handle||0;
+				inf.files=(files=WChar.alloc(8192));
+				inf.maxFiles=8192;
+				
+				inf.initialDir=(dir=WideString.from(this.directory||cwd()));
+				
+				if(this.title){
+					inf.title=(title=WideString.from(this.title));
+				}
+				if(this.extension){
+					inf.defExt=(ext=WideString.from(this.extension));
+				}
+				
+				inf.flags=0x00080000
+					|(this.multiSelect			?0x00000200:0)
+					|(this.createPrompt			?0x00002000:0)
+					|(this.overwritePrompt		?0x00000002:0)
+					|(this.pathMustExist		?0x00000800:0)
+					|(this.fileMustExist		?0x00001000:0)
+					|(this.noValidate			?0x00000100:0)
+					|(this.testFileCreate		?0:0x00010000)
+					
+					|(this.changeDir			?0:0x00000008)
+					|(this.addToRecent			?0:0x02000000)
+					
+					|(this.hideReadOnly			?0x00000004:0)
+					|(this.hideHidden			?0:0x10000000)
+					|(this.noDereferenceLinks	?0x00100000:0)
+					
+					|(this.readOnly				?0x00000001:0)
+					|(this.noNetworkButton		?0x00020000:0)
+					|(this.noReadOnlyButton		?0x00008000:0)
+				;
+				inf.flagEx=(this.noPlacesBar?1:0);
+				
+				if((this.save?GetSaveFileName:GetOpenFileName)(inf)){
+					if(this.multiSelect){
+						var a=(new MultiWideString(files.valueOf())).toArray();
+						var dir=(this.directory=new Directory(a.shift()));
+						for(var i=0,l=a.length;i<l;i++){
+							a[i]=dir.file(a[i]);
+						}
+						this.files=this.result=a;
+					}else{
+						this.files=[this.file=this.result=new File(file.toString())];
+					}
+					this.filter=filters[Math.max(0,inf.filterIndex-1)];
+					this.readOnly=!!(inf.flags&1);
+					return(this.result);
+				}
+			}finally{
+				free(inf,flt,files,dir,title,ext);
+			}
+		},
+	});
+	var ColorDialog=new Class({
+	});
+	var IconDialog=new Class({
+	});
+	var FontDialog=new Class({
+	});
+	
+	
+	this.FileDialog=FileDialog;
+	this.FolderDialog=FolderDialog;
+})

@@ -1,0 +1,604 @@
+
+2011/04/13
+	add: FTP::
+	add: streamMixin.redirect()
+	fix: HTTP::http.getData()
+
+2011/04/07
+	fix: Mail::SMTP encoding:'utf-7'指定時、ヘッダが壊れる件
+	fix: Image:: stroke系メソッドのdashオプションが動作しない件
+	
+2011/04/05
+	add: Mail::
+	add: Cipher::HMAC
+	mod: WideString.from(),MBString.from() convert \0 and following chars
+	fix: MBString.encodeURI() etc. not works 7-bit charset
+
+2011/03/24
+	add: Video::
+
+2011/03/15
+	add: WOL::
+	add: Socket:: UDP.broadcast()
+
+2011/03/05
+	add: Window::window.sendKeys(),window.mouseMove(),etc,
+	fix: Window::window mouse-related events
+
+2011/02/22
+	fix: Socket::TCPStream.write()
+	fix: HTTPD:: JSONP charset
+	fix: string.escapeHTML() ignore "'" for shit IE
+
+2011/02/15
+	mod: HTTP::HTTP update http.cookies from Set-Cookie response headers
+
+2011/02/01
+	fix: ContentExtractor::
+	fix: LooseXML::
+
+2011/01/25
+	add: Shell::Shortcut
+
+2011/01/24
+	add: tool/idlConv.ng
+
+2011/01/23
+	fix: Image::Pen dash option not works (thanks: @azu_re)
+
+2011/01/22
+	mod: Image::image.drawTo(), optで再描画を行う矩形範囲を指定可能に
+	fix: Image::image.drawImage(), opt.srcを指定したときエラーになる問題
+	fix: LooseXML:: 空タグが正しくパースできなかった問題
+	
+
+2011/01/17
+	fix: Date.from()
+	add: Log@HTTPD
+	fix: LooseXML:: /<[^a-z]/がタグと誤認識される件
+	add: SQLite::db.timeout
+	fix: SQLite:: lots
+
+2010/12/24
+	fix: Date.from()
+	fix: COM:: Dispatch.__invokeByID__() return value was left not addRef-ed
+	fix: LooseXML:: long string source parse failed
+	add: PageRank::
+
+2010/12/16
+	add: Test::
+	add: HTMLRewriter::
+	fix: LooseXML:: remove() of currently persing node
+	fix: LooseXML:: empty tag parsing
+
+2010/12/13
+	add: URLResolver::
+	add: process.exitCode, thread.exitCode (==result)
+	fix: LooseXML:: srcの最後のテキストノードが無視されていた件
+	mod: LooseXML::parentMixin.insert()/append(), XML文字列を直接追加可能に
+
+2010/12/02
+	mod: Process.create() opt.std* can be '' for NUL device
+	fix: Process.create() opt.show  ignored
+
+
+2010/11/30
+	add: LooseXML::parentMixin.match()
+	fix: Hotstrokes:: defineModifiers() send:false causes an error
+	fix: AbstractFile .short, .long, etc.
+
+2010/11/29
+	add: URLFilter::
+
+2010/11/26
+	add: AbstractFile .short, .long, etc.
+
+2010/11/20
+	fix: SQLite:: DB.open() accept File object
+	fix: SQLite:: db.insert() 'or' argument
+	mod: sqlite3.dll update
+
+2010/11/18
+	add: Segmenter::
+	add: Diff::
+	fix: HTTPD:: http://localhost/bookmarklet/ not working
+
+2010/11/11
+	add: HTTPDownloadList::
+	mod: JobList::
+	fix: JobList::
+	fix: string.include() , array.reduce() (thanks: ID:KgdCl0Y+)
+	mod: *.exe & *.dll
+
+2010/11/09
+	fix: free() not working
+	fix: JobList::
+
+2010/11/06
+	add: JobList::
+	add: Number.random()
+
+2010/10/24
+	mod: Window:: window.observe() non-client mouse events
+	mod: Image:: image.drawText() allow opt.file without opt.name
+	fix: Image:: Color RGBがBGRになっていた部分
+	fix: LooseXML:: element.has()
+
+2010/10/20
+	add: Image:: image.getPixelBytes()
+	mod: Window:: Window.create(), NotifyIcon.create() accept Image::Image
+
+2010/10/19
+	add: Image:: image.getHistogram(), image.normalize(), etc.
+	mod: Image:: Image.load(), support .ico etc.
+
+2010/10/18
+	add: Image:: image.adjustBC(), image.join() , etc.
+
+2010/10/16
+	add: Image:: image.threshold() , etc.
+	fix: Image:: 
+
+2010/10/13
+	add: Image:: image.matrixFilter(),image.blur(), etc.
+
+2010/10/09
+	add: Clipboard:: image format
+	mod: Clipboard:: now,type option can be 'handle'
+	add: Image:: image.strokeArc() , etc.
+
+2010/10/08
+	mod: Image:: Image.create() バイト列からの画像生成
+
+2010/10/07
+	mod: Window:: 自前ウィンドウのマウス・キーメッセージのイベント対応
+	add: Image:: image.getPixel() , image.setPixel(), image.filter()
+	fix: Hotstrokes:: Mouseプラグイン
+
+2010/10/06
+	fix: Keyboard::key.down()/key.up()
+
+2010/10/05
+	fix: HTTPD::httpd.map()
+	add: Image:: image.drawTo(),etc.
+
+2010/10/04
+	fix: HTTPD::httpd.map()
+	add: Image:: image.fill(), etc.
+
+2010/10/03
+	add: COM:: Stream,MemoryStream
+	add: Image::Image.toBytes(), Image.capture()
+	mod: Image::Image.load() メモリからの読み込みに対応
+	add: Window::window.capture()
+
+2010/10/02
+	add: Image::Image
+
+
+2010/09/27
+	add: SystemMonitor::InputIdle
+
+2010/09/24
+	mod: Window.propertiesにtopmostなどを追加
+	add: window.moveToCenter()
+	mod: prompt() x,y未指定時の表示位置をプライマリディスプレイ中央に
+
+2010/09/23
+	fix: Hotstrokes::Hotstrokes.mapModifiers() oneShot送信をsendの押し上げ後に
+	add: System.suspendFor(), System.hibernateFor(), System.awake()
+	add: setInterval(), setTimeout(), clearInterval(), clearTimeout()
+
+2010/09/20
+	add: SystemMonitor::ProcessCPU
+	add: SystemMonitor::Network
+	add: SystemMonitor::PerformanceCounter
+
+2010/09/18
+	add: System.memory
+	add: SystemMonitor::
+
+2010/09/12
+	add: COM:: JScript,dispatch.$()
+	add: ATL:: atl.set(), atl.get(), atl.invoke(), atl.$(), trident.update()
+	add: window.request()
+
+2010/09/09
+	mod: Window:: イベントの追加など
+	fix: ATL::Trident Tabキーなどに正しく応答するように
+
+2010/09/08
+	add: System.observe()
+	fix: Process.create() show:0 broken on ngw.exe
+
+2010/09/07
+	add: System.shutdown(), etc.
+	fix: Timer onlyOnce broken, etc.
+
+2010/09/06
+	add: Charset::
+	mod: HTTP::,HTTPD:: 文字コード認識の改善
+
+2010/09/02
+	add: Window::Display
+
+2010/09/01
+	fix: window.icon 取得できない場合がある件
+	fix: Window.observe() exit()で終了できなくなってしまう件
+	mod: Image::Icon.load() 任意のファイルからアイコンを取得できるように
+
+2010/08/31
+	add: ATL::
+
+2010/08/30
+	add: COM:: .observe()
+	fix: COM:: dispatch.invoke() parameter's order reversed, and more...
+	fix: NativeFunction.from() broken by GC
+
+2010/08/25
+	add: COM:: (仮)
+
+2010/08/21
+	add: Dialog::
+
+2010/08/20
+	fix: LooawXML:: 
+		「/」で終る引用符無し属性値のあるタグがエンプティタグと誤認識される件
+
+2010/08/18
+	fix: process.observe()
+
+2010/08/16
+	add: UUID
+
+2010/08/15
+	add: mkexe
+	add: file.ovserve(),etc./directory.observe(),etc.
+
+2010/08/14
+	fix: proxyResponse内での送信が正しく行なえない場合がある件
+	mod: proxyResponseの第2引数にHTTP::Responseオブジェクトを渡すように
+
+2010/08/10
+	mod: sample/HTTPD.ng ドキュメントの検索・閲覧機能
+	fix: HTTPD:: connection.paramsにencodingオプションが反映されない件
+
+2010/08/09
+	add: abstractFile:: time系のsetter
+	add VFS:: ZIP,Fileプラグイン
+	mod VFS:: 仕様の変更・追加および不具合修正など
+
+2010/08/02
+	mod: Window:: Window.focusedをAbstractWindow.focusedに変更
+	add: Window:: Edit.selection
+	add: VFS:: (ultra experimental)
+	fix: HTTPD:: プロキシ機能で、ボディのないレスポンスの処理に問題がある件
+
+2010/07/29
+	add: BufferStream::
+
+2010/07/27
+	fix: window.showPopupMenu() ウィンドウのイベント以外から呼ぶと動作しない件
+	add: window.caret
+
+2010/07/24
+	fix: HTTP::HTTP deflateエンコーディングがデコードできない件
+	fix: HTTPD:: プロキシハンドラでfilter()などが効かない場合がある件
+	             出力されるpacファイルが不正だった件
+
+2010/07/22
+	add: exec()/include()
+	fix: prompt() heightの指定が効かない問題
+
+2010/07/21
+	add: Cipher::Random
+
+2010/07/19
+	add: Cipher::Cipher / encode()などのdestオプション、ランダムsalt対応
+
+2010/07/17
+	add: Cipher::Cipher
+	chg: Cipher::RSA メソッドの仕様
+
+2010/07/15
+	add: Cipher::
+	fix: nativeFunction.toFunction() useLastErrorの指定が効かない場合がある件
+	fix: Clipboard::Clipboard.open() 間違った例外がthrowされることがある件
+
+
+2010/07/08
+	add: HTTPD:: ScriptEvaluatorプラグイン
+	fix: SQLite::db.create()
+
+2010/07/07
+	add: HTTPD:: addUseProxy()/addOptionMembers()/connection.cache
+		ContentBlockerプラグイン
+	fix: Mouse:: マルチディスプレイでのmoveTo()
+		thanks http://twitter.com/tadanoji_g, http://twitter.com/dvorak_
+	mod: abstractFile .move()/.copy() 引数がDirectoryの場合を考慮するように
+
+2010/07/01
+	fix: resource()でMain.directory以下も調べるように
+	add: Unit.__call__ ,unit.extend(), use()
+	add: HTTPD::HTTPD プロキシサーバのconnection.addScripts()
+
+2010/06/29
+	add: HTTPD::HTTPD プロキシサーバ機能
+	add: window.activate() force引数
+	mod: window.ownerThread 存在しないウィンドウではundefinedを返すように
+
+2010/06/23
+	add: HTTPD::httpd.addClientSide()
+				httpd.addServerSide()
+				httpd.addBookmarklets()
+				プラグイン機構
+
+2010/06/21
+	mod: nativeFunction.toFunction() useLastErrorで条件を指定可能に
+	fix: Window::Window.create()
+		メッセージフックやAPIフックを行うアプリケーションを使用している
+		場合に機能しないことがある件
+	add: HTTPD::
+	mod: ng.exe/ngw.exe
+
+2010/06/04
+	add: LooseXML::
+	fix: Date.from()
+
+2010/06/01
+	add: generator.all()
+	add: array.insert() / array.remove() / array.replace()
+	fix: MBString.decodeURI()など
+
+2010/05/31
+	fix: HTTP::
+
+2010/05/31
+	add: SQLite:: クエリラッパー系メソッド
+	add: array.random()
+
+2010/05/29
+	add: SQLite::
+
+2010/05/27
+	fix: process.writeMemory() 
+	fix: Window::notifyIcon.icon 代入時の不具合
+	mod: Main.createNotifyIcon() 引数で初期アイコンファイルを指定可能に
+	mod: HTTP:: タイムアウトを指定するオプション
+
+2010/05/25
+	add: Hash::
+	mod: HTTP:: 認証に対応、その他
+	fix: Socket::SSL マルチスレッドでクラッシュする問題
+
+2010/05/24
+	mod: HTTP::HTTP SSL対応(直接接続のみ)
+	add: Socket::SSL
+	fix: string.unescapeHTML()
+
+2010/05/23
+	mod: HTTP::HTTP ファイルアップロード対応
+	add: HTTP:: HTTP.saveTo()/http.saveTo()
+	add: file.getNonexistent()
+
+2010/05/21
+	add: HTTP::
+	add: string.escapeHTML()/string.unescapeHTML()
+	add: String.random()
+
+2010/05/18
+	add: "__call__" member for addClassMembers()
+
+2010/05/15
+	add: Dictionary
+
+2010/05/14
+	add: CSV::
+	add: string.separate()
+
+2010/05/13
+	add: ジェネレータ関連の機能の追加(join系、union系、groupByなど)
+
+2010/05/12
+	fix: file.ctime/file.mtime/file.atime 取得できなかった不具合
+	add: JavaScript標準機能への拡張の説明
+	add: ジェネレータ関連の拡張機能(see base_stdex.txt)
+
+2010/05/03
+	add: Zlib::
+	add: Signal.waitFor(),Mutex.waitFor()
+	add: signal.turnOnAndWait(),mutex.unlockAndWait()
+	add: autoReset argument for new Signal()
+
+2010/04/27
+	mod: ng.exe/ngw.exe 最新版に差し替え
+	fix: LockableMixin 同じスレッドから複数回同時にロックした場合の問題
+	add: MBString.encodeURI()など
+
+2010/04/24
+	add: Hotstrokes:: hotstrokesContext.repeat()
+
+2010/04/21
+	add: Hotstrokes:: Mouseプラグイン
+
+2010/04/16
+	mod: Hotstrokes:: プラグイン機構の実装
+	add: Hotstrokes:: IMEプラグイン
+
+2010/04/15
+	add: Hotstrokes:: remap()/mapModifiers()
+	fix: Window:: NotifyIconのコンテキストメニュー表示時のフォーカス処理
+
+2010/04/13
+	add: Hotstrokes:: 各種基本機能
+
+2010/04/08
+	add: Hotstrokes:: Hotstrokes.send() のみ
+	fix: Keyboard::key.up()/key.down() 拡張キーが送れない件
+
+2010/04/05
+	add: Window.focused/window.focused
+	fix: NotifyIcon.observe()
+
+2010/04/02
+	add: AhoCorasickMethodユニット
+
+2010/04/01
+	add: window.dropFiles()
+	fix: Clipboardの各部
+
+2010/03/30
+	add: alert()/confirm()/prompt()
+	add: Window.focus()
+
+2010/03/28
+	add:Keyboardユニット
+	mod:Mouse.wait()をMouse.sleep()に名称変更(EventMixinとの重複のため)
+
+2010/03/26
+	add:Clipboardユニット
+
+2010/03/24
+	add:Windowのイベント
+
+2010/03/23
+	add:NotifyIcon
+	add:Main.window/Main.createNotifyIcon()/Main.notifyIcon
+	add:wideString.update()
+	mod:Mouseのイベント名の「button」を省略しない形に変更。
+
+
+2010/03/21
+	add:Imageユニット
+	add:Icon/Bitmap
+	add:window.icon
+
+
+2010/03/18
+	mod:Window.define()/Window.create()
+		menu/contextMenu/textsの実装
+	add:window.showPopupMenu()
+	add:StringTable
+
+2010/03/14
+	add:Pluggable/Plugin
+
+2010/03/11
+	add:file.loadJSON()/file.saveJSON()
+	add:Main.resource()/Main.pref()/Configuration
+	mod:file.exists/directory.exists
+		存在した場合、自身を返すように
+	add:thread.waitExit()
+	fix:Process.create()
+		colorオプション未指定時にwhiteになっていたのを修正
+	add:Mutex.lock()/Mutex.unlock()
+	add:LockableMixin
+	add:CommandReceiverMixin/Command/CommandContext
+	add:Locale/System.locale/System.userLocale/System.currentLocale
+	add:System.dataDirectory
+	add:System.getEnvVar()/System.setEnvVar()/System.expandEnvVar()
+	
+	mod:Window.define()/Window.create()
+		acceleratorsを実装
+
+
+2010/03/03
+	ng.exe,ngw.exe
+		データ実行防止が有効の環境でクラッシュする問題を修正
+
+
+2010/02/23
+	Window
+		主要コントロールの機能を一通り実装
+	Pointer
+		inc()で0個のオフセットを指定できなかった問題を修正
+
+
+
+2010/02/19
+	Window
+		Window.define()/Window.create()を追加
+		Edit/Buttonの一部機能を実装
+		別プロセスの所有するコントロールのtextを読み書きできるように
+		sendでポインタや文字列を送れるように(未確認・未ドキュメント)
+	
+	EventMixin
+		wait()を追加
+	FindInstanceMixin
+		waitExists()/waitExtinct()を追加
+	Process
+		EventMixinをミックスし、exitイベントを実装
+
+
+
+2010/02/12
+	FindInstanceMixin
+		実装した
+	Window
+		情報取得・操作機能を実装
+	Process
+		FindInstanceMixinをミックスするように
+
+2010/02/10
+	ng.exe
+		最新版に更新
+	
+	ngw.exe
+		同梱することに
+	
+	Main
+		ng.jsに記述していた処理をexecute()に移動
+		persistentプロパティがtrueの時、スクリプト本文終了後常駐するように
+		loop/sucess/fail/exitのイベントを実装
+		exit()/singletonize()/restart()/allocConsole()/reside()/unreside()/
+		の実装
+		ngw.exeなどで標準入出力が無いとき、自動でコンソールを生成するように。
+	
+	Process
+		引数の仕様を変更
+		不具合修正など
+	
+	Timer/Signal/Mutexの実装
+	
+	EventMixin
+		observe関連の仕様を変更
+	
+	nativeFunction
+		例外が投げられたときのメモリリークを修正
+
+2010/02/03
+	サンプル
+		マウスに関するサンプルをいくつか追加
+	Mouse
+		試験的に実装。
+
+2010/02/02
+	サンプルをいくつか追加
+	
+	Process
+		create()で標準入出力の文字コードを指定可能に
+	File
+		update()の第2引数で文字コードを指定可能に
+	その他
+
+2010/02/01
+	Socketユニット
+		基本部分を実装
+	streamMixin
+		readText()などの不具合修正
+		readln()/writeln()/bytesReceived/bytesSentを追加
+		write()のobj引数の機能拡張
+		write()などにタイムアウト機能の追加
+	pointer
+		convert()が正常に動作しない不具合修正
+
+
+2010/01/31
+	改行を含むテキストのreadLine()時の不具合を修正
+
+2010/01/30
+	公開
+
+
+
+

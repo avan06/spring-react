@@ -1,0 +1,38 @@
+var reg=new (require("Registry").Registry)("HKCR");
+
+var k1=reg.key(".ng");
+var k2=reg.key("NILScript");
+
+if(k1.exists){
+	if(k1.getValue()!='NILScript'){
+		println("othre association exists.");
+	}else{
+		println("NILScript is installed.");
+	}
+	println("Uninstall it?");
+	println("Press [u] or [c] key. [u]:uninstall / [c]:cancel");
+	Main.stdin.readText(["uc"]);
+	if(Main.stdin.readText(1)=='u'){
+		echo("uninstalling...");
+		k1.remove();
+		k2.remove();
+		println("complete");
+	}
+}else{
+	println("Press [i] or [c] key. [i]:install / [c]:cancel");
+	Main.stdin.readText(["ic"]);
+	if(Main.stdin.readText(1)=='i'){
+		echo("installing...");
+		k1.setValue("","NILScript");
+		k2.setValue("","NILScript");
+		
+		k2.key("shell\\Execute\\command").setValue("",'"'+Main.file.path+'" "%1" %*');
+		k2.key("ShellEx\\DropHandler").setValue("","{86C86720-42A0-1069-A2E8-08002B30309D}");
+		println("complete");
+	}
+}
+
+
+
+
+
