@@ -1,5 +1,7 @@
 package com.mssoftech.springreact;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -10,15 +12,19 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
+import com.mssoftech.web.util.DBFluteUtil;
+
 @Configuration
 @EnableAspectJAutoProxy
 @EnableTransactionManagement
 @EnableAutoConfiguration
 @ComponentScan
 public class Application {
+	static protected Logger log = LoggerFactory.getLogger(Application.class);
 	public static AnnotationConfigWebApplicationContext annotationConfigWebApplicationContext = null;
 
 	public static void main(String[] args) {
+		log.debug("BINDING PORT:"+System.getenv("PORT"));
 		SpringApplication.run(Application.class, args);
 	}
 
