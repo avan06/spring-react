@@ -118,6 +118,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 <id>spring-milestones</id>
 <url>http://repo.spring.io/milestone</url>
 </repository>
+<repository>
+	<id>maven.seasar.org</id>
+	<name>The Seasar Foundation Maven2 Repository</name>
+	<url>http://maven.seasar.org/maven2</url>
+</repository>
 </repositories>
 <pluginRepositories>
 <pluginRepository>
