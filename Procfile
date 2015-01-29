@@ -1,0 +1,1 @@
+web:    java $JAVA_OPTS -cp target/classes:target/dependency/*:lib/* com.mssoftech.springreact.Application

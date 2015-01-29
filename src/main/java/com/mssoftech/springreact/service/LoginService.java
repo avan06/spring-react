@@ -26,7 +26,6 @@ import com.mssoftech.springreact.dbflute.exbhv.SessionBhv;
 import com.mssoftech.springreact.dbflute.exentity.Login;
 import com.mssoftech.springreact.dbflute.exentity.Session;
 import com.mssoftech.web.exception.SystemException;
-import com.mssoftech.web.util.CommonUtil;
 import com.mssoftech.web.util.DBFluteUtil;
 import com.mssoftech.web.util.LoginUtil;
 import com.mssoftech.web.util.ServiceUtil;
