@@ -25,6 +25,11 @@ public class AjaxControl {
 	public void setAppContextUtil(AppContextUtil appContextUtil) {
 		this.appContextUtil = appContextUtil;
 	}
+	@RequestMapping(value = "/health", method = RequestMethod.GET)
+	String health() {
+
+		return "OK";
+	}
 
 	@RequestMapping(value = "/loginauth", method = RequestMethod.POST)
 	String loginauth(HttpServletRequest request, HttpServletResponse response,
