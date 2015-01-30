@@ -15,8 +15,9 @@ $w.LoginRows = React.createClass({
           <tr key={i} >
           <td id={"loginrow#loginId#"+i} style={{width:this.props.cw.c1,backgroundColor:bgcolor}}>{rcd.loginId}</td>
           <td id={"loginrow#name#"+i} style={{width:this.props.cw.c2,backgroundColor:bgcolor}}>{rcd.name}</td>
-          <td id={"loginrow#lid#"+i} style={{width:this.props.cw.c3,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.id}</td>
-          <td id={"loginrow#versionNo#"+i} style={{width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.versionNo}</td>
+          <td id={"loginrow#role#"+i} style={{width:this.props.cw.c3,backgroundColor:bgcolor}}>{rcd.role}</td>
+          <td id={"loginrow#lid#"+i} style={{width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.id}</td>
+          <td id={"loginrow#versionNo#"+i} style={{width:this.props.cw.c5,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.versionNo}</td>
          </tr>
         )
         }, this);
@@ -30,7 +31,17 @@ $w.LoginRows = React.createClass({
 $w.Application = React.createClass({
   mixins: [$w.FluxMixin, $w.StoreWatchMixin("PAGE","COMMON","RCD")],
   getInitialState: function() {
-  $w.application = this
+  $w.app = this;
+      blank={
+                    loginId:"",
+                    name:"",
+                    role:"",
+                    id:"",
+                    versionNo:"",
+                    password:"",
+                    passwordcfm:""
+                    
+                };
       return {
                 user:$c.login.name,
                 search:{
@@ -43,27 +54,12 @@ $w.Application = React.createClass({
                 },
                 login:{
                   url:"/ajax/login",
-                  cw:{c1:100,c2:150,c3:60,c4:60},
+                  cw:{c1:100,c2:150,c3:60,c4:60,c5:60},
                   rcds:[],
-                  blank:{
-                    loginId:"",
-                    name:"",
-                    id:"",
-                    versionNo:"",
-                    password:"",
-                    passwordcfm:""
-                    
-                  },
+                  blank:_.cloneDeep(blank),
                   selRow:-1
                 },
-                form:{
-                    loginId:"",
-                    name:"",
-                    id:"",
-                    versionNo:"",
-                    password:"",
-                    passwordcfm:""
-                },
+                form:_.cloneDeep(blank),
                 tabkey:1
 
               };
@@ -102,7 +98,7 @@ $w.Application = React.createClass({
       
       
       <b.TabbedArea activeKey={this.state.tabkey} className="usertab" bsStyle="pills"  
-      onSelect={this.handleClick.bind(this,{target:{name:"tabselect"}})} 
+      onSelect={$w.tabClick} 
       style={{backgroundColor: "#FFFFFF"}}>
        {/*                                      
         *   検索
@@ -110,7 +106,7 @@ $w.Application = React.createClass({
       <b.TabPane eventKey={1} tab="検索"  
         style={{border:1,borderStyle:"solid",height:535}}>
       <b.Row style={{margin:5}}>
-      <b.Button bsSize="xsmall" bsStyle="primary" onClick={this.handleClick} 
+      <b.Button bsSize="xsmall" bsStyle="primary" onClick={$w.handleClick} 
         name="btnSearch" style={{width:60,marginLeft:10}}>検索</b.Button>
       </b.Row>
       <b.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
@@ -119,16 +115,16 @@ $w.Application = React.createClass({
           <b.Col xs={2} >
           <$c.SelectOption options={$c.stringOption} style={{height:24,  fontSize:12}}
                name={"search#loginId"}
-              defaultValue={this.state.search.loginId} onChange={this.handleChange} />
+              defaultValue={this.state.search.loginId} onChange={$w.handleChange} />
           </b.Col>
           <b.Col xs={3}>
           <b.Input type="text" value={this.state.search.loginId_s} 
-            name="search#loginId_s" onChange={this.handleChange} 
+            name="search#loginId_s" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
           <b.Col xs={3}>
           <b.Input type="text" value={this.state.search.loginId_e} 
-            name="search#loginId_e" onChange={this.handleChange} 
+            name="search#loginId_e" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
@@ -138,33 +134,34 @@ $w.Application = React.createClass({
           <b.Col xs={2} >
           <$c.SelectOption options={$c.stringOption} 
               style={{height:24,  fontSize:12}} name={"search#name"}
-              defaultValue={this.state.search.name} onChange={this.handleChange} />
+              defaultValue={this.state.search.name} onChange={$w.handleChange} />
           </b.Col>
           <b.Col xs={3}>
           <b.Input type="text" value={this.state.search.name_s} 
-            name="search#name_s" onChange={this.handleChange} 
+            name="search#name_s" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
           <b.Col xs={3}>
           <b.Input type="text" value={this.state.search.name_e} 
-            name="search#name_e" onChange={this.handleChange} 
+            name="search#name_e" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
-      <div style={{width:400,border:1,borderStyle:"solid",
+      <div style={{width:460,border:1,borderStyle:"solid",
           borderColor:"black",height:120,backgroundColor: "#FFFFFF"}}>
        { /*
           *   TABLE
           */}
       <b.Table bordered condensed className="wscrolltable" 
           style={{width:"100%",height:"100%"}}
-      onClick={this.handleClick}>
+      onClick={$w.handleClick}>
        <thead>
         <tr >
           <th　style={{width:this.state.login.cw.c1}}>Login Id</th>
           <th style={{width:this.state.login.cw.c2}}>氏名</th>
-          <th　style={{width:this.state.login.cw.c3}}>id</th>
-          <th style={{width:this.state.login.cw.c4}}>versionNo</th>
+          <th style={{width:this.state.login.cw.c3}}>Role</th>
+          <th　style={{width:this.state.login.cw.c4}}>id</th>
+          <th style={{width:this.state.login.cw.c5}}>versionNo</th>
         </tr>
       </thead>
       <$w.LoginRows rcds={this.state.login.rcds} cw={this.state.login.cw}
@@ -178,11 +175,11 @@ $w.Application = React.createClass({
       <b.TabPane eventKey={2} tab="詳細"
       style={{border:1,borderStyle:"solid",height:535}}>
       <b.Row style={{margin:5}}>
-        <b.Button bsSize="xsmall" bsStyle="primary" onClick={this.handleClick}
+        <b.Button bsSize="xsmall" bsStyle="primary" onClick={$w.handleClick}
             name="btnNew" style={{width:60,marginLeft:10}}>新規</b.Button>
-        <b.Button bsSize="xsmall" bsStyle="primary" onClick={this.handleClick} 
+        <b.Button bsSize="xsmall" bsStyle="primary" onClick={$w.handleClick} 
             name="btnUpdate" style={{width:60,marginLeft:10}}>更新</b.Button>
-        <b.Button bsSize="xsmall" bsStyle="primary" onClick={this.handleClick} 
+        <b.Button bsSize="xsmall" bsStyle="primary" onClick={$w.handleClick} 
             name="btnDelete" style={{width:60,marginLeft:10}}>削除</b.Button>
 
       </b.Row>
@@ -191,7 +188,7 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={2}>
           <b.Input type="text" value={this.state.form.loginId} 
-            name="form#loginId" onChange={this.handleChange} 
+            name="form#loginId" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
@@ -200,7 +197,16 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={2}>
           <b.Input type="text" value={this.state.form.name} 
-            name="form#name" onChange={this.handleChange} 
+            name="form#name" onChange={$w.handleChange} 
+            style={{height:24,fontSize:12,width:"100%"}}/>
+          </b.Col>
+      </b.Row>
+      <b.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
+         <b.Col xs={2} style={{textAlign: "right"}}>Role
+          </b.Col>
+          <b.Col xs={2}>
+          <b.Input type="text" value={this.state.form.role} 
+            name="form#role" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
@@ -209,7 +215,7 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={2}>
           <b.Input type="password" value={this.state.form.password} 
-            name="form#password" onChange={this.handleChange} 
+            name="form#password" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
@@ -218,7 +224,7 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={2}>
           <b.Input type="password" value={this.state.form.passwordcfm} 
-            name="form#passwordcfm" onChange={this.handleChange} 
+            name="form#passwordcfm" onChange={$w.handleChange} 
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
       </b.Row>
@@ -227,7 +233,7 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={1}>
           <b.Input type="text" value={this.state.form.id} 
-            name="form#id" onChange={this.handleChange} 
+            name="form#id" onChange={$w.handleChange} 
             disabled
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
@@ -235,7 +241,7 @@ $w.Application = React.createClass({
           </b.Col>
           <b.Col xs={1}>
           <b.Input type="text" value={this.state.form.versionNo} 
-            name="form#versionNo" onChange={this.handleChange} 
+            name="form#versionNo" onChange={$w.handleChange} 
             disabled
             style={{height:24,fontSize:12,width:"100%"}}/>
           </b.Col>
@@ -243,22 +249,15 @@ $w.Application = React.createClass({
       </b.TabPane>
       </b.TabbedArea>
       <$c.Alert isShow={this.state.common.alert.isShow} 
-          message={this.state.common.alert.message} onClick={this.handleClick} />
+          message={this.state.common.alert.message} onClick={$w.handleClick} />
       <$c.DeleteConfirm isShow={this.state.common.deleteCfm.isShow}
-          onClick={this.handleClick}/>
+          onClick={$w.handleClick}/>
       </div>
     );
   },
   componentDidMount: function() {
 
   },
-  handleChange: function (e) {
-    $w.handleChange(this,e);
-  },
-  handleClick: function (e,tab) {
-    $w.handleClick(this,e,tab);
-  }
-
 });
 
 React.render(<$w.Application flux={$w.flux}/>, document.getElementById('content'));

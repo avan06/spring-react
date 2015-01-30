@@ -46,9 +46,7 @@ public class SessionDbm extends AbstractDBMeta {
         setupEpg(_epgMap, et -> ((Session)et).getId(), (et, vl) -> ((Session)et).setId(cti(vl)), "id");
         setupEpg(_epgMap, et -> ((Session)et).getUuid(), (et, vl) -> ((Session)et).setUuid((String)vl), "uuid");
         setupEpg(_epgMap, et -> ((Session)et).getLoginId(), (et, vl) -> ((Session)et).setLoginId(cti(vl)), "loginId");
-        setupEpg(_epgMap, et -> ((Session)et).getCompId(), (et, vl) -> ((Session)et).setCompId(cti(vl)), "compId");
-        setupEpg(_epgMap, et -> ((Session)et).getFy(), (et, vl) -> ((Session)et).setFy((String)vl), "fy");
-        setupEpg(_epgMap, et -> ((Session)et).getGrp(), (et, vl) -> ((Session)et).setGrp((String)vl), "grp");
+        setupEpg(_epgMap, et -> ((Session)et).getRole(), (et, vl) -> ((Session)et).setRole((String)vl), "role");
         setupEpg(_epgMap, et -> ((Session)et).getData(), (et, vl) -> ((Session)et).setData((String)vl), "data");
         setupEpg(_epgMap, et -> ((Session)et).getVersionNo(), (et, vl) -> ((Session)et).setVersionNo(cti(vl)), "versionNo");
         setupEpg(_epgMap, et -> ((Session)et).getDelFlag(), (et, vl) -> ((Session)et).setDelFlag(cti(vl)), "delFlag");
@@ -91,9 +89,7 @@ public class SessionDbm extends AbstractDBMeta {
     protected final ColumnInfo _columnId = cci("id", "id", null, null, Integer.class, "id", null, true, true, true, "serial", 10, 0, "nextval('session_id_seq'::regclass)", false, null, null, null, null, null, false);
     protected final ColumnInfo _columnUuid = cci("uuid", "uuid", null, null, String.class, "uuid", null, false, false, true, "varchar", 50, 0, null, false, null, null, null, null, null, false);
     protected final ColumnInfo _columnLoginId = cci("login_id", "login_id", null, null, Integer.class, "loginId", null, false, false, false, "int4", 10, 0, null, false, null, null, "login", null, null, false);
-    protected final ColumnInfo _columnCompId = cci("comp_id", "comp_id", null, null, Integer.class, "compId", null, false, false, false, "int4", 10, 0, null, false, null, null, null, null, null, false);
-    protected final ColumnInfo _columnFy = cci("fy", "fy", null, null, String.class, "fy", null, false, false, false, "bpchar", 4, 0, null, false, null, null, null, null, null, false);
-    protected final ColumnInfo _columnGrp = cci("grp", "grp", null, null, String.class, "grp", null, false, false, false, "varchar", 5, 0, null, false, null, null, null, null, null, false);
+    protected final ColumnInfo _columnRole = cci("role", "role", null, null, String.class, "role", null, false, false, false, "varchar", 5, 0, null, false, null, null, null, null, null, false);
     protected final ColumnInfo _columnData = cci("data", "data", null, null, String.class, "data", null, false, false, false, "varchar", 255, 0, null, false, null, null, null, null, null, false);
     protected final ColumnInfo _columnVersionNo = cci("version_no", "version_no", null, null, Integer.class, "versionNo", null, false, false, true, "int4", 10, 0, null, false, OptimisticLockType.VERSION_NO, null, null, null, null, false);
     protected final ColumnInfo _columnDelFlag = cci("del_flag", "del_flag", null, null, Integer.class, "delFlag", null, false, false, true, "int4", 10, 0, "0", false, null, null, null, null, null, false);
@@ -120,20 +116,10 @@ public class SessionDbm extends AbstractDBMeta {
      */
     public ColumnInfo columnLoginId() { return _columnLoginId; }
     /**
-     * comp_id: {int4(10)}
+     * role: {varchar(5)}
      * @return The information object of specified column. (NotNull)
      */
-    public ColumnInfo columnCompId() { return _columnCompId; }
-    /**
-     * fy: {bpchar(4)}
-     * @return The information object of specified column. (NotNull)
-     */
-    public ColumnInfo columnFy() { return _columnFy; }
-    /**
-     * grp: {varchar(5)}
-     * @return The information object of specified column. (NotNull)
-     */
-    public ColumnInfo columnGrp() { return _columnGrp; }
+    public ColumnInfo columnRole() { return _columnRole; }
     /**
      * data: {varchar(255)}
      * @return The information object of specified column. (NotNull)
@@ -185,9 +171,7 @@ public class SessionDbm extends AbstractDBMeta {
         ls.add(columnId());
         ls.add(columnUuid());
         ls.add(columnLoginId());
-        ls.add(columnCompId());
-        ls.add(columnFy());
-        ls.add(columnGrp());
+        ls.add(columnRole());
         ls.add(columnData());
         ls.add(columnVersionNo());
         ls.add(columnDelFlag());

@@ -1,16 +1,15 @@
 $c.checkAndCreate("$w")
  
-$w.handleChange = (jsx,e) ->
-  $c.handleChange(jsx,e.target.name,e.target.value);
-
-$w.handleClick = (jsx,e,tab) ->
-  name=e.target.name
-  if name=="tabselect"
-    tabkey={
+$w.handleChange = (e) ->
+  $c.handleChange($w.app,e.target.name,e.target.value);
+$w.tabClick= (tab) ->
+  tabkey={
       tabkey:tab
     }
-    jsx.setState(tabkey)
-    return
+  $w.app.setState(tabkey)  
+$w.handleClick = (e) ->
+  jsx=$w.app
+  name=e.target.name
   if name=="alert#CloseBtn"
      $w.flux.actions.$c_alertHide()
   if name=="deleteCfm#CloseBtn"
@@ -77,14 +76,7 @@ $w.formUpdateCheck = (form) ->
  
 $w.formClear = (jsx) ->
   formtemp={
-      form:{
-      loginId:""
-      name:""
-      id:""
-      versionNo:""
-      password:""
-      passwordcfm:""
-    }
+      form:_.cloneDeep(jsx.state.login.blank)
   }
   jsx.setState(formtemp)
 $w.constants =

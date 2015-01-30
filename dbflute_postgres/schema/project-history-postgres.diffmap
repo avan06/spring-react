@@ -1,4 +1,46 @@
 map:{
+    ; 2015/01/30 11:52:16 = map:{
+        ; diffDate = 2015/01/30 11:52:16
+        ; tableDiff = map:{
+            ; session = map:{
+                ; tableName = session
+                ; diffType = CHANGE
+                ; columnDiff = map:{
+                    ; role = map:{
+                        ; columnName = role
+                        ; diffType = ADD
+                    }
+                    ; comp_id = map:{
+                        ; columnName = comp_id
+                        ; diffType = DELETE
+                    }
+                    ; fy = map:{
+                        ; columnName = fy
+                        ; diffType = DELETE
+                    }
+                    ; grp = map:{
+                        ; columnName = grp
+                        ; diffType = DELETE
+                    }
+                }
+            }
+        }
+    }
+    ; 2015/01/30 09:53:36 = map:{
+        ; diffDate = 2015/01/30 09:53:36
+        ; tableDiff = map:{
+            ; login = map:{
+                ; tableName = login
+                ; diffType = CHANGE
+                ; columnDiff = map:{
+                    ; role = map:{
+                        ; columnName = role
+                        ; diffType = ADD
+                    }
+                }
+            }
+        }
+    }
     ; 2015/01/28 09:28:50 = map:{
         ; diffDate = 2015/01/28 09:28:50
         ; tableDiff = map:{

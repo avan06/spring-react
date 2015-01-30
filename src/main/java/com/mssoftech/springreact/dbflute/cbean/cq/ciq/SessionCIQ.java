@@ -64,9 +64,7 @@ public class SessionCIQ extends AbstractBsSessionCQ {
     protected ConditionValue xgetCValueId() { return _myCQ.xdfgetId(); }
     protected ConditionValue xgetCValueUuid() { return _myCQ.xdfgetUuid(); }
     protected ConditionValue xgetCValueLoginId() { return _myCQ.xdfgetLoginId(); }
-    protected ConditionValue xgetCValueCompId() { return _myCQ.xdfgetCompId(); }
-    protected ConditionValue xgetCValueFy() { return _myCQ.xdfgetFy(); }
-    protected ConditionValue xgetCValueGrp() { return _myCQ.xdfgetGrp(); }
+    protected ConditionValue xgetCValueRole() { return _myCQ.xdfgetRole(); }
     protected ConditionValue xgetCValueData() { return _myCQ.xdfgetData(); }
     protected ConditionValue xgetCValueVersionNo() { return _myCQ.xdfgetVersionNo(); }
     protected ConditionValue xgetCValueDelFlag() { return _myCQ.xdfgetDelFlag(); }

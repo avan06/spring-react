@@ -352,6 +352,11 @@ public class BsLoginCB extends AbstractConditionBean {
          * @return The information object of specified column. (NotNull)
          */
         public SpecifiedColumn columnUpdateProcess() { return doColumn("update_process"); }
+        /**
+         * role: {varchar(20)}
+         * @return The information object of specified column. (NotNull)
+         */
+        public SpecifiedColumn columnRole() { return doColumn("role"); }
         public void everyColumn() { doEveryColumn(); }
         public void exceptRecordMetaColumn() { doExceptRecordMetaColumn(); }
         @Override

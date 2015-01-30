@@ -15,8 +15,9 @@ $w.LoginRows = React.createClass({displayName: 'LoginRows',
           React.createElement("tr", {key: i}, 
           React.createElement("td", {id: "loginrow#loginId#"+i, style: {width:this.props.cw.c1,backgroundColor:bgcolor}}, rcd.loginId), 
           React.createElement("td", {id: "loginrow#name#"+i, style: {width:this.props.cw.c2,backgroundColor:bgcolor}}, rcd.name), 
-          React.createElement("td", {id: "loginrow#lid#"+i, style: {width:this.props.cw.c3,backgroundColor:bgcolor,textAlign:"right"}}, rcd.id), 
-          React.createElement("td", {id: "loginrow#versionNo#"+i, style: {width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}, rcd.versionNo)
+          React.createElement("td", {id: "loginrow#role#"+i, style: {width:this.props.cw.c3,backgroundColor:bgcolor}}, rcd.role), 
+          React.createElement("td", {id: "loginrow#lid#"+i, style: {width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}, rcd.id), 
+          React.createElement("td", {id: "loginrow#versionNo#"+i, style: {width:this.props.cw.c5,backgroundColor:bgcolor,textAlign:"right"}}, rcd.versionNo)
          )
         )
         }, this);
@@ -27,13 +28,14 @@ $w.LoginRows = React.createClass({displayName: 'LoginRows',
           );
     }
   });
-$w.app = React.createClass({displayName: 'Application',
+$w.Application = React.createClass({displayName: 'Application',
   mixins: [$w.FluxMixin, $w.StoreWatchMixin("COMMON","RCD")],
   getInitialState: function() {
   $w.app = this;
       blank={
                     loginId:"",
                     name:"",
+                    role:"",
                     id:"",
                     versionNo:"",
                     password:"",
@@ -52,7 +54,7 @@ $w.app = React.createClass({displayName: 'Application',
                 },
                 login:{
                   url:"/ajax/login",
-                  cw:{c1:100,c2:150,c3:60,c4:60},
+                  cw:{c1:100,c2:150,c3:60,c4:60,c5:60},
                   rcds:[],
                   blank:_.cloneDeep(blank),
                   selRow:-1
@@ -126,7 +128,7 @@ $w.app = React.createClass({displayName: 'Application',
             style: {height:24,fontSize:12,width:"100%"}})
           )
       ), 
-      React.createElement("div", {style: {width:400,border:1,borderStyle:"solid",
+      React.createElement("div", {style: {width:460,border:1,borderStyle:"solid",
           borderColor:"black",height:120,backgroundColor: "#FFFFFF"}}, 
       React.createElement(b.Table, {bordered: true, condensed: true, className: "wscrolltable", 
           style: {width:"100%",height:"100%"}, 
@@ -135,8 +137,9 @@ $w.app = React.createClass({displayName: 'Application',
         React.createElement("tr", null, 
           React.createElement("th", {　style: {width:this.state.login.cw.c1}}, "Login Id"), 
           React.createElement("th", {style: {width:this.state.login.cw.c2}}, "氏名"), 
-          React.createElement("th", {　style: {width:this.state.login.cw.c3}}, "id"), 
-          React.createElement("th", {style: {width:this.state.login.cw.c4}}, "versionNo")
+          React.createElement("th", {style: {width:this.state.login.cw.c3}}, "Role"), 
+          React.createElement("th", {　style: {width:this.state.login.cw.c4}}, "id"), 
+          React.createElement("th", {style: {width:this.state.login.cw.c5}}, "versionNo")
         )
       ), 
       React.createElement($w.LoginRows, {rcds: this.state.login.rcds, cw: this.state.login.cw, 
@@ -167,6 +170,15 @@ $w.app = React.createClass({displayName: 'Application',
           React.createElement(b.Col, {xs: 2}, 
           React.createElement(b.Input, {type: "text", value: this.state.form.name, 
             name: "form#name", onChange: $w.handleChange, 
+            style: {height:24,fontSize:12,width:"100%"}})
+          )
+      ), 
+      React.createElement(b.Row, {　style: {verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}, 
+         React.createElement(b.Col, {xs: 2, style: {textAlign: "right"}}, "Role"
+          ), 
+          React.createElement(b.Col, {xs: 2}, 
+          React.createElement(b.Input, {type: "text", value: this.state.form.role, 
+            name: "form#role", onChange: $w.handleChange, 
             style: {height:24,fontSize:12,width:"100%"}})
           )
       ), 
@@ -218,4 +230,4 @@ $w.app = React.createClass({displayName: 'Application',
 
 });
 
-React.render(React.createElement($w.app, {flux: $w.flux}), document.getElementById('content'));
+React.render(React.createElement($w.Application, {flux: $w.flux}), document.getElementById('content'));

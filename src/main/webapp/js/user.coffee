@@ -1,8 +1,7 @@
 $c.checkAndCreate("$w")
  
 $w.handleChange = (e) ->
-  jsx=$w.app
-  $c.handleChange(jsx,e.target.name,e.target.value);
+  $c.handleChange($w.app,e.target.name,e.target.value);
 
 $w.handleClick = (e) ->
   jsx=$w.app

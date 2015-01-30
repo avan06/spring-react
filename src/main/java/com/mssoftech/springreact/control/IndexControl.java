@@ -80,7 +80,7 @@ public class IndexControl {
 		String[] libfiles = new String[] { "/js/lib/fluxxor.js",
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
-		String title = "USER管理";
+		String title = "USER INLINE";
 		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
@@ -94,7 +94,31 @@ public class IndexControl {
 		String[] libfiles = new String[] { "/js/lib/fluxxor.js",
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
-		String title = "USER管理";
+		String title = "USER TAB";
+		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+				files, libfiles, title,appContextUtil);
+	}
+	@RequestMapping("/usertbl")
+	String usertbl(HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
+		String[] files = new String[] { "/js/$c.js", "/js/$v.js",
+				"/js/usertbl.js", "/js/_cjsx.js", "/js/usertbljsx.js" };
+		String[] libfiles = new String[] { "/js/lib/fluxxor.js",
+				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
+				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
+		String title = "USER TAB";
+		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+				files, libfiles, title,appContextUtil);
+	}
+	@RequestMapping("/systbl")
+	String systbl(HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
+		String[] files = new String[] { "/js/$c.js", "/js/$v.js",
+				"/js/systbl.js", "/js/_cjsx.js", "/js/systbljsx.js" };
+		String[] libfiles = new String[] { "/js/lib/fluxxor.js",
+				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
+				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
+		String title = "USER TAB";
 		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}

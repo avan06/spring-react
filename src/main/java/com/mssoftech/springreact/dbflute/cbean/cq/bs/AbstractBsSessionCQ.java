@@ -437,439 +437,157 @@ public abstract class AbstractBsSessionCQ extends AbstractConditionQuery {
     protected abstract ConditionValue xgetCValueLoginId();
 
     /**
-     * Equal(=). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as equal. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_Equal(Integer compId) {
-        doSetCompId_Equal(compId);
-    }
-
-    protected void doSetCompId_Equal(Integer compId) {
-        regCompId(CK_EQ, compId);
-    }
-
-    /**
-     * NotEqual(&lt;&gt;). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as notEqual. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_NotEqual(Integer compId) {
-        doSetCompId_NotEqual(compId);
-    }
-
-    protected void doSetCompId_NotEqual(Integer compId) {
-        regCompId(CK_NES, compId);
-    }
-
-    /**
-     * GreaterThan(&gt;). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as greaterThan. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_GreaterThan(Integer compId) {
-        regCompId(CK_GT, compId);
-    }
-
-    /**
-     * LessThan(&lt;). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as lessThan. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_LessThan(Integer compId) {
-        regCompId(CK_LT, compId);
-    }
-
-    /**
-     * GreaterEqual(&gt;=). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as greaterEqual. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_GreaterEqual(Integer compId) {
-        regCompId(CK_GE, compId);
-    }
-
-    /**
-     * LessEqual(&lt;=). And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compId The value of compId as lessEqual. (NullAllowed: if null, no condition)
-     */
-    public void setCompId_LessEqual(Integer compId) {
-        regCompId(CK_LE, compId);
-    }
-
-    /**
-     * RangeOf with various options. (versatile) <br>
-     * {(default) minNumber &lt;= column &lt;= maxNumber} <br>
-     * And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param minNumber The min number of compId. (NullAllowed: if null, no from-condition)
-     * @param maxNumber The max number of compId. (NullAllowed: if null, no to-condition)
-     * @param opLambda The callback for option of range-of. (NotNull)
-     */
-    public void setCompId_RangeOf(Integer minNumber, Integer maxNumber, ConditionOptionCall<RangeOfOption> opLambda) {
-        setCompId_RangeOf(minNumber, maxNumber, xcROOP(opLambda));
-    }
-
-    /**
-     * RangeOf with various options. (versatile) <br>
-     * {(default) minNumber &lt;= column &lt;= maxNumber} <br>
-     * And NullIgnored, OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param minNumber The min number of compId. (NullAllowed: if null, no from-condition)
-     * @param maxNumber The max number of compId. (NullAllowed: if null, no to-condition)
-     * @param rangeOfOption The option of range-of. (NotNull)
-     */
-    protected void setCompId_RangeOf(Integer minNumber, Integer maxNumber, RangeOfOption rangeOfOption) {
-        regROO(minNumber, maxNumber, xgetCValueCompId(), "comp_id", rangeOfOption);
-    }
-
-    /**
-     * InScope {in (1, 2)}. And NullIgnored, NullElementIgnored, SeveralRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compIdList The collection of compId as inScope. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setCompId_InScope(Collection<Integer> compIdList) {
-        doSetCompId_InScope(compIdList);
-    }
-
-    protected void doSetCompId_InScope(Collection<Integer> compIdList) {
-        regINS(CK_INS, cTL(compIdList), xgetCValueCompId(), "comp_id");
-    }
-
-    /**
-     * NotInScope {not in (1, 2)}. And NullIgnored, NullElementIgnored, SeveralRegistered. <br>
-     * comp_id: {int4(10)}
-     * @param compIdList The collection of compId as notInScope. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setCompId_NotInScope(Collection<Integer> compIdList) {
-        doSetCompId_NotInScope(compIdList);
-    }
-
-    protected void doSetCompId_NotInScope(Collection<Integer> compIdList) {
-        regINS(CK_NINS, cTL(compIdList), xgetCValueCompId(), "comp_id");
-    }
-
-    /**
-     * IsNull {is null}. And OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     */
-    public void setCompId_IsNull() { regCompId(CK_ISN, DOBJ); }
-
-    /**
-     * IsNotNull {is not null}. And OnlyOnceRegistered. <br>
-     * comp_id: {int4(10)}
-     */
-    public void setCompId_IsNotNull() { regCompId(CK_ISNN, DOBJ); }
-
-    protected void regCompId(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueCompId(), "comp_id"); }
-    protected abstract ConditionValue xgetCValueCompId();
-
-    /**
      * Equal(=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as equal. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as equal. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_Equal(String fy) {
-        doSetFy_Equal(fRES(fy));
+    public void setRole_Equal(String role) {
+        doSetRole_Equal(fRES(role));
     }
 
-    protected void doSetFy_Equal(String fy) {
-        regFy(CK_EQ, fy);
+    protected void doSetRole_Equal(String role) {
+        regRole(CK_EQ, role);
     }
 
     /**
      * NotEqual(&lt;&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as notEqual. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as notEqual. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_NotEqual(String fy) {
-        doSetFy_NotEqual(fRES(fy));
+    public void setRole_NotEqual(String role) {
+        doSetRole_NotEqual(fRES(role));
     }
 
-    protected void doSetFy_NotEqual(String fy) {
-        regFy(CK_NES, fy);
+    protected void doSetRole_NotEqual(String role) {
+        regRole(CK_NES, role);
     }
 
     /**
      * GreaterThan(&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as greaterThan. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as greaterThan. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_GreaterThan(String fy) {
-        regFy(CK_GT, fRES(fy));
+    public void setRole_GreaterThan(String role) {
+        regRole(CK_GT, fRES(role));
     }
 
     /**
      * LessThan(&lt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as lessThan. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as lessThan. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_LessThan(String fy) {
-        regFy(CK_LT, fRES(fy));
+    public void setRole_LessThan(String role) {
+        regRole(CK_LT, fRES(role));
     }
 
     /**
      * GreaterEqual(&gt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as greaterEqual. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as greaterEqual. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_GreaterEqual(String fy) {
-        regFy(CK_GE, fRES(fy));
+    public void setRole_GreaterEqual(String role) {
+        regRole(CK_GE, fRES(role));
     }
 
     /**
      * LessEqual(&lt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as lessEqual. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as lessEqual. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_LessEqual(String fy) {
-        regFy(CK_LE, fRES(fy));
+    public void setRole_LessEqual(String role) {
+        regRole(CK_LE, fRES(role));
     }
 
     /**
      * InScope {in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fyList The collection of fy as inScope. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param roleList The collection of role as inScope. (NullAllowed: if null (or empty), no condition)
      */
-    public void setFy_InScope(Collection<String> fyList) {
-        doSetFy_InScope(fyList);
+    public void setRole_InScope(Collection<String> roleList) {
+        doSetRole_InScope(roleList);
     }
 
-    protected void doSetFy_InScope(Collection<String> fyList) {
-        regINS(CK_INS, cTL(fyList), xgetCValueFy(), "fy");
-    }
-
-    /**
-     * NotInScope {not in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fyList The collection of fy as notInScope. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setFy_NotInScope(Collection<String> fyList) {
-        doSetFy_NotInScope(fyList);
-    }
-
-    protected void doSetFy_NotInScope(Collection<String> fyList) {
-        regINS(CK_NINS, cTL(fyList), xgetCValueFy(), "fy");
-    }
-
-    /**
-     * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)} <br>
-     * <pre>e.g. setFy_LikeSearch("xxx", op <span style="color: #90226C; font-weight: bold"><span style="font-size: 120%">-</span>&gt;</span> op.<span style="color: #CC4747">likeContain()</span>);</pre>
-     * @param fy The value of fy as likeSearch. (NullAllowed: if null (or empty), no condition)
-     * @param opLambda The callback for option of like-search. (NotNull)
-     */
-    public void setFy_LikeSearch(String fy, ConditionOptionCall<LikeSearchOption> opLambda) {
-        setFy_LikeSearch(fy, xcLSOP(opLambda));
-    }
-
-    /**
-     * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)} <br>
-     * <pre>e.g. setFy_LikeSearch("xxx", new <span style="color: #CC4747">LikeSearchOption</span>().likeContain());</pre>
-     * @param fy The value of fy as likeSearch. (NullAllowed: if null (or empty), no condition)
-     * @param likeSearchOption The option of like-search. (NotNull)
-     */
-    protected void setFy_LikeSearch(String fy, LikeSearchOption likeSearchOption) {
-        regLSQ(CK_LS, fRES(fy), xgetCValueFy(), "fy", likeSearchOption);
-    }
-
-    /**
-     * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
-     * And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as notLikeSearch. (NullAllowed: if null (or empty), no condition)
-     * @param opLambda The callback for option of like-search. (NotNull)
-     */
-    public void setFy_NotLikeSearch(String fy, ConditionOptionCall<LikeSearchOption> opLambda) {
-        setFy_NotLikeSearch(fy, xcLSOP(opLambda));
-    }
-
-    /**
-     * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
-     * And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * fy: {bpchar(4)}
-     * @param fy The value of fy as notLikeSearch. (NullAllowed: if null (or empty), no condition)
-     * @param likeSearchOption The option of not-like-search. (NotNull)
-     */
-    protected void setFy_NotLikeSearch(String fy, LikeSearchOption likeSearchOption) {
-        regLSQ(CK_NLS, fRES(fy), xgetCValueFy(), "fy", likeSearchOption);
-    }
-
-    /**
-     * IsNull {is null}. And OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     */
-    public void setFy_IsNull() { regFy(CK_ISN, DOBJ); }
-
-    /**
-     * IsNullOrEmpty {is null or empty}. And OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     */
-    public void setFy_IsNullOrEmpty() { regFy(CK_ISNOE, DOBJ); }
-
-    /**
-     * IsNotNull {is not null}. And OnlyOnceRegistered. <br>
-     * fy: {bpchar(4)}
-     */
-    public void setFy_IsNotNull() { regFy(CK_ISNN, DOBJ); }
-
-    protected void regFy(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueFy(), "fy"); }
-    protected abstract ConditionValue xgetCValueFy();
-
-    /**
-     * Equal(=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as equal. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_Equal(String grp) {
-        doSetGrp_Equal(fRES(grp));
-    }
-
-    protected void doSetGrp_Equal(String grp) {
-        regGrp(CK_EQ, grp);
-    }
-
-    /**
-     * NotEqual(&lt;&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as notEqual. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_NotEqual(String grp) {
-        doSetGrp_NotEqual(fRES(grp));
-    }
-
-    protected void doSetGrp_NotEqual(String grp) {
-        regGrp(CK_NES, grp);
-    }
-
-    /**
-     * GreaterThan(&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as greaterThan. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_GreaterThan(String grp) {
-        regGrp(CK_GT, fRES(grp));
-    }
-
-    /**
-     * LessThan(&lt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as lessThan. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_LessThan(String grp) {
-        regGrp(CK_LT, fRES(grp));
-    }
-
-    /**
-     * GreaterEqual(&gt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as greaterEqual. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_GreaterEqual(String grp) {
-        regGrp(CK_GE, fRES(grp));
-    }
-
-    /**
-     * LessEqual(&lt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as lessEqual. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_LessEqual(String grp) {
-        regGrp(CK_LE, fRES(grp));
-    }
-
-    /**
-     * InScope {in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grpList The collection of grp as inScope. (NullAllowed: if null (or empty), no condition)
-     */
-    public void setGrp_InScope(Collection<String> grpList) {
-        doSetGrp_InScope(grpList);
-    }
-
-    protected void doSetGrp_InScope(Collection<String> grpList) {
-        regINS(CK_INS, cTL(grpList), xgetCValueGrp(), "grp");
+    protected void doSetRole_InScope(Collection<String> roleList) {
+        regINS(CK_INS, cTL(roleList), xgetCValueRole(), "role");
     }
 
     /**
      * NotInScope {not in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grpList The collection of grp as notInScope. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param roleList The collection of role as notInScope. (NullAllowed: if null (or empty), no condition)
      */
-    public void setGrp_NotInScope(Collection<String> grpList) {
-        doSetGrp_NotInScope(grpList);
+    public void setRole_NotInScope(Collection<String> roleList) {
+        doSetRole_NotInScope(roleList);
     }
 
-    protected void doSetGrp_NotInScope(Collection<String> grpList) {
-        regINS(CK_NINS, cTL(grpList), xgetCValueGrp(), "grp");
+    protected void doSetRole_NotInScope(Collection<String> roleList) {
+        regINS(CK_NINS, cTL(roleList), xgetCValueRole(), "role");
     }
 
     /**
      * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)} <br>
-     * <pre>e.g. setGrp_LikeSearch("xxx", op <span style="color: #90226C; font-weight: bold"><span style="font-size: 120%">-</span>&gt;</span> op.<span style="color: #CC4747">likeContain()</span>);</pre>
-     * @param grp The value of grp as likeSearch. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)} <br>
+     * <pre>e.g. setRole_LikeSearch("xxx", op <span style="color: #90226C; font-weight: bold"><span style="font-size: 120%">-</span>&gt;</span> op.<span style="color: #CC4747">likeContain()</span>);</pre>
+     * @param role The value of role as likeSearch. (NullAllowed: if null (or empty), no condition)
      * @param opLambda The callback for option of like-search. (NotNull)
      */
-    public void setGrp_LikeSearch(String grp, ConditionOptionCall<LikeSearchOption> opLambda) {
-        setGrp_LikeSearch(grp, xcLSOP(opLambda));
+    public void setRole_LikeSearch(String role, ConditionOptionCall<LikeSearchOption> opLambda) {
+        setRole_LikeSearch(role, xcLSOP(opLambda));
     }
 
     /**
      * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)} <br>
-     * <pre>e.g. setGrp_LikeSearch("xxx", new <span style="color: #CC4747">LikeSearchOption</span>().likeContain());</pre>
-     * @param grp The value of grp as likeSearch. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)} <br>
+     * <pre>e.g. setRole_LikeSearch("xxx", new <span style="color: #CC4747">LikeSearchOption</span>().likeContain());</pre>
+     * @param role The value of role as likeSearch. (NullAllowed: if null (or empty), no condition)
      * @param likeSearchOption The option of like-search. (NotNull)
      */
-    protected void setGrp_LikeSearch(String grp, LikeSearchOption likeSearchOption) {
-        regLSQ(CK_LS, fRES(grp), xgetCValueGrp(), "grp", likeSearchOption);
+    protected void setRole_LikeSearch(String role, LikeSearchOption likeSearchOption) {
+        regLSQ(CK_LS, fRES(role), xgetCValueRole(), "role", likeSearchOption);
     }
 
     /**
      * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
      * And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as notLikeSearch. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as notLikeSearch. (NullAllowed: if null (or empty), no condition)
      * @param opLambda The callback for option of like-search. (NotNull)
      */
-    public void setGrp_NotLikeSearch(String grp, ConditionOptionCall<LikeSearchOption> opLambda) {
-        setGrp_NotLikeSearch(grp, xcLSOP(opLambda));
+    public void setRole_NotLikeSearch(String role, ConditionOptionCall<LikeSearchOption> opLambda) {
+        setRole_NotLikeSearch(role, xcLSOP(opLambda));
     }
 
     /**
      * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
      * And NullOrEmptyIgnored, SeveralRegistered. <br>
-     * grp: {varchar(5)}
-     * @param grp The value of grp as notLikeSearch. (NullAllowed: if null (or empty), no condition)
+     * role: {varchar(5)}
+     * @param role The value of role as notLikeSearch. (NullAllowed: if null (or empty), no condition)
      * @param likeSearchOption The option of not-like-search. (NotNull)
      */
-    protected void setGrp_NotLikeSearch(String grp, LikeSearchOption likeSearchOption) {
-        regLSQ(CK_NLS, fRES(grp), xgetCValueGrp(), "grp", likeSearchOption);
+    protected void setRole_NotLikeSearch(String role, LikeSearchOption likeSearchOption) {
+        regLSQ(CK_NLS, fRES(role), xgetCValueRole(), "role", likeSearchOption);
     }
 
     /**
      * IsNull {is null}. And OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
+     * role: {varchar(5)}
      */
-    public void setGrp_IsNull() { regGrp(CK_ISN, DOBJ); }
+    public void setRole_IsNull() { regRole(CK_ISN, DOBJ); }
 
     /**
      * IsNullOrEmpty {is null or empty}. And OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
+     * role: {varchar(5)}
      */
-    public void setGrp_IsNullOrEmpty() { regGrp(CK_ISNOE, DOBJ); }
+    public void setRole_IsNullOrEmpty() { regRole(CK_ISNOE, DOBJ); }
 
     /**
      * IsNotNull {is not null}. And OnlyOnceRegistered. <br>
-     * grp: {varchar(5)}
+     * role: {varchar(5)}
      */
-    public void setGrp_IsNotNull() { regGrp(CK_ISNN, DOBJ); }
+    public void setRole_IsNotNull() { regRole(CK_ISNN, DOBJ); }
 
-    protected void regGrp(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueGrp(), "grp"); }
-    protected abstract ConditionValue xgetCValueGrp();
+    protected void regRole(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueRole(), "role"); }
+    protected abstract ConditionValue xgetCValueRole();
 
     /**
      * Equal(=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>

@@ -1,8 +1,9 @@
 (function() {
   var rcdStore;
   $c.checkAndCreate("$w");
-  $w.handleChange = function(jsx, e) {
-    var logintemp, names;
+  $w.handleChange = function(e) {
+    var jsx, logintemp, names;
+    jsx = $w.app;
     names = e.target.name.split("#");
     if (names[0] === "loginrow") {
       logintemp = {
@@ -22,8 +23,9 @@
     }
     return refnode.getInputDOMNode().focus();
   };
-  $w.handleClick = function(jsx, e) {
-    var def, ids, logintemp, name, ref, selRow;
+  $w.handleClick = function(e) {
+    var def, ids, jsx, logintemp, name, ref, selRow;
+    jsx = $w.app;
     name = e.target.name;
     ids = e.target.id.split("#");
     if (ids[0] === "loginrow") {
@@ -62,8 +64,9 @@
       return $w.formDelete(jsx);
     }
   };
-  $w.handleRowKeyDown = function(jsx, e) {
-    var curRow, def, done, logintemp, name, names, ref;
+  $w.handleRowKeyDown = function(e) {
+    var curRow, def, done, jsx, logintemp, name, names, ref;
+    jsx = $w.app;
     name = e.target.name;
     names = name.split("#");
     logintemp = {
@@ -180,14 +183,7 @@
   $w.formClear = function(jsx) {
     var formtemp;
     formtemp = {
-      form: {
-        loginId: "",
-        name: "",
-        id: "",
-        versionNo: "",
-        password: "",
-        passwordcfm: ""
-      }
+      form: _.cloneDeep(jsx.state.login.blank)
     };
     return jsx.setState(formtemp);
   };

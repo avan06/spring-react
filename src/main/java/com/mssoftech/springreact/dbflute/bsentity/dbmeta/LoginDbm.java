@@ -54,6 +54,7 @@ public class LoginDbm extends AbstractDBMeta {
         setupEpg(_epgMap, et -> ((Login)et).getUpdateDatetime(), (et, vl) -> ((Login)et).setUpdateDatetime(ctldt(vl)), "updateDatetime");
         setupEpg(_epgMap, et -> ((Login)et).getUpdateUser(), (et, vl) -> ((Login)et).setUpdateUser((String)vl), "updateUser");
         setupEpg(_epgMap, et -> ((Login)et).getUpdateProcess(), (et, vl) -> ((Login)et).setUpdateProcess((String)vl), "updateProcess");
+        setupEpg(_epgMap, et -> ((Login)et).getRole(), (et, vl) -> ((Login)et).setRole((String)vl), "role");
     }
     public PropertyGateway findPropertyGateway(String prop)
     { return doFindEpg(_epgMap, prop); }
@@ -84,6 +85,7 @@ public class LoginDbm extends AbstractDBMeta {
     protected final ColumnInfo _columnUpdateDatetime = cci("update_datetime", "update_datetime", null, null, java.time.LocalDateTime.class, "updateDatetime", null, false, false, true, "timestamp", 29, 6, null, true, null, null, null, null, null, false);
     protected final ColumnInfo _columnUpdateUser = cci("update_user", "update_user", null, null, String.class, "updateUser", null, false, false, true, "varchar", 30, 0, null, true, null, null, null, null, null, false);
     protected final ColumnInfo _columnUpdateProcess = cci("update_process", "update_process", null, null, String.class, "updateProcess", null, false, false, true, "varchar", 30, 0, null, true, null, null, null, null, null, false);
+    protected final ColumnInfo _columnRole = cci("role", "role", null, null, String.class, "role", null, false, false, false, "varchar", 20, 0, null, false, null, null, null, null, null, false);
 
     /**
      * id: {PK, ID, NotNull, serial(10)}
@@ -145,6 +147,11 @@ public class LoginDbm extends AbstractDBMeta {
      * @return The information object of specified column. (NotNull)
      */
     public ColumnInfo columnUpdateProcess() { return _columnUpdateProcess; }
+    /**
+     * role: {varchar(20)}
+     * @return The information object of specified column. (NotNull)
+     */
+    public ColumnInfo columnRole() { return _columnRole; }
 
     protected List<ColumnInfo> ccil() {
         List<ColumnInfo> ls = newArrayList();
@@ -160,6 +167,7 @@ public class LoginDbm extends AbstractDBMeta {
         ls.add(columnUpdateDatetime());
         ls.add(columnUpdateUser());
         ls.add(columnUpdateProcess());
+        ls.add(columnRole());
         return ls;
     }
 

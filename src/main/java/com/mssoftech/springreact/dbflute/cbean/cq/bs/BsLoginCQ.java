@@ -327,6 +327,26 @@ public class BsLoginCQ extends AbstractBsLoginCQ {
      */
     public BsLoginCQ addOrderBy_UpdateProcess_Desc() { regOBD("update_process"); return this; }
 
+    protected ConditionValue _role;
+    public ConditionValue xdfgetRole()
+    { if (_role == null) { _role = nCV(); }
+      return _role; }
+    protected ConditionValue xgetCValueRole() { return xdfgetRole(); }
+
+    /** 
+     * Add order-by as ascend. <br>
+     * role: {varchar(20)}
+     * @return this. (NotNull)
+     */
+    public BsLoginCQ addOrderBy_Role_Asc() { regOBA("role"); return this; }
+
+    /**
+     * Add order-by as descend. <br>
+     * role: {varchar(20)}
+     * @return this. (NotNull)
+     */
+    public BsLoginCQ addOrderBy_Role_Desc() { regOBD("role"); return this; }
+
     // ===================================================================================
     //                                                             SpecifiedDerivedOrderBy
     //                                                             =======================

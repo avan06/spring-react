@@ -1,9 +1,7 @@
 (function() {
   $c.checkAndCreate("$w");
   $w.handleChange = function(e) {
-    var jsx;
-    jsx = $w.app;
-    return $c.handleChange(jsx, e.target.name, e.target.value);
+    return $c.handleChange($w.app, e.target.name, e.target.value);
   };
   $w.handleClick = function(e) {
     var ids, jsx, logintemp, name, selRow;

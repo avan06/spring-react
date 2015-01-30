@@ -378,4 +378,67 @@ $c.stringOption=[
     label: "%?指定"
   },
 ]
-
+$c.numberOption=[
+  {
+    value: ""
+    label: ""
+  },
+  {
+    value: "="
+    label: "="
+  },
+  {
+    value: "between"
+    label: "間"
+  },
+  {
+    value: ">"
+    label: ">"
+  },
+  {
+    value: ">="
+    label: ">="
+  },
+  {
+    value: "<"
+    label: "<"
+  },
+  {
+    value: "<="
+    label: "<="
+  },
+  {
+    value: "<>"
+    label: "<>"
+  },
+]
+$c.timestampOption=[
+  {
+    value: ""
+    label: ""
+  },
+  {
+    value: "="
+    label: "="
+  },
+  {
+    value: "between"
+    label: "間"
+  },
+  {
+    value: ">"
+    label: ">"
+  },
+  {
+    value: ">="
+    label: ">="
+  },
+  {
+    value: "<"
+    label: "<"
+  },
+  {
+    value: "<="
+    label: "<="
+  },
+]

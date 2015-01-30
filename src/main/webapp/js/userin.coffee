@@ -1,6 +1,7 @@
 $c.checkAndCreate("$w")
  
-$w.handleChange = (jsx,e) ->
+$w.handleChange = (e) ->
+  jsx=$w.app
   names = e.target.name.split("#");
   if (names[0] == "loginrow")
     logintemp={login:jsx.state.login}
@@ -13,7 +14,8 @@ $w.setFocus = (ref,def) ->
   if typeof(refnode)=="undefined"
     refnode=$w.loginRows.refs[def]
   refnode.getInputDOMNode().focus()
-$w.handleClick = (jsx,e) ->
+$w.handleClick = (e) ->
+  jsx=$w.app
   name=e.target.name 
   ids = e.target.id.split("#");  
   if (ids[0] == "loginrow")
@@ -41,7 +43,8 @@ $w.handleClick = (jsx,e) ->
     $w.formUpdate(jsx)
   if name == "btnDelete"
     $w.formDelete(jsx)
-$w.handleRowKeyDown = (jsx,e) ->
+$w.handleRowKeyDown = (e) ->
+  jsx=$w.app
   name=e.target.name
   names=name.split("#")
   logintemp={login:jsx.state.login}
@@ -129,14 +132,7 @@ $w.formUpdateCheck = (form) ->
  
 $w.formClear = (jsx) ->
   formtemp={
-      form:{
-      loginId:""
-      name:""
-      id:""
-      versionNo:""
-      password:""
-      passwordcfm:""
-    }
+      form:_.cloneDeep(jsx.state.login.blank)
   }
   jsx.setState(formtemp)
 $w.drop = (jsx,from,to) ->

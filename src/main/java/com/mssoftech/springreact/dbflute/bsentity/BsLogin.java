@@ -17,7 +17,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  *     id
  * 
  * [column]
- *     id, login_id, name, password, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
+ *     id, login_id, name, password, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process, role
  * 
  * [sequence]
  *     login_id_seq
@@ -54,6 +54,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  * java.time.LocalDateTime updateDatetime = entity.getUpdateDatetime();
  * String updateUser = entity.getUpdateUser();
  * String updateProcess = entity.getUpdateProcess();
+ * String role = entity.getRole();
  * entity.setId(id);
  * entity.setLoginId(loginId);
  * entity.setName(name);
@@ -66,6 +67,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  * entity.setUpdateDatetime(updateDatetime);
  * entity.setUpdateUser(updateUser);
  * entity.setUpdateProcess(updateProcess);
+ * entity.setRole(role);
  * = = = = = = = = = =/
  * </pre>
  * @author DBFlute(AutoGenerator)
@@ -116,6 +118,9 @@ public abstract class BsLogin extends AbstractEntity implements DomainEntity, En
 
     /** update_process: {NotNull, varchar(30)} */
     protected String _updateProcess;
+
+    /** role: {varchar(20)} */
+    protected String _role;
 
     // ===================================================================================
     //                                                                             DB Meta
@@ -227,6 +232,7 @@ public abstract class BsLogin extends AbstractEntity implements DomainEntity, En
         sb.append(dm).append(xfND(_updateDatetime));
         sb.append(dm).append(xfND(_updateUser));
         sb.append(dm).append(xfND(_updateProcess));
+        sb.append(dm).append(xfND(_role));
         if (sb.length() > dm.length()) {
             sb.delete(0, dm.length());
         }
@@ -467,5 +473,23 @@ public abstract class BsLogin extends AbstractEntity implements DomainEntity, En
     public void setUpdateProcess(String updateProcess) {
         registerModifiedProperty("updateProcess");
         _updateProcess = updateProcess;
+    }
+
+    /**
+     * [get] role: {varchar(20)} <br>
+     * @return The value of the column 'role'. (NullAllowed even if selected: for no constraint)
+     */
+    public String getRole() {
+        checkSpecifiedProperty("role");
+        return _role;
+    }
+
+    /**
+     * [set] role: {varchar(20)} <br>
+     * @param role The value of the column 'role'. (NullAllowed: null update allowed for no constraint)
+     */
+    public void setRole(String role) {
+        registerModifiedProperty("role");
+        _role = role;
     }
 }

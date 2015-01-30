@@ -83,6 +83,7 @@ public class LoginCIQ extends AbstractBsLoginCQ {
     protected ConditionValue xgetCValueUpdateDatetime() { return _myCQ.xdfgetUpdateDatetime(); }
     protected ConditionValue xgetCValueUpdateUser() { return _myCQ.xdfgetUpdateUser(); }
     protected ConditionValue xgetCValueUpdateProcess() { return _myCQ.xdfgetUpdateProcess(); }
+    protected ConditionValue xgetCValueRole() { return _myCQ.xdfgetRole(); }
     protected Map<String, Object> xfindFixedConditionDynamicParameterMap(String pp) { return null; }
     public String keepScalarCondition(LoginCQ sq)
     { throwIICBOE("ScalarCondition"); return null; }

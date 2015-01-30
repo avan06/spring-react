@@ -133,65 +133,25 @@ public class BsSessionCQ extends AbstractBsSessionCQ {
      */
     public BsSessionCQ addOrderBy_LoginId_Desc() { regOBD("login_id"); return this; }
 
-    protected ConditionValue _compId;
-    public ConditionValue xdfgetCompId()
-    { if (_compId == null) { _compId = nCV(); }
-      return _compId; }
-    protected ConditionValue xgetCValueCompId() { return xdfgetCompId(); }
+    protected ConditionValue _role;
+    public ConditionValue xdfgetRole()
+    { if (_role == null) { _role = nCV(); }
+      return _role; }
+    protected ConditionValue xgetCValueRole() { return xdfgetRole(); }
 
     /** 
      * Add order-by as ascend. <br>
-     * comp_id: {int4(10)}
+     * role: {varchar(5)}
      * @return this. (NotNull)
      */
-    public BsSessionCQ addOrderBy_CompId_Asc() { regOBA("comp_id"); return this; }
+    public BsSessionCQ addOrderBy_Role_Asc() { regOBA("role"); return this; }
 
     /**
      * Add order-by as descend. <br>
-     * comp_id: {int4(10)}
+     * role: {varchar(5)}
      * @return this. (NotNull)
      */
-    public BsSessionCQ addOrderBy_CompId_Desc() { regOBD("comp_id"); return this; }
-
-    protected ConditionValue _fy;
-    public ConditionValue xdfgetFy()
-    { if (_fy == null) { _fy = nCV(); }
-      return _fy; }
-    protected ConditionValue xgetCValueFy() { return xdfgetFy(); }
-
-    /** 
-     * Add order-by as ascend. <br>
-     * fy: {bpchar(4)}
-     * @return this. (NotNull)
-     */
-    public BsSessionCQ addOrderBy_Fy_Asc() { regOBA("fy"); return this; }
-
-    /**
-     * Add order-by as descend. <br>
-     * fy: {bpchar(4)}
-     * @return this. (NotNull)
-     */
-    public BsSessionCQ addOrderBy_Fy_Desc() { regOBD("fy"); return this; }
-
-    protected ConditionValue _grp;
-    public ConditionValue xdfgetGrp()
-    { if (_grp == null) { _grp = nCV(); }
-      return _grp; }
-    protected ConditionValue xgetCValueGrp() { return xdfgetGrp(); }
-
-    /** 
-     * Add order-by as ascend. <br>
-     * grp: {varchar(5)}
-     * @return this. (NotNull)
-     */
-    public BsSessionCQ addOrderBy_Grp_Asc() { regOBA("grp"); return this; }
-
-    /**
-     * Add order-by as descend. <br>
-     * grp: {varchar(5)}
-     * @return this. (NotNull)
-     */
-    public BsSessionCQ addOrderBy_Grp_Desc() { regOBD("grp"); return this; }
+    public BsSessionCQ addOrderBy_Role_Desc() { regOBD("role"); return this; }
 
     protected ConditionValue _data;
     public ConditionValue xdfgetData()

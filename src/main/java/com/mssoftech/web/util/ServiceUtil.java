@@ -26,7 +26,7 @@ public class ServiceUtil {
 	
 	public static String invoke(String str, HttpServletRequest request,
 			HttpServletResponse response, String smethod,
-			Class<LoginService> clazz, AppContextUtil appContextUtil) {
+			Class clazz, AppContextUtil appContextUtil) {
 		try {
 			Method[] methods = clazz.getMethods();
 			Object target = appContextUtil.rootContext.getBean(clazz);
@@ -62,24 +62,24 @@ public class ServiceUtil {
 				}
 				// ---------------------------------
 			}
-			putErrorLogAndMail(e);
+			putErrorLog(e);
 			return JSON.encode(DBFluteUtil.setErrorMessage("System Error",
 					null));
 
 		} catch (Exception e) {
-			putErrorLogAndMailOrg(e);
+			putErrorLogOrg(e);
 			return JSON.encode(DBFluteUtil.setErrorMessage("System Error",
 					null));
 		}
 	}
 
-	private static void putErrorLogAndMailOrg(Exception e) {
+	private static void putErrorLogOrg(Exception e) {
 		String msg = e.getClass().getName();
 		log.debug("System Error:" + msg);
 		CommonUtil.putStacktraceToLog(log, e);
 	}
 
-	private static void putErrorLogAndMail(InvocationTargetException e) {
+	private static void putErrorLog(InvocationTargetException e) {
 		Exception cause = (Exception) e.getCause();
 		String msg = cause.getClass().getName();
 		log.debug("System Error:" + msg);

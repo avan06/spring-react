@@ -94,6 +94,7 @@ public class LoginService {
 		Session session = new Session();
 		session.setUuid(uuid);
 		session.setLoginId(login.getId());
+		session.setRole(login.getRole());
 		sessionBhv.insert(session);
 		return session;
 	}
@@ -349,10 +350,8 @@ public class LoginService {
 	}
 
 	private Map entityToMap(Login login) {
-		Map map = BeanUtil.copyBeanToNewMap(
-				login,
-				include("id", "loginId", "name", "defCompany", "defFy", "adm",
-						"versionNo"));
+		Map map = BeanUtil.copyBeanToNewMap(login,
+				include("id", "loginId", "name", "role", "versionNo"));
 		return map;
 	}
 

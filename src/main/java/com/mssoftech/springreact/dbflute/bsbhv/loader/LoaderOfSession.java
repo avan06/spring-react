@@ -13,7 +13,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  *     id
  *
  * [column]
- *     id, uuid, login_id, comp_id, fy, grp, data, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
+ *     id, uuid, login_id, role, data, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
  *
  * [sequence]
  *     session_id_seq

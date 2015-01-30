@@ -328,20 +328,10 @@ public class BsSessionCB extends AbstractConditionBean {
          */
         public SpecifiedColumn columnLoginId() { return doColumn("login_id"); }
         /**
-         * comp_id: {int4(10)}
+         * role: {varchar(5)}
          * @return The information object of specified column. (NotNull)
          */
-        public SpecifiedColumn columnCompId() { return doColumn("comp_id"); }
-        /**
-         * fy: {bpchar(4)}
-         * @return The information object of specified column. (NotNull)
-         */
-        public SpecifiedColumn columnFy() { return doColumn("fy"); }
-        /**
-         * grp: {varchar(5)}
-         * @return The information object of specified column. (NotNull)
-         */
-        public SpecifiedColumn columnGrp() { return doColumn("grp"); }
+        public SpecifiedColumn columnRole() { return doColumn("role"); }
         /**
          * data: {varchar(255)}
          * @return The information object of specified column. (NotNull)

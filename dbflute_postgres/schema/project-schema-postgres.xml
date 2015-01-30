@@ -29,6 +29,7 @@
             required="true" size="30" type="VARCHAR"/>
         <column dbType="varchar" javaType="String" name="update_process"
             required="true" size="30" type="VARCHAR"/>
+        <column dbType="varchar" javaType="String" name="role" size="20" type="VARCHAR"/>
         <unique name="login_login_id_key">
             <unique-column name="login_id" position="1"/>
             <unique-column name="del_flag" position="2"/>
@@ -43,10 +44,7 @@
             required="true" size="50" type="VARCHAR"/>
         <column dbType="int4" javaType="Integer" name="login_id"
             size="10" type="INTEGER"/>
-        <column dbType="int4" javaType="Integer" name="comp_id"
-            size="10" type="INTEGER"/>
-        <column dbType="bpchar" javaType="String" name="fy" size="4" type="CHAR"/>
-        <column dbType="varchar" javaType="String" name="grp" size="5" type="VARCHAR"/>
+        <column dbType="varchar" javaType="String" name="role" size="5" type="VARCHAR"/>
         <column dbType="varchar" javaType="String" name="data"
             size="255" type="VARCHAR"/>
         <column dbType="int4" javaType="Integer" name="version_no"
@@ -168,10 +166,10 @@
         <sequence incrementSize="1" maximumValue="9223372036854775807"
             minimumValue="1" name="login_id_seq" schema="springreact.public"/>
         <sequence incrementSize="1" maximumValue="9223372036854775807"
-            minimumValue="1" name="session_id_seq" schema="springreact.public"/>
-        <sequence incrementSize="1" maximumValue="9223372036854775807"
             minimumValue="1" name="sys_table_id_seq" schema="springreact.public"/>
         <sequence incrementSize="1" maximumValue="9223372036854775807"
             minimumValue="1" name="user_table_id_seq" schema="springreact.public"/>
+        <sequence incrementSize="1" maximumValue="9223372036854775807"
+            minimumValue="1" name="session_id_seq" schema="springreact.public"/>
     </sequenceGroup>
 </database>

@@ -36,11 +36,12 @@ public class ScreenSecurityUtil {
 		Login login = LoginUtil.getLoginFromSession(session,
 				appContextUtil.rootContext.getBean(LoginBhv.class));
 		if (session == null) {
-			return JspUtil.returnError(request,"セッションが切れています。再度ログインして下さい。");
+			return JspUtil.returnError(request, "セッションが切れています。再度ログインして下さい。");
 		}
 		try {
-			if (checkAuth(screen, session, login) == false) {
-				return JspUtil.returnError(request,"この画面は権限がありません。");
+			if (checkAuth(screen, session, login,
+					appContextUtil.rootContext.getBean(SysTableBhv.class)) == false) {
+				return JspUtil.returnError(request, "この画面は権限がありません。");
 			}
 		} catch (Exception e) {
 			CommonUtil.putStacktraceToLog(log, e);
@@ -52,30 +53,27 @@ public class ScreenSecurityUtil {
 		return "index";
 	}
 
-	private static boolean checkAuth(String screen, Session session, Login login)
-			throws Exception {
-		// SysTable table = getScreenData(screen, null, null);
-		// String auth = table.getS1Data();
-		return true;
-		// String grp = StringUtil.nullConvToString(session.getGrp());
-		// if (grp.length() != 1) {
-		// return false;
-		// }
-		// if (auth.contains(StringUtil.nullConvToString(session.getGrp()))) {
-		// return true;
-		// }
-		//
-		// return false;
+	private static boolean checkAuth(String screen, Session session,
+			Login login, SysTableBhv sysTableBhv) throws Exception {
+		SysTable table = getScreenData(screen, null, null, sysTableBhv);
+		String auth = table.getS1Data();
+		String grp = StringUtil.nullConvToString(session.getRole());
+		if (grp.length() != 1) {
+			return false;
+		}
+		if (auth.contains(StringUtil.nullConvToString(session.getRole()))) {
+			return true;
+		}
+
+		return false;
 	}
 
 	@SuppressWarnings("unused")
 	private static SysTable getScreenData(String screen, Integer comp_id,
-			String fy,SysTableBhv sysTableBhv) throws Exception {
+			String fy, SysTableBhv sysTableBhv) throws Exception {
 
-		
-		ListResultBean<SysTable> list = sysTableBhv.selectList(cb-> {
-			//cb.ignoreNullOrEmptyQuery();
-			cb.enableEmptyStringQuery(()->{
+		ListResultBean<SysTable> list = sysTableBhv.selectList(cb -> {
+			cb.enableEmptyStringQuery(() -> {
 				cb.query().setKey2_Equal("");
 			});
 			cb.query().setDelFlag_Equal(0);

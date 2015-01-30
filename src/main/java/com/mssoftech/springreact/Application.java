@@ -12,8 +12,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
-import com.mssoftech.web.util.DBFluteUtil;
-
 @Configuration
 @EnableAspectJAutoProxy
 @EnableTransactionManagement

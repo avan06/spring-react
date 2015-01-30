@@ -19,7 +19,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  *     id
  * 
  * [column]
- *     id, uuid, login_id, comp_id, fy, grp, data, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
+ *     id, uuid, login_id, role, data, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
  * 
  * [sequence]
  *     session_id_seq
@@ -47,9 +47,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  * Integer id = entity.getId();
  * String uuid = entity.getUuid();
  * Integer loginId = entity.getLoginId();
- * Integer compId = entity.getCompId();
- * String fy = entity.getFy();
- * String grp = entity.getGrp();
+ * String role = entity.getRole();
  * String data = entity.getData();
  * Integer versionNo = entity.getVersionNo();
  * Integer delFlag = entity.getDelFlag();
@@ -62,9 +60,7 @@ import com.mssoftech.springreact.dbflute.exentity.*;
  * entity.setId(id);
  * entity.setUuid(uuid);
  * entity.setLoginId(loginId);
- * entity.setCompId(compId);
- * entity.setFy(fy);
- * entity.setGrp(grp);
+ * entity.setRole(role);
  * entity.setData(data);
  * entity.setVersionNo(versionNo);
  * entity.setDelFlag(delFlag);
@@ -98,14 +94,8 @@ public abstract class BsSession extends AbstractEntity implements DomainEntity, 
     /** login_id: {int4(10), FK to login} */
     protected Integer _loginId;
 
-    /** comp_id: {int4(10)} */
-    protected Integer _compId;
-
-    /** fy: {bpchar(4)} */
-    protected String _fy;
-
-    /** grp: {varchar(5)} */
-    protected String _grp;
+    /** role: {varchar(5)} */
+    protected String _role;
 
     /** data: {varchar(255)} */
     protected String _data;
@@ -237,9 +227,7 @@ public abstract class BsSession extends AbstractEntity implements DomainEntity, 
         sb.append(dm).append(xfND(_id));
         sb.append(dm).append(xfND(_uuid));
         sb.append(dm).append(xfND(_loginId));
-        sb.append(dm).append(xfND(_compId));
-        sb.append(dm).append(xfND(_fy));
-        sb.append(dm).append(xfND(_grp));
+        sb.append(dm).append(xfND(_role));
         sb.append(dm).append(xfND(_data));
         sb.append(dm).append(xfND(_versionNo));
         sb.append(dm).append(xfND(_delFlag));
@@ -330,57 +318,21 @@ public abstract class BsSession extends AbstractEntity implements DomainEntity, 
     }
 
     /**
-     * [get] comp_id: {int4(10)} <br>
-     * @return The value of the column 'comp_id'. (NullAllowed even if selected: for no constraint)
+     * [get] role: {varchar(5)} <br>
+     * @return The value of the column 'role'. (NullAllowed even if selected: for no constraint)
      */
-    public Integer getCompId() {
-        checkSpecifiedProperty("compId");
-        return _compId;
+    public String getRole() {
+        checkSpecifiedProperty("role");
+        return _role;
     }
 
     /**
-     * [set] comp_id: {int4(10)} <br>
-     * @param compId The value of the column 'comp_id'. (NullAllowed: null update allowed for no constraint)
+     * [set] role: {varchar(5)} <br>
+     * @param role The value of the column 'role'. (NullAllowed: null update allowed for no constraint)
      */
-    public void setCompId(Integer compId) {
-        registerModifiedProperty("compId");
-        _compId = compId;
-    }
-
-    /**
-     * [get] fy: {bpchar(4)} <br>
-     * @return The value of the column 'fy'. (NullAllowed even if selected: for no constraint)
-     */
-    public String getFy() {
-        checkSpecifiedProperty("fy");
-        return _fy;
-    }
-
-    /**
-     * [set] fy: {bpchar(4)} <br>
-     * @param fy The value of the column 'fy'. (NullAllowed: null update allowed for no constraint)
-     */
-    public void setFy(String fy) {
-        registerModifiedProperty("fy");
-        _fy = fy;
-    }
-
-    /**
-     * [get] grp: {varchar(5)} <br>
-     * @return The value of the column 'grp'. (NullAllowed even if selected: for no constraint)
-     */
-    public String getGrp() {
-        checkSpecifiedProperty("grp");
-        return _grp;
-    }
-
-    /**
-     * [set] grp: {varchar(5)} <br>
-     * @param grp The value of the column 'grp'. (NullAllowed: null update allowed for no constraint)
-     */
-    public void setGrp(String grp) {
-        registerModifiedProperty("grp");
-        _grp = grp;
+    public void setRole(String role) {
+        registerModifiedProperty("role");
+        _role = role;
     }
 
     /**

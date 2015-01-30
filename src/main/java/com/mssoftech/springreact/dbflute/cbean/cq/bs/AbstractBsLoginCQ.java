@@ -1574,6 +1574,159 @@ public abstract class AbstractBsLoginCQ extends AbstractConditionQuery {
     protected void regUpdateProcess(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueUpdateProcess(), "update_process"); }
     protected abstract ConditionValue xgetCValueUpdateProcess();
 
+    /**
+     * Equal(=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as equal. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_Equal(String role) {
+        doSetRole_Equal(fRES(role));
+    }
+
+    protected void doSetRole_Equal(String role) {
+        regRole(CK_EQ, role);
+    }
+
+    /**
+     * NotEqual(&lt;&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as notEqual. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_NotEqual(String role) {
+        doSetRole_NotEqual(fRES(role));
+    }
+
+    protected void doSetRole_NotEqual(String role) {
+        regRole(CK_NES, role);
+    }
+
+    /**
+     * GreaterThan(&gt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as greaterThan. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_GreaterThan(String role) {
+        regRole(CK_GT, fRES(role));
+    }
+
+    /**
+     * LessThan(&lt;). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as lessThan. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_LessThan(String role) {
+        regRole(CK_LT, fRES(role));
+    }
+
+    /**
+     * GreaterEqual(&gt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as greaterEqual. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_GreaterEqual(String role) {
+        regRole(CK_GE, fRES(role));
+    }
+
+    /**
+     * LessEqual(&lt;=). And NullOrEmptyIgnored, OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as lessEqual. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_LessEqual(String role) {
+        regRole(CK_LE, fRES(role));
+    }
+
+    /**
+     * InScope {in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)}
+     * @param roleList The collection of role as inScope. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_InScope(Collection<String> roleList) {
+        doSetRole_InScope(roleList);
+    }
+
+    protected void doSetRole_InScope(Collection<String> roleList) {
+        regINS(CK_INS, cTL(roleList), xgetCValueRole(), "role");
+    }
+
+    /**
+     * NotInScope {not in ('a', 'b')}. And NullOrEmptyIgnored, NullOrEmptyElementIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)}
+     * @param roleList The collection of role as notInScope. (NullAllowed: if null (or empty), no condition)
+     */
+    public void setRole_NotInScope(Collection<String> roleList) {
+        doSetRole_NotInScope(roleList);
+    }
+
+    protected void doSetRole_NotInScope(Collection<String> roleList) {
+        regINS(CK_NINS, cTL(roleList), xgetCValueRole(), "role");
+    }
+
+    /**
+     * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)} <br>
+     * <pre>e.g. setRole_LikeSearch("xxx", op <span style="color: #90226C; font-weight: bold"><span style="font-size: 120%">-</span>&gt;</span> op.<span style="color: #CC4747">likeContain()</span>);</pre>
+     * @param role The value of role as likeSearch. (NullAllowed: if null (or empty), no condition)
+     * @param opLambda The callback for option of like-search. (NotNull)
+     */
+    public void setRole_LikeSearch(String role, ConditionOptionCall<LikeSearchOption> opLambda) {
+        setRole_LikeSearch(role, xcLSOP(opLambda));
+    }
+
+    /**
+     * LikeSearch with various options. (versatile) {like '%xxx%' escape ...}. And NullOrEmptyIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)} <br>
+     * <pre>e.g. setRole_LikeSearch("xxx", new <span style="color: #CC4747">LikeSearchOption</span>().likeContain());</pre>
+     * @param role The value of role as likeSearch. (NullAllowed: if null (or empty), no condition)
+     * @param likeSearchOption The option of like-search. (NotNull)
+     */
+    protected void setRole_LikeSearch(String role, LikeSearchOption likeSearchOption) {
+        regLSQ(CK_LS, fRES(role), xgetCValueRole(), "role", likeSearchOption);
+    }
+
+    /**
+     * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
+     * And NullOrEmptyIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as notLikeSearch. (NullAllowed: if null (or empty), no condition)
+     * @param opLambda The callback for option of like-search. (NotNull)
+     */
+    public void setRole_NotLikeSearch(String role, ConditionOptionCall<LikeSearchOption> opLambda) {
+        setRole_NotLikeSearch(role, xcLSOP(opLambda));
+    }
+
+    /**
+     * NotLikeSearch with various options. (versatile) {not like 'xxx%' escape ...} <br>
+     * And NullOrEmptyIgnored, SeveralRegistered. <br>
+     * role: {varchar(20)}
+     * @param role The value of role as notLikeSearch. (NullAllowed: if null (or empty), no condition)
+     * @param likeSearchOption The option of not-like-search. (NotNull)
+     */
+    protected void setRole_NotLikeSearch(String role, LikeSearchOption likeSearchOption) {
+        regLSQ(CK_NLS, fRES(role), xgetCValueRole(), "role", likeSearchOption);
+    }
+
+    /**
+     * IsNull {is null}. And OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     */
+    public void setRole_IsNull() { regRole(CK_ISN, DOBJ); }
+
+    /**
+     * IsNullOrEmpty {is null or empty}. And OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     */
+    public void setRole_IsNullOrEmpty() { regRole(CK_ISNOE, DOBJ); }
+
+    /**
+     * IsNotNull {is not null}. And OnlyOnceRegistered. <br>
+     * role: {varchar(20)}
+     */
+    public void setRole_IsNotNull() { regRole(CK_ISNN, DOBJ); }
+
+    protected void regRole(ConditionKey ky, Object vl) { regQ(ky, vl, xgetCValueRole(), "role"); }
+    protected abstract ConditionValue xgetCValueRole();
+
     // ===================================================================================
     //                                                                     ScalarCondition
     //                                                                     ===============

@@ -1,19 +1,20 @@
 (function() {
   var rcdStore;
   $c.checkAndCreate("$w");
-  $w.handleChange = function(jsx, e) {
-    return $c.handleChange(jsx, e.target.name, e.target.value);
+  $w.handleChange = function(e) {
+    return $c.handleChange($w.app, e.target.name, e.target.value);
   };
-  $w.handleClick = function(jsx, e, tab) {
-    var ids, logintemp, name, selRow, tabkey;
+  $w.tabClick = function(tab) {
+    var tabkey;
+    tabkey = {
+      tabkey: tab
+    };
+    return $w.app.setState(tabkey);
+  };
+  $w.handleClick = function(e) {
+    var ids, jsx, logintemp, name, selRow;
+    jsx = $w.app;
     name = e.target.name;
-    if (name === "tabselect") {
-      tabkey = {
-        tabkey: tab
-      };
-      jsx.setState(tabkey);
-      return;
-    }
     if (name === "alert#CloseBtn") {
       $w.flux.actions.$c_alertHide();
     }
@@ -104,14 +105,7 @@
   $w.formClear = function(jsx) {
     var formtemp;
     formtemp = {
-      form: {
-        loginId: "",
-        name: "",
-        id: "",
-        versionNo: "",
-        password: "",
-        passwordcfm: ""
-      }
+      form: _.cloneDeep(jsx.state.login.blank)
     };
     return jsx.setState(formtemp);
   };

@@ -15,7 +15,7 @@ import com.mssoftech.springreact.dbflute.cbean.*;
  *     id
  *
  * [column]
- *     id, login_id, name, password, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process
+ *     id, login_id, name, password, version_no, del_flag, register_datetime, register_user, register_process, update_datetime, update_user, update_process, role
  *
  * [sequence]
  *     login_id_seq
