@@ -53,13 +53,11 @@ public class CalenderUtil {
 
 	}
 
-	public static void convertTimestampFromString(Map m, String ele)
-			throws ParseException {
+	public static void convertTimestampFromString(Map<String, Object> m, String ele) throws ParseException {
 		m.put(ele, timestampConvertFromString((String) m.get(ele)));
 	}
 
-	public static Timestamp timestampConvertFromString(String sDatetime)
-			throws ParseException {
+	public static Timestamp timestampConvertFromString(String sDatetime) throws ParseException {
 		if (sDatetime == null) {
 			return null;
 		}
@@ -148,8 +146,7 @@ public class CalenderUtil {
 		}
 	}
 
-	public static void convertData(Map updateInput, String... elements)
-			throws Exception {
+	public static void convertData(Map<String, Object> updateInput, String... elements) throws Exception {
 		for (String ele : elements) {
 			convertEachData(updateInput, ele);
 			convertEachData(updateInput, "ele");
@@ -157,8 +154,7 @@ public class CalenderUtil {
 
 	}
 
-	public static void convertEachData(Map updateInput, String element)
-			throws Exception {
+	public static void convertEachData(Map<String, Object> updateInput, String element) throws Exception {
 		String stime = (String) updateInput.get(element);
 		String hour = "0";
 		String min = "0";
@@ -188,20 +184,19 @@ public class CalenderUtil {
 			if (min.compareTo("60") >= 0) {
 				throw new SystemException("分が異常値です。:" + min);
 			}
-			Long milisecond = ((Long.parseLong(hour) - 9L) * 3600 + Long
-					.parseLong(min) * 60) * 1000;
+			Long milisecond = ((Long.parseLong(hour) - 9L) * 3600 + Long.parseLong(min) * 60) * 1000;
 			Time time = new Time(milisecond);
 			updateInput.put(element, time);
 		}
 	}
 
-	public static void convertIntToTime(Map map, String... elements) {
+	public static void convertIntToTime(Map<String, Object> map, String... elements) {
 		for (String ele : elements) {
 			convertEachIntToTime(map, ele);
 		}
 	}
 
-	private static void convertEachIntToTime(Map map, String ele) {
+	private static void convertEachIntToTime(Map<String, Object> map, String ele) {
 		Object tt = (Object) map.get(ele);
 		map.put(ele, convertIntToStringTime(tt));
 	}

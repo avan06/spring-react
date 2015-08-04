@@ -24,6 +24,10 @@ public class IndexControl {
 	final static Logger logger = LoggerFactory.getLogger(IndexControl.class);
 
 	private AppContextUtil appContextUtil;
+	@Autowired
+	private JspUtil jspUtil;
+	@Autowired
+	private ScreenSecurityUtil screenSecurityUtil;
 
 	public AppContextUtil getAppContextUtil() {
 		return appContextUtil;
@@ -43,10 +47,10 @@ public class IndexControl {
 			if (!redirect.equals("")) {
 				return "redirect:" + redirect;
 			}
-			HashMap jsCss = JspUtil.getJsCss(request.getContextPath(),
+			HashMap<String, Object> jsCss = jspUtil.getJsCss(request.getContextPath(),
 					new String[] { "/js/$c.js", "/js/$v.js", "/js/index.js",
-							"/js/_cjsx.js", "/js/indexjsx.js" }, new String[] {
-							"/js/lib/fluxxor.js", "/js/lib/react.js",
+							"/js/_cjsx.js", "/js/indexjsx.js" }, 
+					new String[] {"/js/lib/fluxxor.js", "/js/lib/react.js",
 							"/js/lib/react-bootstrap.js",
 							"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" },
 					new String[] { "/css/bootstrap.css", "/css/main.css" },
@@ -68,7 +72,7 @@ public class IndexControl {
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
 		String title = "USER管理";
-		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+		return screenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
 
@@ -81,7 +85,7 @@ public class IndexControl {
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
 		String title = "USER INLINE";
-		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+		return screenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
 	
@@ -95,7 +99,7 @@ public class IndexControl {
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
 		String title = "USER TAB";
-		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+		return screenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
 	@RequestMapping("/usertbl")
@@ -107,7 +111,7 @@ public class IndexControl {
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
 		String title = "USER TAB";
-		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+		return screenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
 	@RequestMapping("/systbl")
@@ -119,7 +123,7 @@ public class IndexControl {
 				"/js/lib/react.js", "/js/lib/react-bootstrap.js",
 				"/js/lib/jquery-1.11.1.js", "/js/lib/lodash.js" };
 		String title = "USER TAB";
-		return ScreenSecurityUtil.generateAuthorizedScreen(request, response,
+		return screenSecurityUtil.generateAuthorizedScreen(request, response,
 				files, libfiles, title,appContextUtil);
 	}
 }

@@ -1,40 +1,38 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="ja" xml:lang="ja">
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="utf-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core"%>
+<%@ taglib prefix="s" uri="http://www.springframework.org/tags"%>
+<%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt"%>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions"%>
+<%@ taglib prefix="sf" uri="http://www.springframework.org/tags/form"%>
+
+<html>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <meta http-equiv="Content-Style-Type" content="text/css" />
-  <meta http-equiv="Content-Script-Type" content="text/JavaScript" />
-  <%@ page import="java.util.HashMap"  %>
-  <%@ page import="java.util.ArrayList"  %>
-  <%@ page import="org.apache.commons.lang.*"  %>   
-  <% 	
-      ArrayList jscmd = (ArrayList)((HashMap)request.getAttribute("__jscss")).get("jscmd");
-      ArrayList jslib =(ArrayList)((HashMap)request.getAttribute("__jscss")).get("jslib");
-  		ArrayList js =(ArrayList)((HashMap)request.getAttribute("__jscss")).get("js");
-  		ArrayList css =(ArrayList)((HashMap)request.getAttribute("__jscss")).get("css");
-  		String title =(String)((HashMap)request.getAttribute("__jscss")).get("title");
-  		String jscmdh =(String)((HashMap)request.getAttribute("__jscss")).get("jscmdh");
-  %>
 
+<script>${__jscss.jscmdh}</script>
 
-  <script><% out.print(jscmdh); %></script>
- 
-  <% for(Object s:jslib) { %>
-  	<script src=<% out.print(s); %>></script> 
-  <% } %>
-   <script>
-  <% for(Object s:jscmd) { %>
-  <% out.print(s); %>
-  <% } %>
-  </script>
-    <% for(Object s:css) { %>
-  	<LINK rel="stylesheet" href="<% out.print(s); %>">
-  <% } %>  
-  <title><% out.print(title); %></title>
+<c:forEach var="s" items="${__jscss.jslib}">
+<script src="${s}"></script>
+</c:forEach>
+
+<c:if test="${__jscss.jscmd != null}">
+<script lang="javascript">
+	<c:forEach var="s" items="${__jscss.jscmd}">
+	${s}
+	</c:forEach>
+</script>
+</c:if>
+
+<c:forEach var="s" items="${__jscss.css}">
+<LINK rel="stylesheet" href="${s}">
+</c:forEach>
+
+<title>${__jscss.title}</title>
 </head>
 <body>
-    <div id="content"></div>
-  <% for(Object s:js) { %>
-  	<script src=<% out.print(s); %>></script> 
-  <% } %>
+	<div id="content"></div>
+
+	<c:forEach var="s" items="${__jscss.js}">
+	<script src="${s}"></script>
+	</c:forEach>
 </body>
 </html>

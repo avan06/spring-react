@@ -1,1 +1,0 @@
-DATABASE_URL:postgres://test:testpass@localhost:5432/springreact

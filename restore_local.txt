@@ -1,1 +1,0 @@
-pg_restore -Fc --no-acl --no-owner -h localhost -U test -d springreact springreact.dump

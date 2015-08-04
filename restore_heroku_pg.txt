@@ -1,1 +1,0 @@
-heroku pgbackups:restore HEROKU_POSTGRESQL_VIOLET https://s3.amazonaws.com/springreact/springreact.dump --app spring-react

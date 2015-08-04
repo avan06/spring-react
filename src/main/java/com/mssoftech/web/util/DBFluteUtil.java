@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -16,48 +15,21 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.commons.beanutils.PropertyUtils;
-import org.dbflute.bhv.AbstractBehaviorWritable;
-import org.dbflute.cbean.AbstractConditionQuery;
-import org.dbflute.cbean.coption.ConditionOptionCall;
-import org.dbflute.cbean.coption.LikeSearchOption;
-import org.dbflute.dbmeta.AbstractDBMeta;
-import org.dbflute.dbmeta.info.ColumnInfo;
-import org.dbflute.hook.AccessContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mssoftech.web.exception.SystemException;
-
-
 public class DBFluteUtil {
 	static protected Logger log = LoggerFactory.getLogger(DBFluteUtil.class);
-	static HashMap _comnColMap = null;
+	static HashMap<String, String> _comnColMap = null;
 	static HashMap<String, String> _omap = null;
 	static HashMap<String, String> _omap2 = null;
 	static Boolean localenv = null;
 	static String LF = "\n";
-	
-	public static void clearAccessContext() {
-		AccessContext.clearAccessContextOnThread();
-		log.debug("ActionAccessContextIntercepter End");
-	}
 
-	public static void setUserProcessToAccessContext(String user, String process) {
-		AccessContext ac = AccessContext.getAccessContextOnThread();
-		ac.setAccessUser(user);
-		ac.setAccessProcess(process);
-	}
-	public static void setNewAccessContext(String user, String process) {
-		AccessContext ac = new AccessContext();
-		ac.setAccessUser(user);
-		ac.setAccessProcess(process);
-		AccessContext.setAccessContextOnThread(ac);
-		log.debug("ActionAccessContextIntercepter Begin");
-	}
-	public static synchronized HashMap getOpMap() {
+	public static synchronized HashMap<String, String> getOpMap() {
 		if (_omap == null) {
 
-			_omap = new HashMap();
+			_omap = new HashMap<String, String>();
 			_omap.put("=", "Equal");
 			_omap.put("<>", "NotEqual");
 			_omap.put(">", "GreaterThan");
@@ -74,34 +46,30 @@ public class DBFluteUtil {
 		return _omap;
 	}
 
-	public static synchronized HashMap getOpMap2() {
+	public static synchronized HashMap<String, String> getOpMap2() {
 		if (_omap2 == null) {
 
-			_omap2 = new HashMap();
+			_omap2 = new HashMap<String, String>();
 			_omap2.put("between", "LessEqual");
 			_omap2.put("exclude", "GreaterThan");
 		}
 		return _omap2;
 	}
 
-	public static HashMap getJsCss(String contextPath, String[] js,
-			String[] css, String title, String[] jscmd) {
-		HashMap jsCss = new HashMap();
+	public static HashMap<String, Object> getJsCss(String contextPath, String[] js, String[] css, String title,
+			String[] jscmd) {
+		HashMap<String, Object> jsCss = new HashMap<String, Object>();
 
-		String[] jsSmart = {
-				"/js/sc/system/modules/ISC_Core.js",
-				"/js/sc/system/modules/ISC_Foundation.js",
+		String[] jsSmart = { "/js/sc/system/modules/ISC_Core.js", "/js/sc/system/modules/ISC_Foundation.js",
 				// "/js/sc/system/modules/ISC_Calendar.js",
-				"/js/sc/system/modules/ISC_Containers.js",
-				"/js/sc/system/modules/ISC_Grids.js",
-				"/js/sc/system/modules/ISC_Forms.js",
-				"/js/sc/system/modules/ISC_DataBinding.js",
+				"/js/sc/system/modules/ISC_Containers.js", "/js/sc/system/modules/ISC_Grids.js",
+				"/js/sc/system/modules/ISC_Forms.js", "/js/sc/system/modules/ISC_DataBinding.js",
 				"/js/sc/skins/EnterpriseBlue/load_skin.js", "/js/json2.min.js" };
-		jsCss.put("js", new ArrayList());
-		jsCss.put("css", new ArrayList());
-		jsCss.put("jscmd", new ArrayList());
-		jsCss.put("jscmdh", "var isomorphicDir=\"" + contextPath + "/js/sc/\";"
-				+ "\n contextpath=\"" + contextPath + "\";");
+		jsCss.put("js", new ArrayList<String>());
+		jsCss.put("css", new ArrayList<String>());
+		jsCss.put("jscmd", new ArrayList<String>());
+		jsCss.put("jscmdh",
+				"var isomorphicDir=\"" + contextPath + "/js/sc/\";" + "\n contextpath=\"" + contextPath + "\";");
 		jsCss.put("title", title);
 		putStrings(jsCss, "jscmd", jscmd);
 		putStrings(jsCss, "js", contextPath, jsSmart);
@@ -110,44 +78,44 @@ public class DBFluteUtil {
 		return jsCss;
 	}
 
-	public static void putStrings(HashMap map, String parameter,
-			String contextPath, String[] strings) {
+	public static void putStrings(HashMap<String, Object> map, String parameter, String contextPath, String[] strings) {
 		for (String s : strings) {
-			((ArrayList) map.get(parameter)).add(contextPath + s);
+			((ArrayList<String>) map.get(parameter)).add(contextPath + s);
 		}
 	}
 
-	public static void putStrings(HashMap map, String parameter,
-			String[] strings) {
+	public static void putStrings(HashMap<String, Object> map, String parameter, String[] strings) {
 		for (String s : strings) {
-			((ArrayList) map.get(parameter)).add(s);
+			((ArrayList<String>) map.get(parameter)).add(s);
 		}
 	}
 
-	public static HashMap setFetchResult(Object data, Map params) {
+	public static HashMap<String, HashMap<String, Object>> setFetchResult(Object data, Map<String, Object> params) {
 		return setFetchResult(data, 0, 0, 1, params);
 	}
 
-	public static HashMap setErrorMessage(String errorMessage, Map params) {
+	public static HashMap<String, HashMap<String, Object>> setErrorMessage(String errorMessage,
+			Map<String, Object> params) {
 		return setFetchResult(errorMessage, -1, 0, 0, params);
 	}
 
-	public static HashMap setFetchResult(Object data, int status, int startRow,
-			int totalRows, Map params) {
+	public static HashMap<String, HashMap<String, Object>> setFetchResult(Object data, int status, int startRow,
+			int totalRows, Map<String, Object> params) {
 		if (params != null) {
 			putTreasureData(params);
 		}
-		HashMap response = getResponse(data, status, startRow, totalRows);
-		HashMap result = new HashMap();
+		HashMap<String, Object> response = getResponse(data, status, startRow, totalRows);
+		HashMap<String, HashMap<String, Object>> result = new HashMap<String, HashMap<String, Object>>();
 		result.put("response", response);
 		return result;
 	}
 
-	public static HashMap setNormalFetchResult(ArrayList ar, Map params) {
+	public static HashMap<String, HashMap<String, Object>> setNormalFetchResult(ArrayList<Object> ar,
+			Map<String, Object> params) {
 		return setFetchResult(ar, 0, 0, ar.size(), params);
 	}
 
-	public static void putTreasureData(Map params) {
+	public static void putTreasureData(Map<String, Object> params) {
 		Timestamp endTime = CalenderUtil.getCurrentTime();
 		Timestamp startTime = (Timestamp) params.get("startTimeStamp");
 		if (startTime == null) {
@@ -164,19 +132,15 @@ public class DBFluteUtil {
 		String sStart = format.format(start);
 
 		Long duration = endTime.getTime() - startTime.getTime();
-		System.out.println("@[development.ajax] {\"date\":\""
-				+ sStart.substring(0, 10) + "\",\"hour\":\""
-				+ sStart.substring(11, 13) + "\",\"min_sec\":\""
-				+ sStart.substring(14, 19) + "\",\"class\":\""
-				+ ssclass[ssclass.length - 1] + "\",\"opType\":\""
-				+ operationType + "\",\"duration\":" + duration.toString()
-				+ "}");
+		System.out.println("@[development.ajax] {\"date\":\"" + sStart.substring(0, 10) + "\",\"hour\":\""
+				+ sStart.substring(11, 13) + "\",\"min_sec\":\"" + sStart.substring(14, 19) + "\",\"class\":\""
+				+ ssclass[ssclass.length - 1] + "\",\"opType\":\"" + operationType + "\",\"duration\":"
+				+ duration.toString() + "}");
 
 	}
 
-	private static HashMap getResponse(Object data, int status, int startRow,
-			int totalRows) {
-		HashMap response = new HashMap();
+	private static HashMap<String, Object> getResponse(Object data, int status, int startRow, int totalRows) {
+		HashMap<String, Object> response = new HashMap<String, Object>();
 		response.put("status", status);
 		response.put("startRow", startRow);
 		response.put("endRow", startRow + totalRows - 1);
@@ -185,10 +149,9 @@ public class DBFluteUtil {
 		return response;
 	}
 
-	public static void removeMetaCommonColumns(Map<String, Object> resultMap,
-			HashMap columns, String excludeCat, String[] excludeColumns) {
-		for (Iterator<String> iterator = resultMap.keySet().iterator(); iterator
-				.hasNext();) {
+	public static void removeMetaCommonColumns(Map<String, Object> resultMap, HashMap<String, Object> columns,
+			String excludeCat, String[] excludeColumns) {
+		for (Iterator<String> iterator = resultMap.keySet().iterator(); iterator.hasNext();) {
 			String column = iterator.next();
 			String columnCat = (String) columns.get(column);
 			if (columnCat == null) {
@@ -211,10 +174,9 @@ public class DBFluteUtil {
 		return "/index.jsp";
 	}
 
-	public static HashMap copyToHashMap(Object mt, String[] elements)
-			throws IllegalAccessException, InvocationTargetException,
-			NoSuchMethodException {
-		HashMap hm = new HashMap();
+	public static HashMap<String, Object> copyToHashMap(Object mt, String[] elements)
+			throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+		HashMap<String, Object> hm = new HashMap<String, Object>();
 		for (String ele : elements) {
 			hm.put(ele, PropertyUtils.getSimpleProperty(mt, ele));
 		}
@@ -222,196 +184,12 @@ public class DBFluteUtil {
 	}
 
 	public static void copyCommonRegData(Object old, Object upd)
-			throws IllegalAccessException, InvocationTargetException,
-			NoSuchMethodException {
-		String[] commonCols = new String[] { "registerDatetime",
-				"registerUser", "registerProcess" };
+			throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+		String[] commonCols = new String[] { "registerDatetime", "registerUser", "registerProcess" };
 		for (String col : commonCols) {
-			PropertyUtils.setSimpleProperty(upd, col,
-					PropertyUtils.getSimpleProperty(old, col));
+			PropertyUtils.setSimpleProperty(upd, col, PropertyUtils.getSimpleProperty(old, col));
 		}
 
-	}
-
-	public static void setCriteria(AbstractConditionQuery query, Map map)
-			 {
-		// AbstractConditionQuery
-		HashMap opMap = getOpMap();
-		HashMap opMap2 = getOpMap2();
-		String field = (String) map.get("fieldName");
-
-		String operator = (String) map.get("operator");
-		String op = (String) opMap.get(operator);
-		String setter = "set" + field.substring(0, 1).toUpperCase()
-				+ field.substring(1) + "_" + op;
-		String op2 = (String) opMap2.get(operator);
-		String setter2 = "set" + field.substring(0, 1).toUpperCase()
-				+ field.substring(1) + "_" + op2;
-		String start = CommonUtil.convertToString(map.get("start"));
-		String end = CommonUtil.convertToString(map.get("end"));
-		
-		ConditionOptionCall<LikeSearchOption> likeContain = (o) -> {
-			o.likeContain();
-		};
-		ConditionOptionCall<LikeSearchOption> likePrefix = (o) -> {
-			o.likePrefix();
-		};
-		ConditionOptionCall<LikeSearchOption> likeSuffix = (o) -> {
-			o.likeSuffix();
-		};
-
-		// start がNullまたは Spaceなら何もしない
-		if (operator == null || start == null || start.equals("")) {
-			return;
-		}
-		if (operator.equals("between") && (end == null || end.equals(""))) {
-			return;
-		}
-
-			
-		
-		try {
-			Method[] methods = query.getClass().getMethods();
-			for (Method method : methods) {
-				if (method.getName().equals(setter)) {
-					Object startObj = convParameterFromString(start,
-							method.getParameterTypes()[0]);
-					if (op.equals("LikeSearch") || op.equals("NotLikeSearch")) {
-						ConditionOptionCall<LikeSearchOption> lso = null;
-						if (operator.equals("contains")
-								|| operator.equals("does not contain")) {
-							lso=likeContain;
-						}
-						if (operator.equals("starts with")
-								|| operator.equals("does not start with")) {
-							lso=likePrefix;
-						}
-						if (operator.equals("ends with")
-								|| operator.equals("does not end with")) {
-							lso=likeSuffix;
-						}
-						// method.invoke(query, startObj, lso);
-						method.invoke(query, startObj, lso);
-					} else {
-						method.invoke(query, startObj);
-					}
-
-				}
-				// if (operator.equals("between") &&
-				// method.getName().equals(setter2)) {
-				if (method.getName().equals(setter2)) {
-					Object endObj = convParameterFromString(end,
-							method.getParameterTypes()[0]);
-					method.invoke(query, endObj);
-				}
-			
-
-			}
-		} catch (Exception e) {
-			if (e.getClass().equals(SystemException.class)){
-				throw (SystemException)e;
-			}
-			log.error("SetupQueryCriteriaError");
-			CommonUtil.putStacktraceToLog(log, e);
-			throw new SystemException("SetupQueryCriteriaError");
-		}
-
-	}
-
-	private static Object convParameterFromString(String param, Class<?> class1) {
-		if (param == null) {
-			return null;
-		}
-		if (class1.equals(String.class)) {
-			return param;
-		}
-		param = param.trim();
-		if (class1.equals(Integer.class)) {
-			try {
-				return Integer.valueOf(param);
-			} catch (Exception e) {
-				throw new SystemException(param + "の整数形式が正しくないです。");
-			}
-		}
-		if (class1.equals(Date.class)) {
-			SimpleDateFormat format = CalenderUtil.getSdfDate();
-			try {
-				return format.parse(param);
-			} catch (Exception e) {
-				throw new SystemException(param + "の日付形式が正しくないです。");
-			}
-
-		}
-		if (class1.equals(Timestamp.class)) {
-
-			if (param.length() == 10) {
-				param = param + " 00:00:00";
-			}
-			SimpleDateFormat format = CalenderUtil.getSdfTimestamp();
-
-			try {
-				return new Timestamp(format.parse(param).getTime());
-			} catch (Exception e) {
-				;
-				throw new SystemException(param + "の時間形式が正しくないです。");
-			}
-
-		}
-		if (class1.equals(Boolean.class)) {
-			if (param.equals("true")) {
-				return new Boolean(true);
-			}
-			return new Boolean(false);
-		}
-
-		throw new RuntimeException("Conversion rule not set for "
-				+ class1.toString());
-	}
-
-	public static HashMap getColumns(AbstractBehaviorWritable bhv)
-			throws Exception {
-		HashMap<String, String> columns = new HashMap();
-		HashMap commonColMap = getComnColMap();
-		Method getMyDBMeta = bhv.getClass().getMethod("getMyDBMeta",
-				(Class<?>[]) null);
-		AbstractDBMeta myDBMeta = (AbstractDBMeta) getMyDBMeta.invoke(bhv,
-				(Object[]) null);
-		Method[] methods = myDBMeta.getClass().getMethods();
-		String type = null;
-		for (Method method : methods) {
-			String methodName = method.getName();
-
-			if (!methodName.startsWith("column")
-					|| method.getReturnType() != ColumnInfo.class) {
-				continue;
-			}
-			String column = methodName.substring(6, 7).toLowerCase()
-					+ methodName.substring(7);
-			if ((type = (String) commonColMap.get(column)) != null) {
-				columns.put(column, type);
-			} else {
-				columns.put(column, "N");
-			}
-		}
-		return columns;
-	}
-
-	private static synchronized HashMap getComnColMap() {
-		if (_comnColMap == null) {
-			_comnColMap = new HashMap();
-			for (String c : new String[] { "registerDatetime", "registerUser",
-					"registerProcess" }) {
-				_comnColMap.put(c, "R");
-			}
-			for (String c : new String[] { "updateDatetime", "updateUser",
-					"updateProcess" }) {
-				_comnColMap.put(c, "U");
-			}
-			for (String c : new String[] { "versionNo" }) {
-				_comnColMap.put(c, "V");
-			}
-		}
-		return _comnColMap;
 	}
 
 	public static void copyWebXml(String from) throws Exception {

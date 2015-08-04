@@ -9,15 +9,11 @@ import javax.servlet.http.HttpServletResponse;
 
 import net.arnx.jsonic.JSON;
 
-import org.dbflute.exception.EntityAlreadyExistsException;
-import org.dbflute.exception.EntityAlreadyUpdatedException;
-import org.dbflute.exception.SQLFailureException;
 import org.seasar.util.exception.IllegalPropertyRuntimeException;
 import org.seasar.util.exception.ParseRuntimeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mssoftech.springreact.service.LoginService;
 import com.mssoftech.springreact.util.AppContextUtil;
 import com.mssoftech.web.exception.SystemException;
 
@@ -26,12 +22,12 @@ public class ServiceUtil {
 	
 	public static String invoke(String str, HttpServletRequest request,
 			HttpServletResponse response, String smethod,
-			Class clazz, AppContextUtil appContextUtil) {
+			Class<?> clazz, AppContextUtil appContextUtil) {
 		try {
 			Method[] methods = clazz.getMethods();
 			Object target = appContextUtil.rootContext.getBean(clazz);
 			Object res = null;
-			Map params = createParams(str, clazz);
+			Map<String, Object> params = createParams(str, clazz);
 			for (Method method : methods) {
 				if (method.getName().equals(smethod)) {
 					res = method.invoke(target, params, request, response);
@@ -63,7 +59,7 @@ public class ServiceUtil {
 				// ---------------------------------
 			}
 			putErrorLog(e);
-			return JSON.encode(DBFluteUtil.setErrorMessage("System Error",
+			return JSON.encode(DBFluteUtil.setErrorMessage("System Error...\n" + e,
 					null));
 
 		} catch (Exception e) {
@@ -88,45 +84,15 @@ public class ServiceUtil {
 
 	private static String setRtnMessage(Throwable cause) {
 		String rtn=null;
-		if (cause.getClass() == SQLFailureException.class) {
-			String message = getMessage(cause);
-			rtn =  JSON.encode(DBFluteUtil.setErrorMessage(
-					"SQL ERROR\n" + message, null));
-		}
-
-		else if (cause.getClass() == EntityAlreadyUpdatedException.class) {
-			rtn =   JSON.encode(DBFluteUtil.setErrorMessage(
-					"既にDataが更新されています。再度読み込んでから実行して下さい。", null));
-		}
-		else if (cause.getClass() == EntityAlreadyExistsException.class) {
-			rtn =   JSON.encode(DBFluteUtil.setErrorMessage(
-					"キー項目の重複です。既に登録されています。", null));
-		}
-		else if (cause.getClass() == SystemException.class) {
+		if (cause.getClass() == SystemException.class) {
 			rtn =   JSON.encode(DBFluteUtil.setErrorMessage(
 					cause.getMessage(), null));
 		}
 		return rtn;
 	}
 
-	private static String getMessage(Throwable cause) {
-		log.warn(cause.toString());
-		String message = "";
-
-		Throwable cause2 = cause.getCause();
-		Throwable cause3 = null;
-		if (cause2 != null) {
-			message = cause2.getMessage();
-			cause3 = cause2.getCause();
-		}
-		if (cause3 != null) {
-			message=cause3.getMessage();
-		}
-		return message;
-	}
-
-	private static Map createParams(String str, Class<LoginService> clazz) {
-		Map params = (Map) JSON.decode(str);
+	private static Map<String, Object> createParams(String str, Class<?> clazz) { // Class<LoginService>
+		Map<String, Object> params = (Map<String, Object>) JSON.decode(str);
 		params.put("startTimeStamp", CalenderUtil.getCurrentTime());
 		params.put("class", clazz.getSimpleName());
 		return params;

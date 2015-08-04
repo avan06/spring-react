@@ -37,30 +37,30 @@ public class DatabaseConvertUtil {
 		return s;
 	}
 
-	public static void convertNumericValueToString(Map map,
+	public static void convertNumericValueToString(Map<String, Object> map,
 			final CharSequence... propertyNames) {
 		for (CharSequence element : propertyNames) {
-			if (map.get(element) != null) {
-				if (map.get(element).getClass() == BigDecimal.class) {
-					map.put(element, ((BigDecimal) map.get(element)).toString());
+			if (map.get(element.toString()) != null) {
+				if (map.get(element.toString()).getClass() == BigDecimal.class) {
+					map.put(element.toString(), ((BigDecimal) map.get(element.toString())).toString());
 				}
-				if (map.get(element).getClass() == Long.class) {
-					map.put(element, ((Long) map.get(element)).toString());
+				if (map.get(element.toString()).getClass() == Long.class) {
+					map.put(element.toString(), ((Long) map.get(element.toString())).toString());
 				}
-				if (map.get(element).getClass() == Integer.class) {
-					map.put(element, ((Integer) map.get(element)).toString());
+				if (map.get(element.toString()).getClass() == Integer.class) {
+					map.put(element.toString(), ((Integer) map.get(element.toString())).toString());
 				}
 			}
 		}
 	}
 
-	public static void convertNumericValueToCommaString(Map map,
+	public static void convertNumericValueToCommaString(Map<String, Object> map,
 			final CharSequence... propertyNames) {
 		for (CharSequence element : propertyNames) {
-			if (map.get(element) != null) {
+			if (map.get(element.toString()) != null) {
 				try {
-					map.put(element,
-							StringUtil.formatData(map.get(element), "IC"));
+					map.put(element.toString(),
+							StringUtil.formatData(map.get(element.toString()), "IC"));
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -68,19 +68,19 @@ public class DatabaseConvertUtil {
 		}
 	}
 
-	public static void convertToUpper(Map map,
+	public static void convertToUpper(Map<String, Object> map,
 			final CharSequence... propertyNames) {
 		for (CharSequence element : propertyNames) {
-			if (map.get(element) != null) {
-				map.put(element, ((String) map.get(element)).toUpperCase());
+			if (map.get(element.toString()) != null) {
+				map.put(element.toString(), ((String) map.get(element)).toUpperCase());
 			}
 		}
 	}
 
-	public static void removeComma(Map map, final CharSequence... propertyNames) {
+	public static void removeComma(Map<String, Object> map, final CharSequence... propertyNames) {
 		for (CharSequence element : propertyNames) {
-			if (map.get(element) != null) {
-				map.put(element, removeComma((String) map.get(element)));
+			if (map.get(element.toString()) != null) {
+				map.put(element.toString(), removeComma((String) map.get(element.toString())));
 			}
 		}
 	}
@@ -97,12 +97,12 @@ public class DatabaseConvertUtil {
 		return res;
 	}
 
-	public static void convertToStringWhenNull(Map newin,
+	public static void convertToStringWhenNull(Map<String, Object> newin,
 			final CharSequence... propertyNames) {
 		for (CharSequence element : propertyNames) {
-			String indata = (String) newin.get(element);
+			String indata = (String) newin.get(element.toString());
 			if (indata == null) {
-				newin.put(element, "");
+				newin.put(element.toString(), "");
 			}
 		}
 	}

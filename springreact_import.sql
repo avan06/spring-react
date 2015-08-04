@@ -1,0 +1,83 @@
+CREATE TABLE login (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  login_id varchar(40) NOT NULL,
+  name varchar(40) NOT NULL,
+  password varchar(40) NOT NULL,
+  version_no int(11) NOT NULL,
+  del_flag int(11) NOT NULL DEFAULT '0',
+  register_datetime timestamp NOT NULL,
+  register_user varchar(30) NOT NULL,
+  register_process varchar(30) NOT NULL,
+  update_datetime timestamp NOT NULL,
+  update_user varchar(30) NOT NULL,
+  update_process varchar(30) NOT NULL,
+  role varchar(20) DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY login_login_id_key (login_id,del_flag)
+);
+
+CREATE TABLE session (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  uuid varchar(50) NOT NULL,
+  login_id int(11) DEFAULT NULL,
+  role varchar(5) DEFAULT NULL,
+  data varchar(255) DEFAULT NULL,
+  version_no int(11) NOT NULL,
+  del_flag int(11) NOT NULL DEFAULT '0',
+  register_datetime timestamp NOT NULL,
+  register_user varchar(30) NOT NULL,
+  register_process varchar(30) NOT NULL,
+  update_datetime timestamp NOT NULL,
+  update_user varchar(30) NOT NULL,
+  update_process varchar(30) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY session_uuid_key (uuid),
+  KEY session_login_fkey (login_id),
+  CONSTRAINT session_login_fkey FOREIGN KEY (login_id) REFERENCES login (id)
+);
+
+CREATE TABLE sys_table (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  table_name varchar(40) NOT NULL,
+  key_1 varchar(40) NOT NULL,
+  key_2 varchar(100) NOT NULL,
+  s1_data text,
+  s2_data varchar(100) DEFAULT NULL,
+  s3_data varchar(100) DEFAULT NULL,
+  n1_data decimal(20,2) DEFAULT NULL,
+  n2_data decimal(20,2) DEFAULT NULL,
+  n3_data decimal(20,2) DEFAULT NULL,
+  version_no int(11) NOT NULL,
+  del_flag int(11) NOT NULL DEFAULT '0',
+  register_datetime timestamp NOT NULL,
+  register_user varchar(30) NOT NULL,
+  register_process varchar(30) NOT NULL,
+  update_datetime timestamp NOT NULL,
+  update_user varchar(30) NOT NULL,
+  update_process varchar(30) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY sys_table_table_name_key_1_key_2_del_flag_key (table_name,key_1,key_2,del_flag)
+);
+
+CREATE TABLE user_table (
+  id int(11) NOT NULL AUTO_INCREMENT,
+  table_name varchar(40) NOT NULL,
+  key_1 varchar(40) NOT NULL,
+  key_2 varchar(100) NOT NULL,
+  s1_data text,
+  s2_data varchar(100) DEFAULT NULL,
+  s3_data varchar(100) DEFAULT NULL,
+  n1_data decimal(20,2) DEFAULT NULL,
+  n2_data decimal(20,2) DEFAULT NULL,
+  n3_data decimal(20,2) DEFAULT NULL,
+  version_no int(11) NOT NULL,
+  del_flag int(11) NOT NULL DEFAULT '0',
+  register_datetime timestamp NOT NULL,
+  register_user varchar(30) NOT NULL,
+  register_process varchar(30) NOT NULL,
+  update_datetime timestamp NOT NULL,
+  update_user varchar(30) NOT NULL,
+  update_process varchar(30) NOT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY user_table_table_name_key_1_key_2_del_flag_key (table_name,key_1,key_2,del_flag)
+);

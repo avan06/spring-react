@@ -1,61 +1,65 @@
 package com.mssoftech.web.util;
 
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.dbflute.cbean.result.ListResultBean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.mssoftech.springreact.dbflute.exbhv.LoginBhv;
-import com.mssoftech.springreact.dbflute.exbhv.SessionBhv;
-import com.mssoftech.springreact.dbflute.exbhv.SysTableBhv;
-import com.mssoftech.springreact.dbflute.exentity.Login;
-import com.mssoftech.springreact.dbflute.exentity.Session;
-import com.mssoftech.springreact.dbflute.exentity.SysTable;
+import com.mssoftech.springreact.domain.Login;
+import com.mssoftech.springreact.domain.Session;
+import com.mssoftech.springreact.domain.SysTable;
 import com.mssoftech.springreact.util.AppContextUtil;
 
+@Component
+@Transactional
 public class ScreenSecurityUtil {
-	static protected Logger log = LoggerFactory
-			.getLogger(ScreenSecurityUtil.class);
+	@PersistenceContext
+	private EntityManager em;
+	@Autowired
+	private LoginUtil loginUtil;
+	@Autowired
+	private JspUtil jspUtil;
 
-	public static String generateAuthorizedScreen(HttpServletRequest request,
-			HttpServletResponse response, String[] files, String[] libfiles,
-			String title, AppContextUtil appContextUtil) {
-		return generateAuthorizedScreen(request, response, files, libfiles,
-				title, null, appContextUtil);
+	protected Logger log = LoggerFactory.getLogger(ScreenSecurityUtil.class);
+
+	public String generateAuthorizedScreen(HttpServletRequest request, HttpServletResponse response,
+			String[] files, String[] libfiles, String title, AppContextUtil appContextUtil) {
+		return generateAuthorizedScreen(request, response, files, libfiles, title, null, appContextUtil);
 	}
 
-	public static String generateAuthorizedScreen(HttpServletRequest request,
-			HttpServletResponse response, String[] files, String[] libfiles,
-			String title, String[] scripts, AppContextUtil appContextUtil) {
+	public String generateAuthorizedScreen(HttpServletRequest request, HttpServletResponse response,
+			String[] files, String[] libfiles, String title, String[] scripts, AppContextUtil appContextUtil) {
 		String url[] = request.getRequestURL().toString().split("/");
 		String screen = url[url.length - 1];
-		Session session = LoginUtil.getSessionFromRequestCookie(request,
-				appContextUtil.rootContext.getBean(SessionBhv.class));
-		Login login = LoginUtil.getLoginFromSession(session,
-				appContextUtil.rootContext.getBean(LoginBhv.class));
+		Session session = loginUtil.getSessionFromRequestCookie(request);
+		Login login = loginUtil.getLoginFromSession(session);
 		if (session == null) {
-			return JspUtil.returnError(request, "セッションが切れています。再度ログインして下さい。");
+			return jspUtil.returnError(request, "セッションが切れています。再度ログインして下さい。");
 		}
 		try {
-			if (checkAuth(screen, session, login,
-					appContextUtil.rootContext.getBean(SysTableBhv.class)) == false) {
-				return JspUtil.returnError(request, "この画面は権限がありません。");
+			if (checkAuth(screen, session, login) == false) {
+				return jspUtil.returnError(request, "この画面は権限がありません。");
 			}
 		} catch (Exception e) {
 			CommonUtil.putStacktraceToLog(log, e);
 			return e.getMessage();
 		}
 
-		JspUtil.setJspVariable(request, session, files, libfiles, title,
-				scripts, appContextUtil.rootContext.getBean(LoginBhv.class));
+		jspUtil.setJspVariable(request, session, files, libfiles, title, scripts);
 		return "index";
 	}
 
-	private static boolean checkAuth(String screen, Session session,
-			Login login, SysTableBhv sysTableBhv) throws Exception {
-		SysTable table = getScreenData(screen, null, null, sysTableBhv);
+	private boolean checkAuth(String screen, Session session, Login login) throws Exception {
+		SysTable table = getScreenData(screen, null, null);
 		String auth = table.getS1Data();
 		String grp = StringUtil.nullConvToString(session.getRole());
 		if (grp.length() != 1) {
@@ -68,23 +72,42 @@ public class ScreenSecurityUtil {
 		return false;
 	}
 
-	@SuppressWarnings("unused")
-	private static SysTable getScreenData(String screen, Integer comp_id,
-			String fy, SysTableBhv sysTableBhv) throws Exception {
+	@Transactional //FIXME
+	private SysTable getScreenData(String screen, Integer comp_id, String fy) throws Exception {
+		List<SysTable> sysTableList = em
+				.createQuery("From SysTable "
+						+ "where delFlag = :delFlag and tableName = :tableName and key1 = :key1 and key2 = :key2 "
+						+ "ORDER BY key1, key2", SysTable.class)
+				.setParameter("delFlag", 0)
+				.setParameter("tableName", "screenAuth")
+				.setParameter("key1", screen)
+				.setParameter("key2", "").getResultList();
 
-		ListResultBean<SysTable> list = sysTableBhv.selectList(cb -> {
-			cb.enableEmptyStringQuery(() -> {
-				cb.query().setKey2_Equal("");
-			});
-			cb.query().setDelFlag_Equal(0);
-			cb.query().setTableName_Equal("screenAuth");
-			cb.query().setKey1_Equal(screen);
-			cb.query().addOrderBy_Key1_Asc().addOrderBy_Key2_Asc();
-		});
-		if (list.size() == 0) {
-			throw new Exception("システムエラー  画面権限データ" + screen + " が登録されていません。");
+		if (sysTableList.size() == 0) {
+			//throw new Exception("システムエラー  画面権限データ" + screen + " が登録されていません。");
+			Date d = new Date();
+
+			SysTable sysTable = new SysTable();
+			sysTable.setTableName("screenAuth");
+			sysTable.setKey1(screen);
+			sysTable.setKey2("");
+			
+			sysTable.setS1Data("1");
+
+			sysTable.setVersionNo(1);
+			sysTable.setDelFlag(0);
+
+			sysTable.setRegisterDatetime(d);
+			sysTable.setRegisterUser("SYSTEM");
+			sysTable.setRegisterProcess(this.getClass().getSimpleName());
+			sysTable.setUpdateDatetime(d);
+			sysTable.setUpdateUser("SYSTEM");
+			sysTable.setUpdateProcess(this.getClass().getSimpleName());
+
+			em.persist(sysTable);
+			return getScreenData(screen, comp_id, fy);
 		}
 
-		return list.get(0);
+		return sysTableList.get(0);
 	}
 }

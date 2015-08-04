@@ -1,2 +1,0 @@
-ng sample/HTTPD
-pause
