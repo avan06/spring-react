@@ -1,5 +1,5 @@
   var b = ReactBootstrap;
-  var Hello = React.createClass({displayName: 'Hello',
+  var Hello = React.createClass({displayName: "Hello",
     getInitialState: function() {
         return {input1:0, 
                 input2:0};

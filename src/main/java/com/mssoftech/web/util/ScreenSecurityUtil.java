@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.mssoftech.springreact.domain.Login;
 import com.mssoftech.springreact.domain.Session;
 import com.mssoftech.springreact.domain.SysTable;
-import com.mssoftech.springreact.util.AppContextUtil;
 
 @Component
 @Transactional
@@ -32,12 +31,12 @@ public class ScreenSecurityUtil {
 	protected Logger log = LoggerFactory.getLogger(ScreenSecurityUtil.class);
 
 	public String generateAuthorizedScreen(HttpServletRequest request, HttpServletResponse response,
-			String[] files, String[] libfiles, String title, AppContextUtil appContextUtil) {
-		return generateAuthorizedScreen(request, response, files, libfiles, title, null, appContextUtil);
+			String[] files, String[] libfiles, String title) {
+		return generateAuthorizedScreen(request, response, files, libfiles, title, null);
 	}
 
 	public String generateAuthorizedScreen(HttpServletRequest request, HttpServletResponse response,
-			String[] files, String[] libfiles, String title, String[] scripts, AppContextUtil appContextUtil) {
+			String[] files, String[] libfiles, String title, String[] scripts) {
 		String url[] = request.getRequestURL().toString().split("/");
 		String screen = url[url.length - 1];
 		Session session = loginUtil.getSessionFromRequestCookie(request);

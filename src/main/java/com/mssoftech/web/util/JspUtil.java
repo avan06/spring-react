@@ -57,7 +57,7 @@ public class JspUtil {
 		jsCss.put("jslib", new ArrayList<String>());
 		jsCss.put("css", new ArrayList<String>());
 		jsCss.put("jscmd", new ArrayList<String>());
-		jsCss.put("jscmdh", "$c_contextpath=\"" + contextPath + "\";");
+		jsCss.put("jscmdh", "base_contextpath=\"" + contextPath + "\";");
 		jsCss.put("title", title);
 		DBFluteUtil.putStrings(jsCss, "jscmd", jscmd);
 		DBFluteUtil.putStrings(jsCss, "js", contextPath, js);

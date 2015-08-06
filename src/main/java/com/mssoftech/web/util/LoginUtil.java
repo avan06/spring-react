@@ -72,10 +72,10 @@ public class LoginUtil {
 		Login login = this.getLoginFromSession(session);
 		
 		String[] loginInfoScript = new String[] {
-				"if (!(window[\"$c\"] != null)) {window[\"$c\"] = {};}\n",
-				"$c.login = {};\n",
-				"$c.login.uid = " + login.getId().toString() + ";\n",
-				"$c.login.name = '" + login.getName() + "';\n" };
+				"if (!(window[\"base\"] != null)) {window[\"base\"] = {};}\n",
+				"base.login = {};\n",
+				"base.login.uid = " + login.getId().toString() + ";\n",
+				"base.login.name = '" + login.getName() + "';\n" };
 		return loginInfoScript;
 	}
 
