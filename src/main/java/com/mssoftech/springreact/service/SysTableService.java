@@ -14,6 +14,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.seasar.util.beans.util.BeanUtil;
+import org.seasar.util.beans.util.CopyOptionsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -156,15 +157,16 @@ public class SysTableService {
 		} catch (Exception e) {
 			ServiceUtil.mapToNewBeanExceptionAnalyze(e);
 		}
-		SysTable oldSysTable = em.find(SysTable.class, upd.getId());
-		if (oldSysTable == null) {
+		SysTable dbSysTable = em.find(SysTable.class, upd.getId());
+		if (dbSysTable == null) {
 			throw new SystemException("id:" + upd.getId().toString() + "　が見つかりません");
 		}
-		if (!(upd.getTableName().equals(oldSysTable.getTableName()) && upd.getKey1().equals(oldSysTable.getKey1())
-				&& upd.getKey2().equals(oldSysTable.getKey2())) && sysTableCodeDupCheck(upd)) {
+		if (!(upd.getTableName().equals(dbSysTable.getTableName()) && upd.getKey1().equals(dbSysTable.getKey1())
+				&& upd.getKey2().equals(dbSysTable.getKey2())) && sysTableCodeDupCheck(upd)) {
 			return DBFluteUtil.setErrorMessage("このDataは既に使用されています。", params);
 		}
-		em.merge(upd);
+		BeanUtil.copyBeanToBean(upd, dbSysTable, CopyOptionsUtil.excludeNull());
+		em.merge(dbSysTable);
 		Map<String, Object> map = null;
 		map = entityToMap(upd);
 		return DBFluteUtil.setFetchResult(map, params);

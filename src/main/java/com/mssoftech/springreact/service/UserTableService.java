@@ -13,6 +13,7 @@ import javax.persistence.PersistenceContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.seasar.util.beans.util.BeanUtil;
+import org.seasar.util.beans.util.CopyOptionsUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -154,15 +155,16 @@ public class UserTableService {
 		} catch (Exception e) {
 			ServiceUtil.mapToNewBeanExceptionAnalyze(e);
 		}
-		UserTable oldUserTable = em.find(UserTable.class, upd.getId());
-		if (oldUserTable == null) {
+		UserTable dbUserTable = em.find(UserTable.class, upd.getId());
+		if (dbUserTable == null) {
 			throw new SystemException("id:" + upd.getId().toString() + "　が見つかりません");
 		}
-		if (!(upd.getTableName().equals(oldUserTable.getTableName()) && upd.getKey1().equals(oldUserTable.getKey1())
-				&& upd.getKey2().equals(oldUserTable.getKey2())) && userTableCodeDupCheck(upd)) {
+		if (!(upd.getTableName().equals(dbUserTable.getTableName()) && upd.getKey1().equals(dbUserTable.getKey1())
+				&& upd.getKey2().equals(dbUserTable.getKey2())) && userTableCodeDupCheck(upd)) {
 			return DBFluteUtil.setErrorMessage("このDataは既に使用されています。", params);
 		}
-		em.merge(oldUserTable);
+		BeanUtil.copyBeanToBean(upd, dbUserTable, CopyOptionsUtil.excludeNull());
+		em.merge(dbUserTable);
 		Map<String, Object> map = null;
 		map = entityToMap(upd);
 		return DBFluteUtil.setFetchResult(map, params);

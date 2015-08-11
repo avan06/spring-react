@@ -1,24 +1,24 @@
-base.checkAndCreate("$w")
-$w.windowArray = []
-$w.maxWindow = -1
+base.checkAndCreate("wObj")
+wObj.windowArray = []
+wObj.maxWindow = -1
 
-$w.windowOpen = (jspath) -> 
+wObj.windowOpen = (jspath) -> 
   w = window.open(base_contextpath + jspath, '_blank',"");
   window.focus();
-  $w.maxWindow = $w.maxWindow + 1
-  $w.windowArray[$w.maxWindow] = w
+  wObj.maxWindow = wObj.maxWindow + 1
+  wObj.windowArray[wObj.maxWindow] = w
 
-$w.windowClose  = -> 
-  for i in [0..$w.maxWindow]
-    if (typeof $w.windowArray[i] != "undefined")
-      if typeof $w.windowArray[i].window == "object" && $w.windowArray[i].window != null
-       $w.windowArray[i].window.close() 
-  $w.maxWindow = -1    
-$w.handleChange = (e) ->
-  jsx=$w.app
+wObj.windowClose  = -> 
+  for i in [0..wObj.maxWindow]
+    if (typeof wObj.windowArray[i] != "undefined")
+      if typeof wObj.windowArray[i].window == "object" && wObj.windowArray[i].window != null
+       wObj.windowArray[i].window.close() 
+  wObj.maxWindow = -1    
+wObj.handleChange = (e) ->
+  jsx=wObj.application
   base.handleChange(jsx,e.target.name,e.target.value);
-$w.handleClick = (e) ->
-  jsx=$w.app
+wObj.handleClick = (e) ->
+  jsx=wObj.application
   name=e.target.name
   if name=="loginForm#CancelBtn"
     jsx.setState({
@@ -30,10 +30,10 @@ $w.handleClick = (e) ->
     })
     return
   if name=="loginForm#LoginBtn"
-    $w.flux.actions.loginClick(jsx.state.loginForm)
+    wObj.flux.actions.loginClick(jsx.state.loginForm)
     return
   if name=="alert#CloseBtn"
-    $w.flux.actions.base_alertHide()
+    wObj.flux.actions.base_alertHide()
     return
   if name=="btnLogin"
     if jsx.state.page.logbtn == "LOGIN"
@@ -41,35 +41,35 @@ $w.handleClick = (e) ->
         loginForm_isShow:true
       })
       return
-    $w.windowClose()
-    $w.flux.actions.logoffClick()
+    wObj.windowClose()
+    wObj.flux.actions.logoffClick()
     return
   if jsx.state.page.name == "" 
-    $w.flux.actions.base_alertShow("Login していません")
+    wObj.flux.actions.base_alertShow("Login していません")
     return
 #これ以下はLOGIN状態のみ有効
   if name=="btnUser"
-    $w.windowOpen("/user")
+    wObj.windowOpen("/user")
   if name=="btnUserin"
-    $w.windowOpen("/userin")
+    wObj.windowOpen("/userin")
   if name=="btnUsertab"
-    $w.windowOpen("/usertab")
+    wObj.windowOpen("/usertab")
   if name=="btnUsertbl"
-    $w.windowOpen("/usertbl")
+    wObj.windowOpen("/usertbl")
   if name=="btnSystbl"
-    $w.windowOpen("/systbl")
-$w.handleLoginKeyPress = (e) ->
-  jsx=$w.app
+    wObj.windowOpen("/systbl")
+wObj.handleLoginKeyPress = (e) ->
+  jsx=wObj.application
   key=e.key
   if e.key=="Enter"
-    $w.flux.actions.loginClick(jsx.state.loginForm)
-$w.constants =
+    wObj.flux.actions.loginClick(jsx.state.loginForm)
+wObj.constants =
   $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS"
   $W_LOGOFF_SUCCESS: "$W_LOGOFF_SUCCESS" 
 rules = []
 rules.push("required,loginId,loginIdは必須項目です");  
 rules.push("required,password,psswordは必須項目です");  
-$w.actions = {
+wObj.actions = {
   loginClick:(loginForm) ->
     res = rsv.validate(loginForm,rules)
     if res.length > 0
@@ -77,14 +77,14 @@ $w.actions = {
       return
     this.dispatch(base.constants.base_LOADING)
     base.ajaxPostJson("/ajax/loginauth",loginForm,"application/json",
-      base.ajaxCallback.bind(this,loginForm,$w.constants.$W_LOGIN_SUCCESS))
+      base.ajaxCallback.bind(this,loginForm,wObj.constants.$W_LOGIN_SUCCESS))
   logoffClick: ->
     this.dispatch(base.constants.base_LOADING)
     base.ajaxPostJson("/ajax/logout","","application/json",
-      base.ajaxCallback.bind(this,"",$w.constants.$W_LOGOFF_SUCCESS))
+      base.ajaxCallback.bind(this,"",wObj.constants.$W_LOGOFF_SUCCESS))
 } 
 
-$w.PageStore = Fluxxor.createStore(
+wObj.PageStore = Fluxxor.createStore(
   initialize: ->
     @data = 
       {
@@ -92,8 +92,8 @@ $w.PageStore = Fluxxor.createStore(
         uid:""
         name:""
       }
-    @bindActions $w.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
-                  $w.constants.$W_LOGOFF_SUCCESS, @onLogoffSuccess
+    @bindActions wObj.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
+                  wObj.constants.$W_LOGOFF_SUCCESS, @onLogoffSuccess
     return
   onLoginSuccess: (res) -> 
     @data.logbtn="LOGOFF"
@@ -110,17 +110,17 @@ $w.PageStore = Fluxxor.createStore(
     return
 ) 
 
-$w.flux = new Fluxxor.Flux()
-$w.pageStore=new $w.PageStore;
-$w.flux.addStore("PAGE",$w.pageStore)
-$w.flux.addActions($w.actions)
-$w.commonStore=new base.CommonStore;
-$w.flux.addStore("COMMON",$w.commonStore)
-$w.flux.addActions(base.actions)
-$w.FluxMixin = Fluxxor.FluxMixin(React)
-$w.StoreWatchMixin = Fluxxor.StoreWatchMixin
-$w.pageStore.on("loginComplete", -> 
-  $w.app.setState(
+wObj.flux = new Fluxxor.Flux()
+wObj.pageStore=new wObj.PageStore;
+wObj.flux.addStore("PAGE",wObj.pageStore)
+wObj.flux.addActions(wObj.actions)
+wObj.commonStore=new base.CommonStore;
+wObj.flux.addStore("COMMON",wObj.commonStore)
+wObj.flux.addActions(base.actions)
+wObj.FluxMixin = Fluxxor.FluxMixin(React)
+wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin
+wObj.pageStore.on("loginComplete", -> 
+  wObj.application.setState(
     {
       loginForm_isShow:false
       loginForm:{

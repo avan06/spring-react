@@ -2,36 +2,36 @@
 (function() {
   var rcdStore;
 
-  base.checkAndCreate("$w");
+  base.checkAndCreate("wObj");
 
-  $w.handleChange = function(jsx, e) {
+  wObj.handleChange = function(jsx, e) {
     return base.handleChange(jsx, e.target.name, e.target.value);
   };
 
-  $w.handleClick = function(jsx, e) {
+  wObj.handleClick = function(jsx, e) {
     var ids, name, selRow, temp;
     name = e.target.name;
     if (name === "alert#CloseBtn") {
-      $w.flux.actions.base_alertHide();
+      wObj.flux.actions.base_alertHide();
     }
     if (name === "deleteCfm#CloseBtn") {
-      $w.flux.actions.base_deleteCfmHide();
+      wObj.flux.actions.base_deleteCfmHide();
     }
     if (name === "deleteCfm#YesBtn") {
-      $w.flux.actions.base_deleteCfmHide();
-      $w.formDeleteCfm(jsx);
+      wObj.flux.actions.base_deleteCfmHide();
+      wObj.formDeleteCfm(jsx);
     }
     if (name === "btnNew") {
-      $w.formClear(jsx);
+      wObj.formClear(jsx);
     }
     if (name === "btnSearch") {
-      $w.formSearch(jsx);
+      wObj.formSearch(jsx);
     }
     if (name === "btnUpdate") {
-      $w.formUpdate(jsx);
+      wObj.formUpdate(jsx);
     }
     if (name === "btnDelete") {
-      $w.formDelete(jsx);
+      wObj.formDelete(jsx);
     }
     if (typeof e.target.id === "undefined") {
       return;
@@ -50,13 +50,13 @@
     }
   };
 
-  $w.formSearch = function(jsx) {
+  wObj.formSearch = function(jsx) {
     var criteria;
     criteria = base.createCriteria(jsx.state.search, ["tableName", "key1"]);
-    return $w.flux.actions.base_rcd_fetch(jsx.state.usertbl, jsx.state.form, "usertbl", criteria);
+    return wObj.flux.actions.base_rcd_fetch(jsx.state.usertbl, jsx.state.form, "usertbl", criteria);
   };
 
-  $w.formUpdate = function(jsx) {
+  wObj.formUpdate = function(jsx) {
     var form, res, rules;
     form = jsx.state.form;
     res = "";
@@ -64,25 +64,25 @@
       rules = [];
     }
     if (res.length > 0) {
-      $w.flux.actions.base_alertShow(res);
+      wObj.flux.actions.base_alertShow(res);
       return;
     }
-    return $w.flux.actions.base_rcd_update(jsx.state.usertbl, jsx.state.form, "usertbl");
+    return wObj.flux.actions.base_rcd_update(jsx.state.usertbl, jsx.state.form, "usertbl");
   };
 
-  $w.formDelete = function(jsx) {
+  wObj.formDelete = function(jsx) {
     if (jsx.state.form.id === "") {
-      $w.flux.actions.base_rcd_delete_id_blank();
+      wObj.flux.actions.base_rcd_delete_id_blank();
       return;
     }
-    return $w.flux.actions.base_deleteCfmShow();
+    return wObj.flux.actions.base_deleteCfmShow();
   };
 
-  $w.formDeleteCfm = function(jsx) {
-    return $w.flux.actions.base_rcd_delete(jsx.state.usertbl, jsx.state.form, "usertbl");
+  wObj.formDeleteCfm = function(jsx) {
+    return wObj.flux.actions.base_rcd_delete(jsx.state.usertbl, jsx.state.form, "usertbl");
   };
 
-  $w.formUpdateCheck = function(form) {
+  wObj.formUpdateCheck = function(form) {
     if (form.password > "" || form.passwordcfm > "") {
       if (form.password !== form.passwordcfm) {
         return [["", "パスワードとパスワード（確認）が一致しません"]];
@@ -91,7 +91,7 @@
     return "";
   };
 
-  $w.formClear = function(jsx) {
+  wObj.formClear = function(jsx) {
     var formtemp;
     formtemp = {
       form: _.cloneDeep(jsx.state.usertbl.blank)
@@ -99,52 +99,52 @@
     return jsx.setState(formtemp);
   };
 
-  $w.constants = {
+  wObj.constants = {
     $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS"
   };
 
-  $w.actions = {
+  wObj.actions = {
     logoffClick: function() {
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", $w.constants.$W_LOGOFF_SUCCESS));
+      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", wObj.constants.$W_LOGOFF_SUCCESS));
     }
   };
 
-  $w.PageStore = Fluxxor.createStore({
+  wObj.PageStore = Fluxxor.createStore({
     initialize: function() {
       this.data = {};
     }
   });
 
-  $w.flux = new Fluxxor.Flux();
+  wObj.flux = new Fluxxor.Flux();
 
-  $w.pageStore = new $w.PageStore;
+  wObj.pageStore = new wObj.PageStore;
 
-  $w.flux.addStore("PAGE", $w.pageStore);
+  wObj.flux.addStore("PAGE", wObj.pageStore);
 
-  $w.flux.addActions($w.actions);
+  wObj.flux.addActions(wObj.actions);
 
-  $w.commonStore = new base.CommonStore;
+  wObj.commonStore = new base.CommonStore;
 
-  $w.flux.addStore("COMMON", $w.commonStore);
+  wObj.flux.addStore("COMMON", wObj.commonStore);
 
-  $w.flux.addActions(base.actions);
+  wObj.flux.addActions(base.actions);
 
-  $w.rcdStore = new base.RcdStore;
+  wObj.rcdStore = new base.RcdStore;
 
-  $w.flux.addStore("RCD", $w.rcdStore);
+  wObj.flux.addStore("RCD", wObj.rcdStore);
 
-  $w.flux.addActions(base.rcdActions);
+  wObj.flux.addActions(base.rcdActions);
 
-  rcdStore = $w.flux.store("RCD");
+  rcdStore = wObj.flux.store("RCD");
 
   rcdStore.addTable("usertbl");
 
-  $w.FluxMixin = Fluxxor.FluxMixin(React);
+  wObj.FluxMixin = Fluxxor.FluxMixin(React);
 
-  $w.StoreWatchMixin = Fluxxor.StoreWatchMixin;
+  wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin;
 
-  $w.fix = function() {
+  wObj.fix = function() {
     return $('#tableusertbl').tablefix({
       width: 900,
       height: 300,
@@ -152,28 +152,28 @@
     });
   };
 
-  $w.rcdStore.on("rcdComplete_usertbl", function() {
+  wObj.rcdStore.on("rcdComplete_usertbl", function() {
     var rcdTemp, temp;
-    rcdTemp = _.cloneDeep($w.app.state.rcd.usertbl);
+    rcdTemp = _.cloneDeep(wObj.application.state.rcd.usertbl);
     temp = {
-      usertbl: $w.app.state.usertbl
+      usertbl: wObj.application.state.usertbl
     };
     temp.usertbl.rcds = rcdTemp.rcds;
     temp.form = rcdTemp.rcd;
     temp.usertbl.selRow = rcdTemp.selRow;
-    return $w.app.setState(temp);
+    return wObj.application.setState(temp);
   });
 
-  $w.getDom = function(refname) {
-    return $w.app.refs[refname].getDOMNode();
+  wObj.getDom = function(refname) {
+    return wObj.application.refs[refname].getDOMNode();
   };
 
-  $w.scroll = function() {
-    return $w.getDom("tableHead").scrollLeft = $w.getDom("tableBody").scrollLeft;
+  wObj.scroll = function() {
+    return wObj.getDom("tableHead").scrollLeft = wObj.getDom("tableBody").scrollLeft;
   };
 
-  $w.onscroll = function() {
-    return $w.getDom("tableBody").onscroll = $w.scroll;
+  wObj.onscroll = function() {
+    return wObj.getDom("tableBody").onscroll = wObj.scroll;
   };
 
 }).call(this);

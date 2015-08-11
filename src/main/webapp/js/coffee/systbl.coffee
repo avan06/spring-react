@@ -1,25 +1,25 @@
-base.checkAndCreate("$w")
+base.checkAndCreate("wObj")
  
-$w.handleChange = (jsx,e) ->
+wObj.handleChange = (jsx,e) ->
   base.handleChange(jsx,e.target.name,e.target.value);
 
-$w.handleClick = (jsx,e) ->
+wObj.handleClick = (jsx,e) ->
   name=e.target.name
   if name=="alert#CloseBtn"
-     $w.flux.actions.base_alertHide()
+     wObj.flux.actions.base_alertHide()
   if name=="deleteCfm#CloseBtn"
-     $w.flux.actions.base_deleteCfmHide()
+     wObj.flux.actions.base_deleteCfmHide()
   if name=="deleteCfm#YesBtn"
-     $w.flux.actions.base_deleteCfmHide()
-     $w.formDeleteCfm(jsx)
+     wObj.flux.actions.base_deleteCfmHide()
+     wObj.formDeleteCfm(jsx)
   if name == "btnNew"
-    $w.formClear(jsx)
+    wObj.formClear(jsx)
   if name == "btnSearch"
-    $w.formSearch(jsx)
+    wObj.formSearch(jsx)
   if name == "btnUpdate"
-    $w.formUpdate(jsx)
+    wObj.formUpdate(jsx)
   if name == "btnDelete"
-    $w.formDelete(jsx)
+    wObj.formDelete(jsx)
   if typeof(e.target.id)=="undefined"
     return
   ids = e.target.id.split("#");
@@ -31,88 +31,88 @@ $w.handleClick = (jsx,e) ->
     temp.form.password=""
     temp.form.passwordcfm=""
     jsx.setState(temp)
-$w.formSearch = (jsx) ->
+wObj.formSearch = (jsx) ->
   criteria=base.createCriteria(jsx.state.search,["tableName","key1"])
-  $w.flux.actions.base_rcd_fetch(jsx.state.systbl,jsx.state.form,"systbl",criteria)
-$w.formUpdate = (jsx) ->
+  wObj.flux.actions.base_rcd_fetch(jsx.state.systbl,jsx.state.form,"systbl",criteria)
+wObj.formUpdate = (jsx) ->
   form = jsx.state.form
   res = ""
   if form.id==""
     rules = []
 
   if res.length > 0
-    $w.flux.actions.base_alertShow(res)
+    wObj.flux.actions.base_alertShow(res)
     return
-  $w.flux.actions.base_rcd_update(jsx.state.systbl,jsx.state.form,"systbl")
-$w.formDelete = (jsx) ->
+  wObj.flux.actions.base_rcd_update(jsx.state.systbl,jsx.state.form,"systbl")
+wObj.formDelete = (jsx) ->
   if jsx.state.form.id == ""
-    $w.flux.actions.base_rcd_delete_id_blank()
+    wObj.flux.actions.base_rcd_delete_id_blank()
     return
-  $w.flux.actions.base_deleteCfmShow()
-$w.formDeleteCfm = (jsx) ->
-  $w.flux.actions.base_rcd_delete(jsx.state.systbl,jsx.state.form,"systbl")
-$w.formUpdateCheck = (form) ->
+  wObj.flux.actions.base_deleteCfmShow()
+wObj.formDeleteCfm = (jsx) ->
+  wObj.flux.actions.base_rcd_delete(jsx.state.systbl,jsx.state.form,"systbl")
+wObj.formUpdateCheck = (form) ->
   if form.password>"" || form.passwordcfm>""
     if form.password != form.passwordcfm
       return [["", "パスワードとパスワード（確認）が一致しません"]]
   return ""
  
-$w.formClear = (jsx) ->
+wObj.formClear = (jsx) ->
   formtemp={
     form:_.cloneDeep(jsx.state.systbl.blank)
   }
   jsx.setState(formtemp)
-$w.constants =
+wObj.constants =
   $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS"
 
 
-$w.actions = {
+wObj.actions = {
   logoffClick: ->
     this.dispatch(base.constants.base_LOADING)
     base.ajaxPostJson("/ajax/logout","","application/json",
-      base.ajaxCallback.bind(this,"",$w.constants.$W_LOGOFF_SUCCESS))
+      base.ajaxCallback.bind(this,"",wObj.constants.$W_LOGOFF_SUCCESS))
 } 
 
-$w.PageStore = Fluxxor.createStore(
+wObj.PageStore = Fluxxor.createStore(
   initialize: ->
     @data = 
       {
       }
-    #@bindActions $w.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
+    #@bindActions wObj.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
 
     return
 ) 
 
-$w.flux = new Fluxxor.Flux()
-$w.pageStore=new $w.PageStore;
-$w.flux.addStore("PAGE",$w.pageStore)
-$w.flux.addActions($w.actions)
-$w.commonStore=new base.CommonStore;
-$w.flux.addStore("COMMON",$w.commonStore)
-$w.flux.addActions(base.actions)
-$w.rcdStore=new base.RcdStore;
-$w.flux.addStore("RCD",$w.rcdStore)
-$w.flux.addActions(base.rcdActions)
-rcdStore = $w.flux.store("RCD")
+wObj.flux = new Fluxxor.Flux()
+wObj.pageStore=new wObj.PageStore;
+wObj.flux.addStore("PAGE",wObj.pageStore)
+wObj.flux.addActions(wObj.actions)
+wObj.commonStore=new base.CommonStore;
+wObj.flux.addStore("COMMON",wObj.commonStore)
+wObj.flux.addActions(base.actions)
+wObj.rcdStore=new base.RcdStore;
+wObj.flux.addStore("RCD",wObj.rcdStore)
+wObj.flux.addActions(base.rcdActions)
+rcdStore = wObj.flux.store("RCD")
 rcdStore.addTable("systbl")
-$w.FluxMixin = Fluxxor.FluxMixin(React)
-$w.StoreWatchMixin = Fluxxor.StoreWatchMixin
-$w.fix = ->
+wObj.FluxMixin = Fluxxor.FluxMixin(React)
+wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin
+wObj.fix = ->
   $('#tablesystbl').tablefix({width:900,height:300,fixRows:1})
-$w.rcdStore.on("rcdComplete_systbl", ->
-  rcdTemp=_.cloneDeep($w.app.state.rcd.systbl)
+wObj.rcdStore.on("rcdComplete_systbl", ->
+  rcdTemp=_.cloneDeep(wObj.application.state.rcd.systbl)
   temp={
-    systbl:$w.app.state.systbl
+    systbl:wObj.application.state.systbl
   }
   temp.systbl.rcds=rcdTemp.rcds
   temp.form=rcdTemp.rcd
   temp.systbl.selRow=rcdTemp.selRow
-  $w.app.setState(temp) 
+  wObj.application.setState(temp) 
 )
-$w.getDom = (refname) ->
-  return $w.app.refs[refname].getDOMNode()
+wObj.getDom = (refname) ->
+  return wObj.application.refs[refname].getDOMNode()
   
-$w.scroll = ->
-  $w.getDom("tableHead").scrollLeft=$w.getDom("tableBody").scrollLeft
-$w.onscroll = ->
-  $w.getDom("tableBody").onscroll=$w.scroll
+wObj.scroll = ->
+  wObj.getDom("tableHead").scrollLeft=wObj.getDom("tableBody").scrollLeft
+wObj.onscroll = ->
+  wObj.getDom("tableBody").onscroll=wObj.scroll

@@ -1,15 +1,15 @@
-base.checkAndCreate("$w")
+base.checkAndCreate("wObj")
   
-$w.handleChannge = (jsx,e) ->
+wObj.handleChannge = (jsx,e) ->
   change = {}
   change[e.target.name] = e.target.value
   jsx.setState(change)
-$w.handleClick = (jsx,e) ->
+wObj.handleClick = (jsx,e) ->
   name=e.target.name
   if name=="btnSearch"
-    $w.flux.actions.loadBuzz();
+    wObj.flux.actions.loadBuzz();
     
-$w.constants =
+wObj.constants =
   LOAD_BUZZ: "LOAD_BUZZ"
   LOAD_BUZZ_SUCCESS: "LOAD_BUZZ_SUCCESS"
   LOAD_BUZZ_FAIL: "LOAD_BUZZ_FAIL"
@@ -17,16 +17,16 @@ $w.constants =
   ADD_BUZZ_SUCCESS: "ADD_BUZZ_SUCCESS"
   ADD_BUZZ_FAIL: "ADD_BUZZ_FAIL"
   
-$w.actions =
+wObj.actions =
   loadBuzz: ->
-    this.dispatch($w.constants.LOAD_BUZZ)
+    this.dispatch(wObj.constants.LOAD_BUZZ)
     BuzzwordClient.load ((words) ->
-      this.dispatch($w.constants.LOAD_BUZZ_SUCCESS,
+      this.dispatch(wObj.constants.LOAD_BUZZ_SUCCESS,
         words: words
       )
       return
     ).bind(this), ((error) ->
-      this.dispatch($w.constants.LOAD_BUZZ_FAIL,
+      this.dispatch(wObj.constants.LOAD_BUZZ_FAIL,
         error: error
       )
       return
@@ -49,14 +49,14 @@ BuzzwordClient =
       return
     ), Math.random() * 1000 + 500
     return    
-$w.RecordStore = Fluxxor.createStore(
+wObj.RecordStore = Fluxxor.createStore(
   initialize: ->
     @loading = false
     @error = null
     @words = {}
-    @bindActions $w.constants.LOAD_BUZZ, @onLoadBuzz, 
-                 $w.constants.LOAD_BUZZ_SUCCESS, @onLoadBuzzSuccess, 
-                 $w.constants.LOAD_BUZZ_FAIL, @onLoadBuzzFail
+    @bindActions wObj.constants.LOAD_BUZZ, @onLoadBuzz, 
+                 wObj.constants.LOAD_BUZZ_SUCCESS, @onLoadBuzzSuccess, 
+                 wObj.constants.LOAD_BUZZ_FAIL, @onLoadBuzzFail
 
     return
 
@@ -79,13 +79,13 @@ $w.RecordStore = Fluxxor.createStore(
 
 )
 
-$w.stores = RecordStore: new $w.RecordStore()
-$w.flux = new Fluxxor.Flux()
-$w.flux.addStores($w.stores)
-$w.flux.addActions($w.actions)
-$w.flux.on "dispatch", (type, payload) ->
+wObj.stores = RecordStore: new wObj.RecordStore()
+wObj.flux = new Fluxxor.Flux()
+wObj.flux.addStores(wObj.stores)
+wObj.flux.addActions(wObj.actions)
+wObj.flux.on "dispatch", (type, payload) ->
   console.log "[Dispatch]", type, payload  if console and console.log
   return
 
-$w.FluxMixin = Fluxxor.FluxMixin(React)
-$w.StoreWatchMixin = Fluxxor.StoreWatchMixin
+wObj.FluxMixin = Fluxxor.FluxMixin(React)
+wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin

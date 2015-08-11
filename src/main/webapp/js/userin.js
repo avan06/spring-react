@@ -2,11 +2,11 @@
 (function() {
   var rcdStore;
 
-  base.checkAndCreate("$w");
+  base.checkAndCreate("wObj");
 
-  $w.handleChange = function(e) {
+  wObj.handleChange = function(e) {
     var jsx, logintemp, names;
-    jsx = $w.app;
+    jsx = wObj.application;
     names = e.target.name.split("#");
     if (names[0] === "loginrow") {
       logintemp = {
@@ -19,18 +19,18 @@
     return base.handleChange(jsx, e.target.name, e.target.value);
   };
 
-  $w.setFocus = function(ref, def) {
+  wObj.setFocus = function(ref, def) {
     var refnode;
-    refnode = $w.loginRows.refs[ref];
+    refnode = wObj.loginRows.refs[ref];
     if (typeof refnode === "undefined") {
-      refnode = $w.loginRows.refs[def];
+      refnode = wObj.loginRows.refs[def];
     }
     return refnode.getInputDOMNode().focus();
   };
 
-  $w.handleClick = function(e) {
+  wObj.handleClick = function(e) {
     var def, ids, jsx, logintemp, name, ref, selRow;
-    jsx = $w.app;
+    jsx = wObj.application;
     name = e.target.name;
     ids = e.target.id.split("#");
     if (ids[0] === "loginrow") {
@@ -44,35 +44,35 @@
       logintemp.form.passwordcfm = "";
       ref = "loginrow#" + ids[1] + "#" + selRow;
       def = "loginrow#loginId#" + selRow;
-      jsx.setState(logintemp, $w.setFocus.bind(this, ref, def));
+      jsx.setState(logintemp, wObj.setFocus.bind(this, ref, def));
     }
     if (name === "alert#CloseBtn") {
-      $w.flux.actions.base_alertHide();
+      wObj.flux.actions.base_alertHide();
     }
     if (name === "deleteCfm#CloseBtn") {
-      $w.flux.actions.base_deleteCfmHide();
+      wObj.flux.actions.base_deleteCfmHide();
     }
     if (name === "deleteCfm#YesBtn") {
-      $w.flux.actions.base_deleteCfmHide();
-      $w.formDeleteCfm(jsx);
+      wObj.flux.actions.base_deleteCfmHide();
+      wObj.formDeleteCfm(jsx);
     }
     if (name === "btnCancel") {
-      $w.formCancel(jsx);
+      wObj.formCancel(jsx);
     }
     if (name === "btnSearch") {
-      $w.formSearch(jsx);
+      wObj.formSearch(jsx);
     }
     if (name === "btnUpdate") {
-      $w.formUpdate(jsx);
+      wObj.formUpdate(jsx);
     }
     if (name === "btnDelete") {
-      return $w.formDelete(jsx);
+      return wObj.formDelete(jsx);
     }
   };
 
-  $w.handleRowKeyDown = function(e) {
+  wObj.handleRowKeyDown = function(e) {
     var curRow, def, done, jsx, logintemp, name, names, ref;
-    jsx = $w.app;
+    jsx = wObj.application;
     name = e.target.name;
     names = name.split("#");
     logintemp = {
@@ -108,16 +108,16 @@
     logintemp.login.selRow = curRow;
     ref = "loginrow#" + names[1] + "#" + curRow;
     def = "loginrow#loginId#" + curRow;
-    return jsx.setState(logintemp, $w.setFocus.bind(this, ref, def));
+    return jsx.setState(logintemp, wObj.setFocus.bind(this, ref, def));
   };
 
-  $w.formSearch = function(jsx) {
+  wObj.formSearch = function(jsx) {
     var criteria;
     criteria = base.createCriteria(jsx.state.search, ["loginId", "name"]);
-    return $w.flux.actions.base_rcd_fetch(jsx.state.login, jsx.state.form, "login", criteria);
+    return wObj.flux.actions.base_rcd_fetch(jsx.state.login, jsx.state.form, "login", criteria);
   };
 
-  $w.formUpdate = function(jsx) {
+  wObj.formUpdate = function(jsx) {
     var def, dirty, i, j, len, logintemp, oldrcds, oldrecord, params, rcd, rcds, ref, res, rules, tran;
     oldrcds = jsx.state.rcd.login.rcds;
     rcds = jsx.state.login.rcds;
@@ -131,14 +131,14 @@
       rcd = rcds[i];
       res = rsv.validate(rcd, rules);
       if (res.length > 0) {
-        $w.flux.actions.base_alertShow(res);
+        wObj.flux.actions.base_alertShow(res);
         logintemp = {
           login: jsx.state.login
         };
         logintemp.login.i;
         ref = "loginrow#loginId#" + i;
         def = ref;
-        jsx.setState(logintemp, $w.setFocus.bind(this, ref, def));
+        jsx.setState(logintemp, wObj.setFocus.bind(this, ref, def));
         return;
       }
       if (rcd.id === "") {
@@ -164,27 +164,27 @@
       }
     }
     if (params.transactions.length > 0) {
-      return $w.flux.actions.base_rcd_transaction(jsx.state.login, params, "login");
+      return wObj.flux.actions.base_rcd_transaction(jsx.state.login, params, "login");
     }
   };
 
-  $w.formDelete = function(jsx) {
+  wObj.formDelete = function(jsx) {
     if (jsx.state.form.id === "") {
-      $w.flux.actions.base_rcd_delete_id_blank();
+      wObj.flux.actions.base_rcd_delete_id_blank();
       return;
     }
-    return $w.flux.actions.base_deleteCfmShow();
+    return wObj.flux.actions.base_deleteCfmShow();
   };
 
-  $w.formCancel = function(jsx) {
-    return $w.rcdSet();
+  wObj.formCancel = function(jsx) {
+    return wObj.rcdSet();
   };
 
-  $w.formDeleteCfm = function(jsx) {
-    return $w.flux.actions.base_rcd_delete(jsx.state.login, jsx.state.login.rcds[jsx.state.login.selRow], "login");
+  wObj.formDeleteCfm = function(jsx) {
+    return wObj.flux.actions.base_rcd_delete(jsx.state.login, jsx.state.login.rcds[jsx.state.login.selRow], "login");
   };
 
-  $w.formUpdateCheck = function(form) {
+  wObj.formUpdateCheck = function(form) {
     if (form.password > "" || form.passwordcfm > "") {
       if (form.password !== form.passwordcfm) {
         return [["", "パスワードとパスワード（確認）が一致しません"]];
@@ -193,7 +193,7 @@
     return "";
   };
 
-  $w.formClear = function(jsx) {
+  wObj.formClear = function(jsx) {
     var formtemp;
     formtemp = {
       form: _.cloneDeep(jsx.state.login.blank)
@@ -201,7 +201,7 @@
     return jsx.setState(formtemp);
   };
 
-  $w.drop = function(jsx, from, to) {
+  wObj.drop = function(jsx, from, to) {
     var fromno, froms, i, j, len, newrcds, rcd, rcds, temp, tono, tos;
     froms = from.split("#");
     tos = to.split("#");
@@ -225,65 +225,65 @@
     return jsx.setState(temp);
   };
 
-  $w.constants = {
+  wObj.constants = {
     $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS"
   };
 
-  $w.actions = {
+  wObj.actions = {
     logoffClick: function() {
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", $w.constants.$W_LOGOFF_SUCCESS));
+      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", wObj.constants.$W_LOGOFF_SUCCESS));
     }
   };
 
-  $w.PageStore = Fluxxor.createStore({
+  wObj.PageStore = Fluxxor.createStore({
     initialize: function() {
       this.data = {};
     }
   });
 
-  $w.flux = new Fluxxor.Flux();
+  wObj.flux = new Fluxxor.Flux();
 
-  $w.pageStore = new $w.PageStore;
+  wObj.pageStore = new wObj.PageStore;
 
-  $w.flux.addStore("PAGE", $w.pageStore);
+  wObj.flux.addStore("PAGE", wObj.pageStore);
 
-  $w.flux.addActions($w.actions);
+  wObj.flux.addActions(wObj.actions);
 
-  $w.commonStore = new base.CommonStore;
+  wObj.commonStore = new base.CommonStore;
 
-  $w.flux.addStore("COMMON", $w.commonStore);
+  wObj.flux.addStore("COMMON", wObj.commonStore);
 
-  $w.flux.addActions(base.actions);
+  wObj.flux.addActions(base.actions);
 
-  $w.rcdStore = new base.RcdStore;
+  wObj.rcdStore = new base.RcdStore;
 
-  $w.flux.addStore("RCD", $w.rcdStore);
+  wObj.flux.addStore("RCD", wObj.rcdStore);
 
-  $w.flux.addActions(base.rcdActions);
+  wObj.flux.addActions(base.rcdActions);
 
-  rcdStore = $w.flux.store("RCD");
+  rcdStore = wObj.flux.store("RCD");
 
   rcdStore.addTable("login");
 
-  $w.FluxMixin = Fluxxor.FluxMixin(React);
+  wObj.FluxMixin = Fluxxor.FluxMixin(React);
 
-  $w.StoreWatchMixin = Fluxxor.StoreWatchMixin;
+  wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin;
 
-  $w.rcdSet = function() {
+  wObj.rcdSet = function() {
     var loginTemp, rcdLogin;
-    rcdLogin = _.cloneDeep($w.app.state.rcd.login);
+    rcdLogin = _.cloneDeep(wObj.application.state.rcd.login);
     loginTemp = {
-      login: $w.app.state.login
+      login: wObj.application.state.login
     };
     loginTemp.login.rcds = rcdLogin.rcds;
     loginTemp.form = rcdLogin.rcd;
     loginTemp.login.selRow = rcdLogin.selRow;
-    return $w.app.setState(loginTemp);
+    return wObj.application.setState(loginTemp);
   };
 
-  $w.rcdStore.on("rcdComplete_login", function() {
-    return $w.rcdSet();
+  wObj.rcdStore.on("rcdComplete_login", function() {
+    return wObj.rcdSet();
   });
 
 }).call(this);

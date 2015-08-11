@@ -1,7 +1,7 @@
-base.checkAndCreate("$w")
+base.checkAndCreate("wObj")
  
-$w.handleChange = (e) ->
-  jsx=$w.app
+wObj.handleChange = (e) ->
+  jsx=wObj.application
   names = e.target.name.split("#");
   if (names[0] == "loginrow")
     logintemp={login:jsx.state.login}
@@ -9,13 +9,13 @@ $w.handleChange = (e) ->
     jsx.setState(logintemp)
     return
   base.handleChange(jsx,e.target.name,e.target.value);
-$w.setFocus = (ref,def) ->
-  refnode=$w.loginRows.refs[ref]
+wObj.setFocus = (ref,def) ->
+  refnode=wObj.loginRows.refs[ref]
   if typeof(refnode)=="undefined"
-    refnode=$w.loginRows.refs[def]
+    refnode=wObj.loginRows.refs[def]
   refnode.getInputDOMNode().focus()
-$w.handleClick = (e) ->
-  jsx=$w.app
+wObj.handleClick = (e) ->
+  jsx=wObj.application
   name=e.target.name 
   ids = e.target.id.split("#");  
   if (ids[0] == "loginrow")
@@ -27,24 +27,24 @@ $w.handleClick = (e) ->
     logintemp.form.passwordcfm=""
     ref="loginrow#"+ids[1]+"#"+selRow
     def="loginrow#loginId#"+selRow
-    jsx.setState(logintemp,$w.setFocus.bind(this,ref,def))
+    jsx.setState(logintemp,wObj.setFocus.bind(this,ref,def))
   if name=="alert#CloseBtn"
-     $w.flux.actions.base_alertHide()
+     wObj.flux.actions.base_alertHide()
   if name=="deleteCfm#CloseBtn"
-     $w.flux.actions.base_deleteCfmHide()
+     wObj.flux.actions.base_deleteCfmHide()
   if name=="deleteCfm#YesBtn"
-     $w.flux.actions.base_deleteCfmHide()
-     $w.formDeleteCfm(jsx)
+     wObj.flux.actions.base_deleteCfmHide()
+     wObj.formDeleteCfm(jsx)
   if name == "btnCancel"
-    $w.formCancel(jsx)
+    wObj.formCancel(jsx)
   if name == "btnSearch"
-    $w.formSearch(jsx)
+    wObj.formSearch(jsx)
   if name == "btnUpdate"
-    $w.formUpdate(jsx)
+    wObj.formUpdate(jsx)
   if name == "btnDelete"
-    $w.formDelete(jsx)
-$w.handleRowKeyDown = (e) ->
-  jsx=$w.app
+    wObj.formDelete(jsx)
+wObj.handleRowKeyDown = (e) ->
+  jsx=wObj.application
   name=e.target.name
   names=name.split("#")
   logintemp={login:jsx.state.login}
@@ -71,11 +71,11 @@ $w.handleRowKeyDown = (e) ->
   logintemp.login.selRow = curRow
   ref="loginrow#"+names[1]+"#"+curRow
   def="loginrow#loginId#"+curRow
-  jsx.setState(logintemp,$w.setFocus.bind(this,ref,def))
-$w.formSearch = (jsx) ->
+  jsx.setState(logintemp,wObj.setFocus.bind(this,ref,def))
+wObj.formSearch = (jsx) ->
   criteria=base.createCriteria(jsx.state.search,["loginId","name"])
-  $w.flux.actions.base_rcd_fetch(jsx.state.login,jsx.state.form,"login",criteria)
-$w.formUpdate = (jsx) ->
+  wObj.flux.actions.base_rcd_fetch(jsx.state.login,jsx.state.form,"login",criteria)
+wObj.formUpdate = (jsx) ->
   oldrcds=jsx.state.rcd.login.rcds
   rcds=jsx.state.login.rcds
   rules = []
@@ -87,12 +87,12 @@ $w.formUpdate = (jsx) ->
   for rcd,i in rcds
     res = rsv.validate(rcd,rules)
     if res.length > 0
-      $w.flux.actions.base_alertShow(res) 
+      wObj.flux.actions.base_alertShow(res) 
       logintemp={login:jsx.state.login}
       logintemp.login.i
       ref="loginrow#loginId#"+i
       def=ref
-      jsx.setState(logintemp,$w.setFocus.bind(this,ref,def))
+      jsx.setState(logintemp,wObj.setFocus.bind(this,ref,def))
       return 
     if rcd.id == ""
       rcd.password="kam" 
@@ -114,28 +114,28 @@ $w.formUpdate = (jsx) ->
         } 
         params.transactions.push(tran)
   if params.transactions.length > 0
-    $w.flux.actions.base_rcd_transaction(jsx.state.login,params,"login")
-$w.formDelete = (jsx) ->
+    wObj.flux.actions.base_rcd_transaction(jsx.state.login,params,"login")
+wObj.formDelete = (jsx) ->
   if jsx.state.form.id == ""
-    $w.flux.actions.base_rcd_delete_id_blank()
+    wObj.flux.actions.base_rcd_delete_id_blank()
     return
-  $w.flux.actions.base_deleteCfmShow()
-$w.formCancel = (jsx) ->
-  $w.rcdSet()
-$w.formDeleteCfm = (jsx) ->
-  $w.flux.actions.base_rcd_delete(jsx.state.login,jsx.state.login.rcds[jsx.state.login.selRow],"login")
-$w.formUpdateCheck = (form) ->
+  wObj.flux.actions.base_deleteCfmShow()
+wObj.formCancel = (jsx) ->
+  wObj.rcdSet()
+wObj.formDeleteCfm = (jsx) ->
+  wObj.flux.actions.base_rcd_delete(jsx.state.login,jsx.state.login.rcds[jsx.state.login.selRow],"login")
+wObj.formUpdateCheck = (form) ->
   if form.password>"" || form.passwordcfm>""
     if form.password != form.passwordcfm
       return [["", "パスワードとパスワード（確認）が一致しません"]]
   return ""
  
-$w.formClear = (jsx) ->
+wObj.formClear = (jsx) ->
   formtemp={
       form:_.cloneDeep(jsx.state.login.blank)
   }
   jsx.setState(formtemp)
-$w.drop = (jsx,from,to) ->
+wObj.drop = (jsx,from,to) ->
   froms=from.split("#")
   tos=to.split("#")
   fromno=Number(froms[froms.length-1])
@@ -152,51 +152,51 @@ $w.drop = (jsx,from,to) ->
   temp=jsx.state.login
   temp.rcds=newrcds
   jsx.setState(temp)
-$w.constants =
+wObj.constants =
   $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS"
 
 
-$w.actions = {
+wObj.actions = {
   logoffClick: ->
     this.dispatch(base.constants.base_LOADING)
     base.ajaxPostJson("/ajax/logout","","application/json",
-      base.ajaxCallback.bind(this,"",$w.constants.$W_LOGOFF_SUCCESS))
+      base.ajaxCallback.bind(this,"",wObj.constants.$W_LOGOFF_SUCCESS))
 } 
 
-$w.PageStore = Fluxxor.createStore(
+wObj.PageStore = Fluxxor.createStore(
   initialize: ->
     @data = 
       {
       }
-    #@bindActions $w.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
+    #@bindActions wObj.constants.$W_LOGIN_SUCCESS, @onLoginSuccess,
 
     return
 ) 
 
-$w.flux = new Fluxxor.Flux()
-$w.pageStore=new $w.PageStore;
-$w.flux.addStore("PAGE",$w.pageStore)
-$w.flux.addActions($w.actions)
-$w.commonStore=new base.CommonStore;
-$w.flux.addStore("COMMON",$w.commonStore)
-$w.flux.addActions(base.actions)
-$w.rcdStore=new base.RcdStore;
-$w.flux.addStore("RCD",$w.rcdStore)
-$w.flux.addActions(base.rcdActions)
-rcdStore = $w.flux.store("RCD")
+wObj.flux = new Fluxxor.Flux()
+wObj.pageStore=new wObj.PageStore;
+wObj.flux.addStore("PAGE",wObj.pageStore)
+wObj.flux.addActions(wObj.actions)
+wObj.commonStore=new base.CommonStore;
+wObj.flux.addStore("COMMON",wObj.commonStore)
+wObj.flux.addActions(base.actions)
+wObj.rcdStore=new base.RcdStore;
+wObj.flux.addStore("RCD",wObj.rcdStore)
+wObj.flux.addActions(base.rcdActions)
+rcdStore = wObj.flux.store("RCD")
 rcdStore.addTable("login")
-$w.FluxMixin = Fluxxor.FluxMixin(React)
-$w.StoreWatchMixin = Fluxxor.StoreWatchMixin
-$w.rcdSet = ->
-  rcdLogin=_.cloneDeep($w.app.state.rcd.login)
+wObj.FluxMixin = Fluxxor.FluxMixin(React)
+wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin
+wObj.rcdSet = ->
+  rcdLogin=_.cloneDeep(wObj.application.state.rcd.login)
   loginTemp={
-    login:$w.app.state.login
+    login:wObj.application.state.login
   }
   loginTemp.login.rcds=rcdLogin.rcds
   loginTemp.form=rcdLogin.rcd
   loginTemp.login.selRow=rcdLogin.selRow
-  $w.app.setState(loginTemp)
-$w.rcdStore.on("rcdComplete_login", ->
-  $w.rcdSet()
+  wObj.application.setState(loginTemp)
+wObj.rcdStore.on("rcdComplete_login", ->
+  wObj.rcdSet()
 )
 

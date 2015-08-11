@@ -1,77 +1,64 @@
-wObj.LoginRows = React.createClass({
-
-		render: function() {
-				var rows = this.props.rcds.map(function(rcd, i){
-				var bgcolor="";
-				if (i==this.props.selRow)
-					bgcolor="#d9edf7";
+wObj.LoginRows = React.createClass
+	render: ->
+		rows = this.props.rcds.map((rcd, i) ->
+			bgcolor="";
+			if (i==this.props.selRow)
+				bgcolor="#d9edf7";
+			else
+				if (i%2 == 1)
+					bgcolor="#F8F8F8";
 				else
-					if (i%2 == 1)
-						bgcolor="#F8F8F8";
-					else
-						bgcolor="#FFFFFF";
-				return (
-					<tr key={i} >
-					<td id={"loginrow#loginId#"+i} style={{width:this.props.cw.c1,backgroundColor:bgcolor}}>{rcd.loginId}</td>
-					<td id={"loginrow#name#"+i} style={{width:this.props.cw.c2,backgroundColor:bgcolor}}>{rcd.name}</td>
-					<td id={"loginrow#role#"+i} style={{width:this.props.cw.c3,backgroundColor:bgcolor}}>{rcd.role}</td>
-					<td id={"loginrow#lid#"+i} style={{width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.id}</td>
-					<td id={"loginrow#versionNo#"+i} style={{width:this.props.cw.c5,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.versionNo}</td>
-				 </tr>
-				)
-				}, this);
-					return ( 
-						<tbody style={{overflowY:"auto",height:92}}>
-								{rows}
-						</tbody>
-					);
-		}
-	});
-wObj.Application = React.createClass({
-	mixins: [wObj.FluxMixin, wObj.StoreWatchMixin("COMMON","RCD")],
-	getInitialState: function() {
-	wObj.application = this;
-			blank={
-										loginId:"",
-										name:"",
-										role:"",
-										id:"",
-										versionNo:"",
-										password:"",
-										passwordcfm:""
-										
-								};
-			return {
-								user:base.login.name,
-								search:{
-									loginId:"starts with",
-									loginId_s:"",
-									loginId_e:"",
-									name:"starts with",
-									name_s:"",
-									name_e:""
-								},
-								login:{
-									url:"/ajax/login",
-									cw:{c1:100,c2:150,c3:60,c4:60,c5:60},
-									rcds:[],
-									blank:_.cloneDeep(blank),
-									selRow:-1
-								},
-								form:_.cloneDeep(blank)
-							};
-	},
-	getStateFromFlux: function() {
-		return {
-			common:_.cloneDeep(wObj.common.data),
-			rcd:_.cloneDeep(wObj.rcd.data)
-			};
-	},
-	render: function() {
-		return (
-			<div className="container-fixed" 
-					style={{fontSize:12,border:1,borderStyle:"solid",width:800,height:600,backgroundColor: "#F0F0F0"}}>
+					bgcolor="#FFFFFF";
+			<tr key={i} >
+				<td id={"loginrow#loginId#"+i} style={{width:this.props.cw.c1,backgroundColor:bgcolor}}>{rcd.loginId}</td>
+				<td id={"loginrow#name#"+i} style={{width:this.props.cw.c2,backgroundColor:bgcolor}}>{rcd.name}</td>
+				<td id={"loginrow#role#"+i} style={{width:this.props.cw.c3,backgroundColor:bgcolor}}>{rcd.role}</td>
+				<td id={"loginrow#lid#"+i} style={{width:this.props.cw.c4,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.id}</td>
+				<td id={"loginrow#versionNo#"+i} style={{width:this.props.cw.c5,backgroundColor:bgcolor,textAlign:"right"}}>{rcd.versionNo}</td>
+			</tr>
+		, this);
+		<tbody style={{overflowY:"auto",height:92}}>
+			{rows}
+		</tbody>
 
+wObj.Application = React.createClass
+	mixins: [wObj.FluxMixin, wObj.StoreWatchMixin("COMMON","RCD")]
+	getInitialState: ->
+		wObj.application = this;
+		blank={
+			loginId:""
+			name:""
+			role:""
+			id:""
+			versionNo:""
+			password:""
+			passwordcfm:""
+		};
+		user:base.login.name
+		search:{
+			loginId:"starts with"
+			loginId_s:""
+			loginId_e:""
+			name:"starts with"
+			name_s:""
+			name_e:""
+		},
+		login:{
+			url:"/ajax/login"
+			cw:{c1:100,c2:150,c3:60,c4:60,c5:60}
+			rcds:[]
+			blank:_.cloneDeep(blank)
+			selRow:-1
+		},
+		form:_.cloneDeep(blank)
+
+	getStateFromFlux: ->
+		common:_.cloneDeep(wObj.common.data)
+		rcd:_.cloneDeep(wObj.rcd.data)
+
+	render: ->
+		<div className="container-fixed" 
+			style={{fontSize:12,border:1,borderStyle:"solid",width:800,height:600,backgroundColor: "#F0F0F0"}}>
 			<ReactBootstrap.Row className="darkBgLarge" 
 					style={{margin:0,height:40,lineHeight:"40px",verticalAlign: "middle"}}>
 				<ReactBootstrap.Col xs={5} style={{textAlign: "center"}}>USER管理
@@ -81,7 +68,7 @@ wObj.Application = React.createClass({
 				</ReactBootstrap.Col>
 				<ReactBootstrap.Col xs={1} className="darkBgMid" >
 				</ReactBootstrap.Col>
-				 <ReactBootstrap.Col xs={1} >
+				<ReactBootstrap.Col xs={1} >
 				<base.Loader src="./img/ajax-loader.gif" isLoading={this.state.common.loading}/>
 				</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
@@ -90,11 +77,11 @@ wObj.Application = React.createClass({
 				name="btnSearch" style={{width:60,marginLeft:10}}>検索</ReactBootstrap.Button>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={1} style={{textAlign: "right"}}>Login ID
+				<ReactBootstrap.Col xs={1} style={{textAlign: "right"}}>Login ID
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2} >
 					<base.SelectOption options={base.stringOption} style={{height:24,  fontSize:12}}
-							 name={"search#loginId"}
+							name={"search#loginId"}
 							defaultValue={this.state.search.loginId} onChange= {wObj.handleChange} />
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={3}>
@@ -109,7 +96,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={1} style={{textAlign: "right"}}>氏名
+				<ReactBootstrap.Col xs={1} style={{textAlign: "right"}}>氏名
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2} >
 					<base.SelectOption options={base.stringOption} 
@@ -127,23 +114,21 @@ wObj.Application = React.createClass({
 						style={{height:24,fontSize:12,width:"100%"}}/>
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
-			<div style={{width:460,border:1,borderStyle:"solid",
-					borderColor:"black",height:120,backgroundColor: "#FFFFFF"}}>
-			<ReactBootstrap.Table bordered condensed className="wscrolltable" 
-					style={{width:"100%",height:"100%"}}
-			onClick={wObj.handleClick}>
-			 <thead>
-				<tr >
-					<th　style={{width:this.state.login.cw.c1}}>Login Id</th>
-					<th style={{width:this.state.login.cw.c2}}>氏名</th>
-					<th style={{width:this.state.login.cw.c3}}>Role</th>
-					<th　style={{width:this.state.login.cw.c4}}>id</th>
-					<th style={{width:this.state.login.cw.c5}}>versionNo</th>
-				</tr>
-			</thead>
-			<wObj.LoginRows rcds={this.state.login.rcds} cw={this.state.login.cw}
-					selRow={this.state.login.selRow}/>
-			</ReactBootstrap.Table>
+			<div style={{width:460,border:1,borderStyle:"solid", borderColor:"black",height:120,backgroundColor: "#FFFFFF"}}>
+				<ReactBootstrap.Table bordered condensed className="wscrolltable" style={{width:"100%",height:"100%"}}
+				onClick={wObj.handleClick}>
+				<thead>
+					<tr >
+						<th　style={{width:this.state.login.cw.c1}}>Login Id</th>
+						<th style={{width:this.state.login.cw.c2}}>氏名</th>
+						<th style={{width:this.state.login.cw.c3}}>Role</th>
+						<th　style={{width:this.state.login.cw.c4}}>id</th>
+						<th style={{width:this.state.login.cw.c5}}>versionNo</th>
+					</tr>
+				</thead>
+				<wObj.LoginRows rcds={this.state.login.rcds} cw={this.state.login.cw}
+						selRow={this.state.login.selRow}/>
+				</ReactBootstrap.Table>
 			</div>
 			<ReactBootstrap.Row style={{margin:5}}>
 				<ReactBootstrap.Button bsSize="xsmall" bsStyle="primary" onClick={wObj.handleClick}
@@ -155,7 +140,7 @@ wObj.Application = React.createClass({
 
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>Login ID
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>Login ID
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2}>
 					<ReactBootstrap.Input type="text" value={this.state.form.loginId} 
@@ -164,7 +149,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>氏名
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>氏名
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2}>
 					<ReactBootstrap.Input type="text" value={this.state.form.name} 
@@ -173,7 +158,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>Role
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>Role
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2}>
 					<ReactBootstrap.Input type="text" value={this.state.form.role} 
@@ -182,7 +167,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>パスワード
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>パスワード
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2}>
 					<ReactBootstrap.Input type="password" value={this.state.form.password} 
@@ -191,7 +176,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>パスワード(確認）
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>パスワード(確認）
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={2}>
 					<ReactBootstrap.Input type="password" value={this.state.form.passwordcfm} 
@@ -200,7 +185,7 @@ wObj.Application = React.createClass({
 					</ReactBootstrap.Col>
 			</ReactBootstrap.Row>
 			<ReactBootstrap.Row　style={{verticalAlign:"middle", lineHeight:"26px",marginLeft:0}}>
-				 <ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>id
+				<ReactBootstrap.Col xs={2} style={{textAlign: "right"}}>id
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={1}>
 					<ReactBootstrap.Input type="text" value={this.state.form.id} 
@@ -208,7 +193,7 @@ wObj.Application = React.createClass({
 						disabled
 						style={{height:24,fontSize:12,width:"100%"}}/>
 					</ReactBootstrap.Col>
-				 <ReactBootstrap.Col xs={1} xsOffset={1} style={{textAlign: "right"}}>ver. No
+				<ReactBootstrap.Col xs={1} xsOffset={1} style={{textAlign: "right"}}>ver. No
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={1}>
 					<ReactBootstrap.Input type="text" value={this.state.form.versionNo} 
@@ -221,12 +206,8 @@ wObj.Application = React.createClass({
 					message={this.state.common.alert.message} onClick={wObj.handleClick} />
 			<base.DeleteConfirm isShow={this.state.common.deleteCfm.isShow}
 					onClick={wObj.handleClick}/>
-			</div>
-		);
-	},
-	componentDidMount: function() {
-	}
+		</div>
 
-});
+	componentDidMount: ->
 
-React.render(<wObj.Application flux={wObj.flux}/>, document.getElementById('content'));
+React.render <wObj.Application flux={wObj.flux}/>, document.getElementById('content');

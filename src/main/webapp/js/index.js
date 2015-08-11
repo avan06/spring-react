@@ -2,41 +2,41 @@
 (function() {
   var rules;
 
-  base.checkAndCreate("$w");
+  base.checkAndCreate("wObj");
 
-  $w.windowArray = [];
+  wObj.windowArray = [];
 
-  $w.maxWindow = -1;
+  wObj.maxWindow = -1;
 
-  $w.windowOpen = function(jspath) {
+  wObj.windowOpen = function(jspath) {
     var w;
     w = window.open(base_contextpath + jspath, '_blank', "");
     window.focus();
-    $w.maxWindow = $w.maxWindow + 1;
-    return $w.windowArray[$w.maxWindow] = w;
+    wObj.maxWindow = wObj.maxWindow + 1;
+    return wObj.windowArray[wObj.maxWindow] = w;
   };
 
-  $w.windowClose = function() {
+  wObj.windowClose = function() {
     var i, j, ref;
-    for (i = j = 0, ref = $w.maxWindow; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
-      if (typeof $w.windowArray[i] !== "undefined") {
-        if (typeof $w.windowArray[i].window === "object" && $w.windowArray[i].window !== null) {
-          $w.windowArray[i].window.close();
+    for (i = j = 0, ref = wObj.maxWindow; 0 <= ref ? j <= ref : j >= ref; i = 0 <= ref ? ++j : --j) {
+      if (typeof wObj.windowArray[i] !== "undefined") {
+        if (typeof wObj.windowArray[i].window === "object" && wObj.windowArray[i].window !== null) {
+          wObj.windowArray[i].window.close();
         }
       }
     }
-    return $w.maxWindow = -1;
+    return wObj.maxWindow = -1;
   };
 
-  $w.handleChange = function(e) {
+  wObj.handleChange = function(e) {
     var jsx;
-    jsx = $w.app;
+    jsx = wObj.application;
     return base.handleChange(jsx, e.target.name, e.target.value);
   };
 
-  $w.handleClick = function(e) {
+  wObj.handleClick = function(e) {
     var jsx, name;
-    jsx = $w.app;
+    jsx = wObj.application;
     name = e.target.name;
     if (name === "loginForm#CancelBtn") {
       jsx.setState({
@@ -49,11 +49,11 @@
       return;
     }
     if (name === "loginForm#LoginBtn") {
-      $w.flux.actions.loginClick(jsx.state.loginForm);
+      wObj.flux.actions.loginClick(jsx.state.loginForm);
       return;
     }
     if (name === "alert#CloseBtn") {
-      $w.flux.actions.base_alertHide();
+      wObj.flux.actions.base_alertHide();
       return;
     }
     if (name === "btnLogin") {
@@ -63,41 +63,41 @@
         });
         return;
       }
-      $w.windowClose();
-      $w.flux.actions.logoffClick();
+      wObj.windowClose();
+      wObj.flux.actions.logoffClick();
       return;
     }
     if (jsx.state.page.name === "") {
-      $w.flux.actions.base_alertShow("Login していません");
+      wObj.flux.actions.base_alertShow("Login していません");
       return;
     }
     if (name === "btnUser") {
-      $w.windowOpen("/user");
+      wObj.windowOpen("/user");
     }
     if (name === "btnUserin") {
-      $w.windowOpen("/userin");
+      wObj.windowOpen("/userin");
     }
     if (name === "btnUsertab") {
-      $w.windowOpen("/usertab");
+      wObj.windowOpen("/usertab");
     }
     if (name === "btnUsertbl") {
-      $w.windowOpen("/usertbl");
+      wObj.windowOpen("/usertbl");
     }
     if (name === "btnSystbl") {
-      return $w.windowOpen("/systbl");
+      return wObj.windowOpen("/systbl");
     }
   };
 
-  $w.handleLoginKeyPress = function(e) {
+  wObj.handleLoginKeyPress = function(e) {
     var jsx, key;
-    jsx = $w.app;
+    jsx = wObj.application;
     key = e.key;
     if (e.key === "Enter") {
-      return $w.flux.actions.loginClick(jsx.state.loginForm);
+      return wObj.flux.actions.loginClick(jsx.state.loginForm);
     }
   };
 
-  $w.constants = {
+  wObj.constants = {
     $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS",
     $W_LOGOFF_SUCCESS: "$W_LOGOFF_SUCCESS"
   };
@@ -108,7 +108,7 @@
 
   rules.push("required,password,psswordは必須項目です");
 
-  $w.actions = {
+  wObj.actions = {
     loginClick: function(loginForm) {
       var res;
       res = rsv.validate(loginForm, rules);
@@ -117,22 +117,22 @@
         return;
       }
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/loginauth", loginForm, "application/json", base.ajaxCallback.bind(this, loginForm, $w.constants.$W_LOGIN_SUCCESS));
+      return base.ajaxPostJson("/ajax/loginauth", loginForm, "application/json", base.ajaxCallback.bind(this, loginForm, wObj.constants.$W_LOGIN_SUCCESS));
     },
     logoffClick: function() {
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", $w.constants.$W_LOGOFF_SUCCESS));
+      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", wObj.constants.$W_LOGOFF_SUCCESS));
     }
   };
 
-  $w.PageStore = Fluxxor.createStore({
+  wObj.PageStore = Fluxxor.createStore({
     initialize: function() {
       this.data = {
         logbtn: "LOGIN",
         uid: "",
         name: ""
       };
-      this.bindActions($w.constants.$W_LOGIN_SUCCESS, this.onLoginSuccess, $w.constants.$W_LOGOFF_SUCCESS, this.onLogoffSuccess);
+      this.bindActions(wObj.constants.$W_LOGIN_SUCCESS, this.onLoginSuccess, wObj.constants.$W_LOGOFF_SUCCESS, this.onLogoffSuccess);
     },
     onLoginSuccess: function(res) {
       this.data.logbtn = "LOGOFF";
@@ -149,26 +149,26 @@
     }
   });
 
-  $w.flux = new Fluxxor.Flux();
+  wObj.flux = new Fluxxor.Flux();
 
-  $w.pageStore = new $w.PageStore;
+  wObj.pageStore = new wObj.PageStore;
 
-  $w.flux.addStore("PAGE", $w.pageStore);
+  wObj.flux.addStore("PAGE", wObj.pageStore);
 
-  $w.flux.addActions($w.actions);
+  wObj.flux.addActions(wObj.actions);
 
-  $w.commonStore = new base.CommonStore;
+  wObj.commonStore = new base.CommonStore;
 
-  $w.flux.addStore("COMMON", $w.commonStore);
+  wObj.flux.addStore("COMMON", wObj.commonStore);
 
-  $w.flux.addActions(base.actions);
+  wObj.flux.addActions(base.actions);
 
-  $w.FluxMixin = Fluxxor.FluxMixin(React);
+  wObj.FluxMixin = Fluxxor.FluxMixin(React);
 
-  $w.StoreWatchMixin = Fluxxor.StoreWatchMixin;
+  wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin;
 
-  $w.pageStore.on("loginComplete", function() {
-    return $w.app.setState({
+  wObj.pageStore.on("loginComplete", function() {
+    return wObj.application.setState({
       loginForm_isShow: false,
       loginForm: {
         loginId: "",

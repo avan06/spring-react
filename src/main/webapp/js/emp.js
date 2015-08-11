@@ -2,24 +2,24 @@
 (function() {
   var BuzzwordClient;
 
-  base.checkAndCreate("$w");
+  base.checkAndCreate("wObj");
 
-  $w.handleChannge = function(jsx, e) {
+  wObj.handleChannge = function(jsx, e) {
     var change;
     change = {};
     change[e.target.name] = e.target.value;
     return jsx.setState(change);
   };
 
-  $w.handleClick = function(jsx, e) {
+  wObj.handleClick = function(jsx, e) {
     var name;
     name = e.target.name;
     if (name === "btnSearch") {
-      return $w.flux.actions.loadBuzz();
+      return wObj.flux.actions.loadBuzz();
     }
   };
 
-  $w.constants = {
+  wObj.constants = {
     LOAD_BUZZ: "LOAD_BUZZ",
     LOAD_BUZZ_SUCCESS: "LOAD_BUZZ_SUCCESS",
     LOAD_BUZZ_FAIL: "LOAD_BUZZ_FAIL",
@@ -28,15 +28,15 @@
     ADD_BUZZ_FAIL: "ADD_BUZZ_FAIL"
   };
 
-  $w.actions = {
+  wObj.actions = {
     loadBuzz: function() {
-      this.dispatch($w.constants.LOAD_BUZZ);
+      this.dispatch(wObj.constants.LOAD_BUZZ);
       BuzzwordClient.load((function(words) {
-        this.dispatch($w.constants.LOAD_BUZZ_SUCCESS, {
+        this.dispatch(wObj.constants.LOAD_BUZZ_SUCCESS, {
           words: words
         });
       }).bind(this), (function(error) {
-        this.dispatch($w.constants.LOAD_BUZZ_FAIL, {
+        this.dispatch(wObj.constants.LOAD_BUZZ_FAIL, {
           error: error
         });
       }).bind(this));
@@ -60,12 +60,12 @@
     }
   };
 
-  $w.RecordStore = Fluxxor.createStore({
+  wObj.RecordStore = Fluxxor.createStore({
     initialize: function() {
       this.loading = false;
       this.error = null;
       this.words = {};
-      this.bindActions($w.constants.LOAD_BUZZ, this.onLoadBuzz, $w.constants.LOAD_BUZZ_SUCCESS, this.onLoadBuzzSuccess, $w.constants.LOAD_BUZZ_FAIL, this.onLoadBuzzFail);
+      this.bindActions(wObj.constants.LOAD_BUZZ, this.onLoadBuzz, wObj.constants.LOAD_BUZZ_SUCCESS, this.onLoadBuzzSuccess, wObj.constants.LOAD_BUZZ_FAIL, this.onLoadBuzzFail);
     },
     onLoadBuzz: function() {
       this.loading = true;
@@ -83,24 +83,24 @@
     }
   });
 
-  $w.stores = {
-    RecordStore: new $w.RecordStore()
+  wObj.stores = {
+    RecordStore: new wObj.RecordStore()
   };
 
-  $w.flux = new Fluxxor.Flux();
+  wObj.flux = new Fluxxor.Flux();
 
-  $w.flux.addStores($w.stores);
+  wObj.flux.addStores(wObj.stores);
 
-  $w.flux.addActions($w.actions);
+  wObj.flux.addActions(wObj.actions);
 
-  $w.flux.on("dispatch", function(type, payload) {
+  wObj.flux.on("dispatch", function(type, payload) {
     if (console && console.log) {
       console.log("[Dispatch]", type, payload);
     }
   });
 
-  $w.FluxMixin = Fluxxor.FluxMixin(React);
+  wObj.FluxMixin = Fluxxor.FluxMixin(React);
 
-  $w.StoreWatchMixin = Fluxxor.StoreWatchMixin;
+  wObj.StoreWatchMixin = Fluxxor.StoreWatchMixin;
 
 }).call(this);
