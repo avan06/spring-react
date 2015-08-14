@@ -13,39 +13,24 @@ base.MulitLine = React.createClass
 		</div>
 
 base.Alert = React.createClass
-	mixins: [ReactBootstrap.OverlayMixin]
-
 	render: ->
-			<span/>
-
-	renderOverlay: ->
-		if (!@props.isShow)
-			return <span/>;
-
-		<ReactBootstrap.Modal onRequestHide={ -> } className="alert">
-			<div className="modal-body"><base.MulitLine value={@props.message} />
-
-			</div>
-			<div className="modal-footer">
-			<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="alert#CloseBtn">了解</ReactBootstrap.Button>
-			</div>
+		<ReactBootstrap.Modal bsSize="small" aria-labelledby='alertModal' show={@props.isShow} onHide={ -> } dialogClassName="alert">
+			<ReactBootstrap.Modal.Body id='alertModal'><base.MulitLine value={@props.message} />
+			</ReactBootstrap.Modal.Body>
+			<ReactBootstrap.Modal.Footer>
+				<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="alert#CloseBtn">了解</ReactBootstrap.Button>
+			</ReactBootstrap.Modal.Footer>
 		</ReactBootstrap.Modal>
 
 base.DeleteConfirm = React.createClass
-	mixins: [ReactBootstrap.OverlayMixin]
-	render: -> <span/>
-
-	renderOverlay: ->
-		if (!@props.isShow)
-			return <span/>;
-
-		<ReactBootstrap.Modal onRequestHide={ -> } className="deleteCfm">
-			<div className="modal-body">削除してよいですね
-			 </div>
-			<div className="modal-footer">
-			<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="deleteCfm#YesBtn">YES</ReactBootstrap.Button>
-			<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="deleteCfm#CloseBtn">NO</ReactBootstrap.Button>
-			</div>
+	render: ->
+		<ReactBootstrap.Modal bsSize="small" aria-labelledby='deleteCfmModal' show={@props.isShow} onHide={ -> } dialogClassName="deleteCfm">
+			<ReactBootstrap.Modal.Body id='deleteCfmModal'>削除してよいですね
+			</ReactBootstrap.Modal.Body>
+			<ReactBootstrap.Modal.Footer>
+				<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="deleteCfm#YesBtn">YES</ReactBootstrap.Button>
+				<ReactBootstrap.Button bsStyle="primary" onClick={@props.onClick} name="deleteCfm#CloseBtn">NO</ReactBootstrap.Button>
+			</ReactBootstrap.Modal.Footer>
 		</ReactBootstrap.Modal>
 
 base.Loader = React.createClass

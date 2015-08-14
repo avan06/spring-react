@@ -116,8 +116,8 @@ public class LoginService {
 
 		if (loginList.size() == 1) {
 			return loginList.get(0);
-		} else {
-			try { //FIXME
+		} else if (params.get("loginId") != null && String.valueOf(params.get("loginId")).length() > 0 && params.get("password") != null && String.valueOf(params.get("password")).length() > 0) {
+			try { //FIXME test
 				SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
 				Date d = formatter.parse(String.valueOf(params.get("startTimeStamp")));
 
@@ -144,7 +144,7 @@ public class LoginService {
 			}
 			return getLoginFromLoginId(params);
 		}
-//		return null;
+		return null;
 	}
 
 	public HashMap<String, HashMap<String, Object>> logout(HashMap<String, Object> params, HttpServletRequest request,

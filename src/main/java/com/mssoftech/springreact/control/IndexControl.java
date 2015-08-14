@@ -37,7 +37,7 @@ public class IndexControl {
 				return "redirect:" + redirect;
 			}
 			HashMap<String, Object> jsCss = jspUtil.getJsCss(request.getContextPath(),
-					new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/index.js", "/js/indexJsx.js" },
+					new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/indexFlux.js", "/js/indexJsx.js" },
 					libfiles,
 					new String[] { "/css/bootstrap.css", "/css/main.css" }, "メニュー", new String[] {});
 			request.setAttribute("__jscss", jsCss);
@@ -50,35 +50,35 @@ public class IndexControl {
 
 	@RequestMapping("/user")
 	String user(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/user.js", "/js/userJsx.js" };
+		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/userFlux.js", "/js/userJsx.js" };
 		String title = "USER管理";
 		return screenSecurityUtil.generateAuthorizedScreen(request, response, files, libfiles, title);
 	}
 
 	@RequestMapping("/userin")
 	String userin(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/userin.js", "/js/userinJsx.js" };
+		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/userinFlux.js", "/js/userinJsx.js" };
 		String title = "USER INLINE";
 		return screenSecurityUtil.generateAuthorizedScreen(request, response, files, libfiles, title);
 	}
 
 	@RequestMapping("/usertab")
 	String usertab(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/usertab.js", "/js/usertabJsx.js" };
+		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/usertabFlux.js", "/js/usertabJsx.js" };
 		String title = "USER TAB";
 		return screenSecurityUtil.generateAuthorizedScreen(request, response, files, libfiles, title);
 	}
 
 	@RequestMapping("/usertbl")
 	String usertbl(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/usertbl.js", "/js/usertblJsx.js" };
+		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/usertblFlux.js", "/js/usertblJsx.js" };
 		String title = "USER TAB";
 		return screenSecurityUtil.generateAuthorizedScreen(request, response, files, libfiles, title);
 	}
 
 	@RequestMapping("/systbl")
 	String systbl(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/systbl.js", "/js/systblJsx.js" };
+		String[] files = new String[] { "/js/rsv.js", "/js/base.js", "/js/baseJsx.js", "/js/systblFlux.js", "/js/systblJsx.js" };
 		String title = "USER TAB";
 		return screenSecurityUtil.generateAuthorizedScreen(request, response, files, libfiles, title);
 	}

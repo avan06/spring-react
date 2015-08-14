@@ -19,24 +19,18 @@ base.MulitLine = React.createClass({displayName: "MulitLine",
 });
 
 base.Alert = React.createClass({displayName: "Alert",
-  mixins: [ReactBootstrap.OverlayMixin],
   render: function() {
-    return React.createElement("span", null);
-  },
-  renderOverlay: function() {
-    if (!this.props.isShow) {
-      return React.createElement("span", null);
-    }
     return React.createElement(ReactBootstrap.Modal, {
-      "onRequestHide": (function() {}),
-      "className": "alert"
-    }, React.createElement("div", {
-      "className": "modal-body"
+      "bsSize": "small",
+      "aria-labelledby": 'alertModal',
+      "show": this.props.isShow,
+      "onHide": (function() {}),
+      "dialogClassName": "alert"
+    }, React.createElement(ReactBootstrap.Modal.Body, {
+      "id": 'alertModal'
     }, React.createElement(base.MulitLine, {
       "value": this.props.message
-    })), React.createElement("div", {
-      "className": "modal-footer"
-    }, React.createElement(ReactBootstrap.Button, {
+    })), React.createElement(ReactBootstrap.Modal.Footer, null, React.createElement(ReactBootstrap.Button, {
       "bsStyle": "primary",
       "onClick": this.props.onClick,
       "name": "alert#CloseBtn"
@@ -45,22 +39,16 @@ base.Alert = React.createClass({displayName: "Alert",
 });
 
 base.DeleteConfirm = React.createClass({displayName: "DeleteConfirm",
-  mixins: [ReactBootstrap.OverlayMixin],
   render: function() {
-    return React.createElement("span", null);
-  },
-  renderOverlay: function() {
-    if (!this.props.isShow) {
-      return React.createElement("span", null);
-    }
     return React.createElement(ReactBootstrap.Modal, {
-      "onRequestHide": (function() {}),
-      "className": "deleteCfm"
-    }, React.createElement("div", {
-      "className": "modal-body"
-    }, "\u524a\u9664\u3057\u3066\u3088\u3044\u3067\u3059\u306d"), React.createElement("div", {
-      "className": "modal-footer"
-    }, React.createElement(ReactBootstrap.Button, {
+      "bsSize": "small",
+      "aria-labelledby": 'deleteCfmModal',
+      "show": this.props.isShow,
+      "onHide": (function() {}),
+      "dialogClassName": "deleteCfm"
+    }, React.createElement(ReactBootstrap.Modal.Body, {
+      "id": 'deleteCfmModal'
+    }, "\u524a\u9664\u3057\u3066\u3088\u3044\u3067\u3059\u306d"), React.createElement(ReactBootstrap.Modal.Footer, null, React.createElement(ReactBootstrap.Button, {
       "bsStyle": "primary",
       "onClick": this.props.onClick,
       "name": "deleteCfm#YesBtn"

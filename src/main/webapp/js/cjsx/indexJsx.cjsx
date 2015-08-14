@@ -1,18 +1,17 @@
 wObj.LoginModal = React.createClass
-	mixins: [ReactBootstrap.OverlayMixin]
 	render: ->
-			<span/>
-
-	renderOverlay: ->
-		if (!@props.isShow)
-			return <span/>;
-
-		<ReactBootstrap.Modal title="Login Form"
-			onRequestHide={@props.onClick.bind(this,{target:{name:"loginForm#CancelBtn"}})}
-			className="form-login">
-			<div className="modal-body">
+		<ReactBootstrap.Modal
+			bsSize="small"
+			aria-labelledby='loginModal'
+			show={@props.isShow}
+			onHide={@props.onClick.bind(this,{target:{name:"loginForm#CancelBtn"}})}
+			dialogClassName="form-login">
+			<ReactBootstrap.Modal.Header closeButton>
+				<ReactBootstrap.Modal.Title id='loginModal'>Login Form</ReactBootstrap.Modal.Title>
+			</ReactBootstrap.Modal.Header>
+			<ReactBootstrap.Modal.Body>
 				<ReactBootstrap.Row style={{height:26}}>
-					<ReactBootstrap.Col xs={3} xsOffset={1}style={{textAlign: "right"}}>Login ID
+					<ReactBootstrap.Col xs={3} xsOffset={1} style={{textAlign: "right"}}>Login ID
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={3}>
 					<ReactBootstrap.Input type="text" value={@props.loginId} onKeyPress={@props.onKeyPress}
@@ -20,18 +19,18 @@ wObj.LoginModal = React.createClass
 					</ReactBootstrap.Col>
 				</ReactBootstrap.Row>
 				<ReactBootstrap.Row style={{height:26}}>
-					<ReactBootstrap.Col xs={3} xsOffset={1}style={{textAlign: "right"}}>Password
+					<ReactBootstrap.Col xs={3} xsOffset={1} style={{textAlign: "right"}}>Password
 					</ReactBootstrap.Col>
 					<ReactBootstrap.Col xs={3}>
 					<ReactBootstrap.Input type="password" value={@props.password} onKeyPress={@props.onKeyPress}
 						name="loginForm#password" onChange={@props.onChange} style={{height:24,fontSize:12,width:150}}/>
 					</ReactBootstrap.Col>
 				</ReactBootstrap.Row>
-			</div>
-			<div className="modal-footer">
+			</ReactBootstrap.Modal.Body>
+			<ReactBootstrap.Modal.Footer>
 				<ReactBootstrap.Button onClick={@props.onClick} name="loginForm#LoginBtn">Login</ReactBootstrap.Button>
 				<ReactBootstrap.Button onClick={@props.onClick} name="loginForm#CancelBtn">Cancel</ReactBootstrap.Button>
-			</div>
+			</ReactBootstrap.Modal.Footer>
 		</ReactBootstrap.Modal>
 
 wObj.Application = React.createClass
@@ -39,10 +38,8 @@ wObj.Application = React.createClass
 	getInitialState: ->
 		wObj.application = this;
 		loginForm:
-			{
-				loginId:"",
-				password:""
-			}
+			loginId:"",
+			password:""
 		loginForm_isShow:false;
 
 	getStateFromFlux: ->

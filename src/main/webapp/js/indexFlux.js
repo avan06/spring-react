@@ -98,8 +98,8 @@
   };
 
   wObj.constants = {
-    $W_LOGIN_SUCCESS: "$W_LOGIN_SUCCESS",
-    $W_LOGOFF_SUCCESS: "$W_LOGOFF_SUCCESS"
+    WObj_LOGIN_SUCCESS: "WObj_LOGIN_SUCCESS",
+    WObj_LOGOFF_SUCCESS: "WObj_LOGOFF_SUCCESS"
   };
 
   rules = [];
@@ -112,16 +112,16 @@
     loginClick: function(loginForm) {
       var res;
       res = rsv.validate(loginForm, rules);
-      if (res.length > 0) {
-        this.dispatch(base.constants.base_ALERT_SHOW, res);
+      if (res.toString().length > 0) {
+        this.dispatch(base.constants.base_ALERT_SHOW, res.toString());
         return;
       }
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/loginauth", loginForm, "application/json", base.ajaxCallback.bind(this, loginForm, wObj.constants.$W_LOGIN_SUCCESS));
+      return base.ajaxPostJson("/ajax/loginauth", loginForm, "application/json", base.ajaxCallback.bind(this, loginForm, wObj.constants.WObj_LOGIN_SUCCESS));
     },
     logoffClick: function() {
       this.dispatch(base.constants.base_LOADING);
-      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", wObj.constants.$W_LOGOFF_SUCCESS));
+      return base.ajaxPostJson("/ajax/logout", "", "application/json", base.ajaxCallback.bind(this, "", wObj.constants.WObj_LOGOFF_SUCCESS));
     }
   };
 
@@ -132,7 +132,7 @@
         uid: "",
         name: ""
       };
-      this.bindActions(wObj.constants.$W_LOGIN_SUCCESS, this.onLoginSuccess, wObj.constants.$W_LOGOFF_SUCCESS, this.onLogoffSuccess);
+      this.bindActions(wObj.constants.WObj_LOGIN_SUCCESS, this.onLoginSuccess, wObj.constants.WObj_LOGOFF_SUCCESS, this.onLogoffSuccess);
     },
     onLoginSuccess: function(res) {
       this.data.logbtn = "LOGOFF";
